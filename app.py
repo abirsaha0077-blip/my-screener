@@ -1,1559 +1,2004 @@
-import streamlit as st
-import streamlit.components.v1 as components
-import yfinance as yf
-import pandas as pd
+from urllib.parse import quote, unquote
 import numpy as np
+import pandas as pd
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-import urllib.parse
-from datetime import datetime
-import warnings
-
-warnings.filterwarnings("ignore")
+import streamlit as st
+import yfinance as yf
 
 # ==============================================================================
-# ১. পেজ কনফিগারেশন
+# ১. পেজ সেটআপ (ফুল-স্ক্রিন ফিনান্সিয়াল টার্মিনাল মোড)
 # ==============================================================================
 st.set_page_config(
     page_title="AlphaPulse Pro | Intraday, Swing & Sector Terminal",
     page_icon="🧭",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="collapsed",
 )
 
 # ==============================================================================
-# ২. ৩২টি মাইক্রো-সেক্টর ও নির্বাচিত লিকুইড শেয়ারের তালিকা
+# ২. ৩২টি মাইক্রো-সেক্টর, ম্যাক্রো ইনডেক্স এবং আসল NIFTY 50-এর তালিকা
 # ==============================================================================
-SECTOR_STOCKS = {
-    "Defence & Aerospace": ["HAL.NS", "BEL.NS", "BDL.NS", "PARAS.NS", "DATAPATTNS.NS", "ASTRAMICRO.NS"],
-    "Shipbuilding & Marine": ["MAZDOCK.NS", "COCHINSHIP.NS", "GRSE.NS", "SCI.NS", "GESHIP.NS"],
-    "Railways & Wagons": ["RVNL.NS", "IRFC.NS", "IRCON.NS", "TITAGARH.NS", "JWL.NS", "CONCOR.NS", "RITES.NS"],
-    "Cables & Wires": ["POLYCAB.NS", "KEI.NS", "RRKABEL.NS", "FINCABLES.NS", "UNIVERSAL.NS"],
-    "Transformers & Power T&D": ["CGPOWER.NS", "VOLTAMP.NS", "TARIL.NS", "HITACHI.NS", "GEVT&D.NS", "APARINDS.NS"],
-    "EMS & Electronics": ["DIXON.NS", "KAYNES.NS", "SYRMA.NS", "AMBER.NS", "PGEL.NS", "CYIENTDLM.NS"],
-    "Green Energy & Solar": ["IREDA.NS", "SUZLON.NS", "INOXWIND.NS", "KPIGREEN.NS", "WAAREEENER.NS", "BORORENEW.NS"],
-    "Power Utilities & Financiers": ["NTPC.NS", "POWERGRID.NS", "TATAPOWER.NS", "PFC.NS", "RECLTD.NS", "NHPC.NS", "JSWENERGY.NS"],
-    "Cooling & HVAC": ["VOLTAS.NS", "BLUESTARCO.NS", "SYMPHONY.NS", "WHIRLPOOL.NS", "HAVELLS.NS"],
-    "CNC, Bearings & Precision Engg": ["CUMMINSIND.NS", "TIMKEN.NS", "SKFINDIA.NS", "SCHAEFFLER.NS", "GRINDWELL.NS", "MTARTECH.NS"],
-    "Pre-Engineered & Infra EPC": ["LT.NS", "KPIL.NS", "KEC.NS", "NCC.NS", "PNCINFRA.NS", "HGINFRA.NS", "ENGINERSIN.NS"],
-    "Real Estate & Housing": ["DLF.NS", "GODREJPROP.NS", "MACROTECH.NS", "OBERIRLTY.NS", "PRESTIGE.NS", "BRIGADE.NS"],
-    "Building Materials (Pipes & Sanitary)": ["ASTRAL.NS", "SUPREMEIND.NS", "CERA.NS", "KAJARIACER.NS", "CENTURYPLY.NS", "PRINCEPIPE.NS"],
-    "CDMO & API Pharma": ["DIVISLAB.NS", "LAURUSLABS.NS", "SYNGENE.NS", "SUVENPHAR.NS", "GRANULES.NS", "NEULANDLAB.NS"],
-    "Largecap Pharma": ["SUNPHARMA.NS", "CIPLA.NS", "DRREDDY.NS", "LUPIN.NS", "AUROPHARMA.NS", "ZYDUSLIFE.NS"],
-    "Hospitals & Diagnostics": ["APOLLOHOSP.NS", "MAXHEALTH.NS", "FORTIS.NS", "NARAYANA.NS", "LALPATHLAB.NS", "METROPOLIS.NS"],
-    "QSR & Food Delivery": ["ZOMATO.NS", "JUBLFOOD.NS", "DEVYANI.NS", "WESTLIFE.NS", "SAPPHIRE.NS", "BIKAJI.NS"],
-    "FMCG Staples": ["ITC.NS", "HINDUNILVR.NS", "NESTLEIND.NS", "BRITANNIA.NS", "DABUR.NS", "MARICO.NS", "TATACONSUM.NS"],
-    "Retail, Apparel & Footwear": ["TRENT.NS", "DMART.NS", "PAGEIND.NS", "BATAINDIA.NS", "METROBRAND.NS", "MANYAVAR.NS"],
-    "Jewellery & Luxury": ["TITAN.NS", "KALYANKJIL.NS", "SENCO.NS", "THANGAMAYL.NS", "ETHOSLTD.NS"],
-    "Auto OEMs": ["M&M.NS", "TATAMOTORS.NS", "MARUTI.NS", "BAJAJ-AUTO.NS", "EICHERMOT.NS", "TVSMOTOR.NS", "HEROMOTOCO.NS"],
-    "Auto Ancillaries & Tyres": ["MOTHERSON.NS", "BOSCHLTD.NS", "SONACOMS.NS", "UNO-MINDA.NS", "APOLLOTYRE.NS", "BALKRISIND.NS"],
-    "IT Largecap": ["TCS.NS", "INFY.NS", "HCLTECH.NS", "WIPRO.NS", "TECHM.NS", "LTIM.NS"],
-    "IT Midcap & ER&D": ["PERSISTENT.NS", "COFORGE.NS", "KPITTECH.NS", "TATAELXSI.NS", "MPHASIS.NS", "OFSS.NS"],
-    "PSU Banks": ["SBIN.NS", "BANKBARODA.NS", "PNB.NS", "CANBK.NS", "UNIONBANK.NS", "INDIANB.NS"],
-    "Private Banks": ["HDFCBANK.NS", "ICICIBANK.NS", "AXISBANK.NS", "KOTAKBANK.NS", "INDUSINDBK.NS", "FEDERALBNK.NS"],
-    "NBFCs & Housing Finance": ["BAJFINANCE.NS", "CHOLAFIN.NS", "SHRIRAMFIN.NS", "MUTHOOTFIN.NS", "MANAPPURAM.NS", "LICHSGFIN.NS"],
-    "Capital Market & Wealth": ["BSE.NS", "MCX.NS", "CDSL.NS", "ANGELONE.NS", "MOTILALOFS.NS", "CAMS.NS", "ANANDRATHI.NS"],
-    "Specialty Chemicals & Agro": ["PIIND.NS", "SRF.NS", "DEEPAKNTR.NS", "NAVINFLUOR.NS", "CLEAN.NS", "AARTIIND.NS"],
-    "Packaging & BOPP Films": ["EPL.NS", "UFLEX.NS", "POLYPLEX.NS", "JINDALPOLY.NS", "MOLDTKPAC.NS", "TCPLPACK.NS"],
-    "Hotels, Tourism & Aviation": ["INDIGO.NS", "INDHOTEL.NS", "LEMON.NS", "CHALET.NS", "IRCTC.NS", "EIHOTEL.NS"],
-    "Metals & Mining": ["TATASTEEL.NS", "JSWSTEEL.NS", "HINDALCO.NS", "VEDL.NS", "NMDC.NS", "COALINDIA.NS", "NATIONALUM.NS"]
+sectors = {
+    "Defence & Aerospace": [
+        "HAL.NS", "BEL.NS", "BDL.NS", "MAZDOCK.NS", "DATAPATTNS.NS", "PARAS.NS"
+    ],
+    "Shipbuilding & Marine": [
+        "MAZDOCK.NS", "COCHINSHIP.NS", "GRSE.NS", "SCI.NS", "GEESHIP.NS"
+    ],
+    "Railways & Wagons": [
+        "RVNL.NS", "IRFC.NS", "TITAGARH.NS", "JWL.NS", "IRCON.NS", "TEXRAIL.NS", "BEML.NS"
+    ],
+    "Cables & Wires": [
+        "POLYCAB.NS", "KEI.NS", "FINCABLES.NS", "RRKABEL.NS", "UNIVERSAL.NS"
+    ],
+    "Transformers & Power T&D": [
+        "CGPOWER.NS", "ABB.NS", "SIEMENS.NS", "TARIL.NS", "VOLTAMP.NS"
+    ],
+    "EMS (Electronics Mfg)": [
+        "DIXON.NS", "KAYNES.NS", "SYRMA.NS", "CYIENTDLM.NS", "AMBER.NS", "PGEL.NS"
+    ],
+    "Green Energy & Solar": [
+        "IREDA.NS", "SUZLON.NS", "KPIGREEN.NS", "WAAREEENER.NS", "BORORENEW.NS", "INOXWIND.NS"
+    ],
+    "Power Utilities & Finance": [
+        "PFC.NS", "RECLTD.NS", "POWERGRID.NS", "NTPC.NS", "TATAPOWER.NS", "JSWENERGY.NS"
+    ],
+    "Cooling, HVAC & Data Center": [
+        "VOLTAS.NS", "BLUESTARCO.NS", "KIRLOSENG.NS", "TRITURBINE.NS", "ANUP.NS", "ELGIEQUIP.NS"
+    ],
+    "CNC, Bearings & Precision Engg": [
+        "SKFINDIA.NS", "TIMKEN.NS", "SCHAEFFLER.NS", "THERMAX.NS", "CUMMINSIND.NS", "MTARTECH.NS"
+    ],
+    "Pre-Engineered & Infra EPC": [
+        "LT.NS", "KPIL.NS", "KEC.NS", "PENNARIND.NS", "NCC.NS", "PNCINFRA.NS"
+    ],
+    "Real Estate & Developers": [
+        "DLF.NS", "MACROTECH.NS", "PRESTIGE.NS", "GODREJPROP.NS", "OBEROIRLTY.NS", "BRIGADE.NS"
+    ],
+    "Building Materials (Pipes & Sanitary)": [
+        "ASTRAL.NS", "SUPREMEIND.NS", "CERA.NS", "KAJARIACER.NS", "CENTURYPLY.NS", "FINPIPE.NS"
+    ],
+    "CDMO & API Pharma": [
+        "LAURUSLABS.NS", "DIVISLAB.NS", "NEULANDLAB.NS", "SYNGENE.NS", "SUVENPHAR.NS", "PIRAMALPH.NS"
+    ],
+    "Largecap & US Generics Pharma": [
+        "SUNPHARMA.NS", "DRREDDY.NS", "CIPLA.NS", "LUPIN.NS", "AUROPHARMA.NS", "ZYDUSLIFE.NS"
+    ],
+    "Hospitals & Diagnostics": [
+        "APOLLOHOSP.NS", "MAXHEALTH.NS", "LALPATHLAB.NS", "NH.NS", "METROPOLIS.NS", "FORTIS.NS"
+    ],
+    "QSR & Food Chains": [
+        "JUBLFOOD.NS", "DEVYANI.NS", "WESTLIFE.NS", "RBA.NS", "SAPPHIRE.NS"
+    ],
+    "FMCG Staples": [
+        "HINDUNILVR.NS", "ITC.NS", "NESTLEIND.NS", "BRITANNIA.NS", "TATACONSUM.NS", "DABUR.NS", "MARICO.NS"
+    ],
+    "Retail, Apparel & Footwear": [
+        "TRENT.NS", "DMART.NS", "METROBRAND.NS", "BATAINDIA.NS", "MANYAVAR.NS", "PAGEIND.NS"
+    ],
+    "Jewellery & Luxury": [
+        "TITAN.NS", "KALYANKJIL.NS", "SENCO.NS", "THANGAMAYL.NS"
+    ],
+    "Auto OEMs & EV": [
+        "M&M.NS", "TATAMOTORS.NS", "MARUTI.NS", "BAJAJ-AUTO.NS", "TVSMOTOR.NS", "OLECTRA.NS", "EICHERMOT.NS"
+    ],
+    "Auto Ancillaries & Tyres": [
+        "MOTHERSON.NS", "SONACOMS.NS", "UNOMINDA.NS", "MRF.NS", "BALKRISIND.NS", "APOLLOTYRE.NS"
+    ],
+    "IT Largecap": [
+        "TCS.NS", "INFY.NS", "HCLTECH.NS", "WIPRO.NS", "TECHM.NS", "LTIM.NS"
+    ],
+    "IT Midcap & Niche Tech": [
+        "PERSISTENT.NS", "COFORGE.NS", "KPITTECH.NS", "TATAELXSI.NS", "ZENSARTECH.NS", "AFFLE.NS"
+    ],
+    "PSU Banks": [
+        "SBIN.NS", "PNB.NS", "BANKBARODA.NS", "CANBK.NS", "UNIONBANK.NS", "INDIANB.NS"
+    ],
+    "Private Banks": [
+        "HDFCBANK.NS", "ICICIBANK.NS", "AXISBANK.NS", "KOTAKBANK.NS", "INDUSINDBK.NS", "FEDERALBNK.NS"
+    ],
+    "NBFCs & Housing Finance": [
+        "BAJFINANCE.NS", "CHOLAFIN.NS", "SHRIRAMFIN.NS", "MUTHOOTFIN.NS", "LICHSGFIN.NS", "MANAPPURAM.NS"
+    ],
+    "Capital Market & Wealth": [
+        "BSE.NS", "CDSL.NS", "MCX.NS", "ANGELONE.NS", "MOTILALOFS.NS", "CAMS.NS"
+    ],
+    "Specialty Chemicals & Agrochem": [
+        "SRF.NS", "PIIND.NS", "NAVINFLUOR.NS", "DEEPAKNTR.NS", "AARTIIND.NS", "CLEAN.NS"
+    ],
+    "Packaging & BOPP Films": [
+        "UFLEX.NS", "JINDALPOLY.NS", "COSMOFIRST.NS", "EPL.NS", "MOLDTKPAC.NS"
+    ],
+    "Hotels & Aviation": [
+        "INDIGO.NS", "INDHOTEL.NS", "EIHOTEL.NS", "LEMONTREE.NS", "CHALET.NS"
+    ],
+    "Metals & Mining": [
+        "TATASTEEL.NS", "JSWSTEEL.NS", "HINDALCO.NS", "COALINDIA.NS", "VEDL.NS", "NMDC.NS"
+    ],
 }
 
-ALL_TICKERS = sorted(list({ticker for stocks in SECTOR_STOCKS.values() for ticker in stocks}))
-TICKER_TO_SECTOR = {ticker: sec for sec, stocks in SECTOR_STOCKS.items() for ticker in stocks}
+NIFTY_50_TICKERS = [
+    "RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "ICICIBANK.NS", "BHARTIARTL.NS",
+    "INFY.NS", "SBIN.NS", "ITC.NS", "HINDUNILVR.NS", "LT.NS",
+    "BAJFINANCE.NS", "HCLTECH.NS", "SUNPHARMA.NS", "MARUTI.NS", "M&M.NS",
+    "KOTAKBANK.NS", "AXISBANK.NS", "NTPC.NS", "ULTRACEMCO.NS", "TITAN.NS",
+    "TATAMOTORS.NS", "POWERGRID.NS", "ADANIENT.NS", "ADANIPORTS.NS", "HAL.NS",
+    "BEL.NS", "TRENT.NS", "COALINDIA.NS", "BAJAJ-AUTO.NS", "ASIANPAINT.NS",
+    "WIPRO.NS", "JSWSTEEL.NS", "TATASTEEL.NS", "NESTLEIND.NS", "GRASIM.NS",
+    "ONGC.NS", "SBILIFE.NS", "DRREDDY.NS", "CIPLA.NS", "HINDALCO.NS",
+    "TECHM.NS", "EICHERMOT.NS", "SHRIRAMFIN.NS", "BPCL.NS", "BRITANNIA.NS",
+    "APOLLOHOSP.NS", "TATACONSUM.NS", "INDUSINDBK.NS", "DIVISLAB.NS", "LTIM.NS"
+]
 
-TIMEFRAME_MAP = {
-    "1D": ("1D (আজকের দিন)", 1),
-    "1W": ("1W (১ সপ্তাহ)", 5),
-    "1M": ("1M (১ মাস)", 21),
-    "3M": ("3M (৩ মাস)", 63),
-    "6M": ("6M (৬ মাস)", 126),
-    "1Y": ("1Y (১ বছর)", 250),
-}
-
-# ==============================================================================
-# ৩. সেশন স্টেট ও কুয়েরি প্যারামিটার হ্যান্ডলিং (URL-Encoded Safe)
-# ==============================================================================
-if "selected_sector" not in st.session_state:
-    st.session_state.selected_sector = "সবগুলো সেক্টর (Show All 32)"
-if "selected_stock" not in st.session_state:
-    st.session_state.selected_stock = "শেয়ার টাইপ করুন..."
-if "active_modal" not in st.session_state:
-    st.session_state.active_modal = None
-
-# URL কুয়েরি প্যারামিটার থেকে নিরাপদে স্টক বা সেক্টর সিলেকশন রিড করা
-qp = st.query_params
-if "focus_stock" in qp:
-    raw_st = urllib.parse.unquote(qp["focus_stock"])
-    full_st = raw_st if raw_st.endswith(".NS") else f"{raw_st}.NS"
-    if full_st in ALL_TICKERS:
-        st.session_state.selected_stock = full_st
-    st.query_params.clear()
-
-if "focus_sector" in qp:
-    raw_sec = urllib.parse.unquote(qp["focus_sector"])
-    if raw_sec in SECTOR_STOCKS:
-        st.session_state.selected_sector = raw_sec
-    st.query_params.clear()
+benchmark = "^NSEI"
+macro_tickers = ["^NSEI", "^NSEBANK", "^INDIAVIX", "USDINR=X"]
+all_tickers = sorted(
+    list(set(macro_tickers + NIFTY_50_TICKERS + [t for s in sectors.values() for t in s]))
+)
 
 # ==============================================================================
-# ৪. টপ হেডার এবং থিম কন্ট্রোল
+# ৩. টপ হেডার বার (থিম সিলেক্টর ও মিটার সুইচ)
 # ==============================================================================
-st.markdown('<div id="alphapulse-top"></div>', unsafe_allow_html=True)
-
-hdr_col1, hdr_col2, hdr_col3 = st.columns([6.2, 2.3, 1.5])
-with hdr_col1:
-    st.markdown(
-        """
-        <div style="display:flex; align-items:center; gap:12px; padding-top:2px;">
-            <span style="font-size:2.1rem;">🧭</span>
-            <div>
-                <h1 style="margin:0; padding:0; font-size:1.75rem; font-weight:800; letter-spacing:-0.3px;">
-                    AlphaPulse Pro — Intraday, Swing & Sector Terminal
-                </h1>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-with hdr_col2:
+top_h1, top_h2, top_h3 = st.columns([2.7, 1.1, 0.8])
+with top_h1:
+    st.markdown("## 🧭 AlphaPulse Pro — Intraday, Swing & Sector Terminal")
+with top_h2:
     theme_choice = st.selectbox(
-        "থিম নির্বাচন",
-        ["🌙 Pro Dark (ডার্ক থিম)", "🌌 Cyber Emerald (টার্মিনাল থিম)", "☀️ Clean Light (লাইট থিম)"],
+        "🎨 থিম (Theme):",
+        [
+            "🌙 Pro Dark (ডার্ক থিম)",
+            "☀️ Pure White (সাদা থিম)",
+            "💎 Frost Blue (ব্লু থিম)",
+        ],
         index=0,
-        label_visibility="collapsed"
+        label_visibility="collapsed",
     )
-
-with hdr_col3:
-    show_analog_meter = st.toggle("🎛️ অ্যানালগ মিটার", value=True)
+with top_h3:
+    show_card_meter = st.toggle("🎛️ অ্যানালগ মিটার", value=True)
 
 # ==============================================================================
-# ৫. ডাইনামিক প্রফেশনাল CSS থিম ও স্টাইলিং
+# ৪. থিম কালার ও প্রফেশনাল সিএসএস (ফ্লোটিং Back-to-Top বাটন সহ)
 # ==============================================================================
-if "Clean Light" in theme_choice:
-    BG_MAIN = "#f4f7fb"
-    BG_CARD = "#ffffff"
-    BG_SUB = "#eef2f9"
-    TEXT_MAIN = "#0f172a"
-    TEXT_MUTED = "#475569"
-    BORDER_COL = "#cbd5e1"
-    ACCENT_BLUE = "#2563eb"
-elif "Cyber Emerald" in theme_choice:
-    BG_MAIN = "#040d0a"
-    BG_CARD = "#091813"
-    BG_SUB = "#0d241c"
-    TEXT_MAIN = "#ecfdf5"
-    TEXT_MUTED = "#94a3b8"
-    BORDER_COL = "#10b98144"
-    ACCENT_BLUE = "#10b981"
+if "Pure White" in theme_choice:
+    bg_color = "#f4f6f9"
+    card_bg = "#ffffff"
+    input_bg = "#ffffff"
+    text_color = "#0f172a"
+    sub_text = "#475569"
+    border_col = "#cbd5e1"
+    chart_bg = "#ffffff"
+    grid_col = "rgba(15, 23, 42, 0.08)"
+    nifty_col_line = "#475569"
+    accent_col = "#2563eb"
+    shadow_css = "0 6px 18px rgba(15, 23, 42, 0.06)"
+elif "Frost Blue" in theme_choice:
+    bg_color = "#eef6ff"
+    card_bg = "#ffffff"
+    input_bg = "#ffffff"
+    text_color = "#082f49"
+    sub_text = "#334155"
+    border_col = "#93c5fd"
+    chart_bg = "#ffffff"
+    grid_col = "rgba(8, 47, 73, 0.08)"
+    nifty_col_line = "#0284c7"
+    accent_col = "#0284c7"
+    shadow_css = "0 6px 18px rgba(2, 132, 199, 0.08)"
 else:
-    BG_MAIN = "#070b14"
-    BG_CARD = "#0f1626"
-    BG_SUB = "#162035"
-    TEXT_MAIN = "#f8fafc"
-    TEXT_MUTED = "#94a3b8"
-    BORDER_COL = "#1e293b"
-    ACCENT_BLUE = "#38bdf8"
+    bg_color = "#090d16"
+    card_bg = "#111827"
+    input_bg = "#1e293b"
+    text_color = "#f8fafc"
+    sub_text = "#94a3b8"
+    border_col = "#334155"
+    chart_bg = "#111827"
+    grid_col = "rgba(255, 255, 255, 0.08)"
+    nifty_col_line = "#facc15"
+    accent_col = "#38bdf8"
+    shadow_css = "0 8px 24px rgba(0, 0, 0, 0.55)"
+
+css_template = """
+<style>
+header[data-testid="stHeader"] {
+    display: none !important;
+}
+section[data-testid="stSidebar"],
+[data-testid="collapsedControl"],
+[data-testid="stSidebarCollapsedControl"] {
+    display: none !important;
+}
+.stApp {
+    background-color: __BG_COLOR__ !important;
+    color: __TEXT_COLOR__ !important;
+}
+.block-container {
+    padding-top: 0.9rem !important;
+    padding-bottom: 2rem !important;
+    padding-left: 1.6rem !important;
+    padding-right: 1.6rem !important;
+    max-width: 100% !important;
+}
+h1, h2, h3, h4, h5, h6, label {
+    color: __TEXT_COLOR__ !important;
+}
+div[data-baseweb="select"] > div {
+    background-color: __INPUT_BG__ !important;
+    color: __TEXT_COLOR__ !important;
+    border: 1.5px solid __BORDER_COL__ !important;
+    border-radius: 10px !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    box-shadow: none !important;
+    transition: all 0.2s ease !important;
+}
+div[data-baseweb="select"] > div:hover,
+div[data-baseweb="select"] > div:focus-within {
+    border-color: __ACCENT_COL__ !important;
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.28) !important;
+}
+div[data-baseweb="select"] span {
+    color: __TEXT_COLOR__ !important;
+}
+div[data-baseweb="popover"] ul {
+    background-color: __CARD_BG__ !important;
+    border: 1px solid __BORDER_COL__ !important;
+}
+div[data-baseweb="popover"] li {
+    color: __TEXT_COLOR__ !important;
+    cursor: pointer !important;
+}
+div[data-baseweb="tab-highlight"] {
+    background-color: __ACCENT_COL__ !important;
+    height: 3px !important;
+}
+div[data-baseweb="tab-border"] {
+    background-color: __BORDER_COL__ !important;
+}
+button[data-baseweb="tab"] {
+    background-color: __CARD_BG__ !important;
+    color: __TEXT_COLOR__ !important;
+    border: 1px solid __BORDER_COL__ !important;
+    border-radius: 10px 10px 0 0 !important;
+    padding: 10px 16px !important;
+    margin-right: 6px !important;
+    font-weight: 700 !important;
+    font-size: 13.5px !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+}
+button[data-baseweb="tab"] p,
+button[data-baseweb="tab"] span {
+    color: __TEXT_COLOR__ !important;
+    font-weight: 700 !important;
+}
+button[data-baseweb="tab"][aria-selected="true"] {
+    background-color: rgba(56, 189, 248, 0.14) !important;
+    border-color: __ACCENT_COL__ !important;
+    border-bottom: 3px solid __ACCENT_COL__ !important;
+    color: __ACCENT_COL__ !important;
+}
+button[data-baseweb="tab"][aria-selected="true"] p,
+button[data-baseweb="tab"][aria-selected="true"] span {
+    color: __ACCENT_COL__ !important;
+}
+div.stButton > button {
+    width: 100%;
+    background-color: __INPUT_BG__ !important;
+    color: __ACCENT_COL__ !important;
+    border: 1px solid __BORDER_COL__ !important;
+    border-radius: 10px !important;
+    font-weight: 700 !important;
+    font-size: 13px !important;
+    padding: 7px 12px !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease;
+}
+div.stButton > button:hover {
+    border-color: __ACCENT_COL__ !important;
+    background-color: rgba(56, 189, 248, 0.16) !important;
+    transform: translateY(-1px);
+}
+div[data-testid="stExpander"] details {
+    background-color: __CARD_BG__ !important;
+    border: 1px solid __BORDER_COL__ !important;
+    border-radius: 12px !important;
+    padding: 4px 10px !important;
+}
+div[data-testid="stExpander"] summary {
+    cursor: pointer !important;
+}
+div[data-testid="stExpander"] summary span,
+div[data-testid="stExpander"] summary p {
+    color: __TEXT_COLOR__ !important;
+    font-weight: 700 !important;
+    font-size: 14px !important;
+}
+div[data-testid="stExpander"] summary:hover span,
+div[data-testid="stExpander"] summary:hover p {
+    color: __ACCENT_COL__ !important;
+}
+div[data-testid="stMetric"] {
+    background-color: __CARD_BG__ !important;
+    border: 1px solid __BORDER_COL__ !important;
+    border-radius: 12px !important;
+    padding: 10px 14px !important;
+    box-shadow: __SHADOW_CSS__ !important;
+}
+div[data-testid="stMetricLabel"] p {
+    color: __SUB_TEXT__ !important;
+    font-weight: 600 !important;
+}
+div[data-testid="stMetricValue"] div {
+    color: __TEXT_COLOR__ !important;
+    font-weight: 800 !important;
+}
+.pro-card {
+    background-color: __CARD_BG__;
+    border: 1px solid __BORDER_COL__;
+    border-radius: 14px;
+    padding: 16px 18px;
+    margin-bottom: 10px;
+    box-shadow: __SHADOW_CSS__;
+    transition: all 0.2s ease;
+}
+.pro-card:hover {
+    border-color: __ACCENT_COL__;
+}
+.focus-drawer {
+    background-color: __CARD_BG__;
+    border: 2px solid __ACCENT_COL__;
+    border-radius: 16px;
+    padding: 18px 22px;
+    margin: 10px 0 18px 0;
+    box-shadow: 0 10px 30px rgba(56, 189, 248, 0.18);
+}
+.intraday-bull-box {
+    background: linear-gradient(135deg, rgba(0, 230, 118, 0.08) 0%, __CARD_BG__ 100%);
+    border: 1px solid rgba(0, 230, 118, 0.4);
+    border-left: 5px solid #00e676;
+    border-radius: 14px;
+    padding: 12px 15px;
+    margin-bottom: 12px;
+    box-shadow: __SHADOW_CSS__;
+}
+.intraday-bear-box {
+    background: linear-gradient(135deg, rgba(255, 82, 82, 0.08) 0%, __CARD_BG__ 100%);
+    border: 1px solid rgba(255, 82, 82, 0.4);
+    border-left: 5px solid #ff5252;
+    border-radius: 14px;
+    padding: 12px 15px;
+    margin-bottom: 12px;
+    box-shadow: __SHADOW_CSS__;
+}
+.focus-pill-bull {
+    display: inline-block;
+    margin: 4px 6px 4px 0;
+    padding: 5px 11px;
+    border-radius: 8px;
+    font-size: 12.5px;
+    font-weight: 700;
+    background: rgba(0, 230, 118, 0.15);
+    border: 1px solid rgba(0, 230, 118, 0.45);
+    color: #00e676 !important;
+    text-decoration: none !important;
+}
+.focus-pill-bull:hover {
+    background: rgba(0, 230, 118, 0.28);
+}
+.focus-pill-bear {
+    display: inline-block;
+    margin: 4px 6px 4px 0;
+    padding: 5px 11px;
+    border-radius: 8px;
+    font-size: 12.5px;
+    font-weight: 700;
+    background: rgba(255, 82, 82, 0.15);
+    border: 1px solid rgba(255, 82, 82, 0.45);
+    color: #ff5252 !important;
+    text-decoration: none !important;
+}
+.focus-pill-bear:hover {
+    background: rgba(255, 82, 82, 0.28);
+}
+.macro-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    justify-content: space-between;
+    background-color: __CARD_BG__;
+    border: 1px solid __BORDER_COL__;
+    border-radius: 12px;
+    padding: 8px 16px;
+    margin-bottom: 12px;
+    box-shadow: __SHADOW_CSS__;
+}
+.macro-item {
+    font-size: 13px;
+    font-weight: 700;
+    color: __TEXT_COLOR__;
+}
+.kpi-card {
+    background-color: __CARD_BG__;
+    border: 1px solid __BORDER_COL__;
+    border-top: 4px solid __ACCENT_COL__;
+    border-radius: 14px;
+    padding: 14px 16px;
+    box-shadow: __SHADOW_CSS__;
+    margin-bottom: 6px;
+    min-height: 112px;
+}
+.kpi-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: __SUB_TEXT__ !important;
+    margin-bottom: 4px;
+}
+.kpi-main {
+    font-size: 18px;
+    font-weight: 800;
+    color: __TEXT_COLOR__ !important;
+    line-height: 1.3;
+    margin-bottom: 6px;
+}
+.kpi-sub-pos {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 700;
+    color: #00e676 !important;
+    background: rgba(0, 230, 118, 0.14);
+    padding: 2px 9px;
+    border-radius: 99px;
+}
+.kpi-sub-neg {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 700;
+    color: #ff5252 !important;
+    background: rgba(255, 82, 82, 0.14);
+    padding: 2px 9px;
+    border-radius: 99px;
+}
+.badge-green {
+    background: rgba(0, 230, 118, 0.16);
+    color: #00e676 !important;
+    border: 1px solid rgba(0, 230, 118, 0.45);
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-weight: 800;
+    font-size: 14px;
+}
+.badge-red {
+    background: rgba(255, 82, 82, 0.16);
+    color: #ff5252 !important;
+    border: 1px solid rgba(255, 82, 82, 0.45);
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-weight: 800;
+    font-size: 14px;
+}
+.stage-banner {
+    display: inline-block;
+    padding: 5px 12px;
+    border-radius: 8px;
+    font-size: 12.5px;
+    font-weight: 700;
+    margin: 6px 0;
+    background: rgba(56, 189, 248, 0.12);
+    color: __TEXT_COLOR__ !important;
+    border-left: 4px solid __ACCENT_COL__;
+}
+.action-btn {
+    display: inline-block;
+    padding: 4px 10px;
+    margin: 3px 4px 3px 0;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    text-decoration: none !important;
+    border: 1px solid __BORDER_COL__;
+    background: __INPUT_BG__;
+    color: __TEXT_COLOR__ !important;
+}
+.action-btn:hover {
+    border-color: __ACCENT_COL__;
+    background: rgba(56, 189, 248, 0.18);
+}
+.ticker-wrap {
+    width: 100%;
+    overflow: hidden;
+    background: __CARD_BG__;
+    border: 1px solid __BORDER_COL__;
+    border-radius: 12px;
+    padding: 10px 14px;
+    margin: 6px 0 12px 0;
+    white-space: nowrap;
+    box-shadow: __SHADOW_CSS__;
+}
+.ticker-move {
+    display: inline-block;
+    animation: ticker 185s linear infinite;
+}
+.ticker-wrap:hover .ticker-move {
+    animation-play-state: paused;
+}
+a.ticker-chip-up {
+    display: inline-block;
+    margin-right: 16px;
+    padding: 5px 14px;
+    border-radius: 999px;
+    font-size: 13.5px;
+    font-weight: 800;
+    background: rgba(0, 230, 118, 0.14);
+    border: 1px solid rgba(0, 230, 118, 0.45);
+    color: #00e676 !important;
+    text-decoration: none !important;
+    cursor: pointer !important;
+    transition: all 0.18s ease;
+}
+a.ticker-chip-up:hover {
+    background: rgba(0, 230, 118, 0.28);
+    transform: scale(1.05);
+}
+a.ticker-chip-down {
+    display: inline-block;
+    margin-right: 16px;
+    padding: 5px 14px;
+    border-radius: 999px;
+    font-size: 13.5px;
+    font-weight: 800;
+    background: rgba(255, 82, 82, 0.14);
+    border: 1px solid rgba(255, 82, 82, 0.45);
+    color: #ff5252 !important;
+    text-decoration: none !important;
+    cursor: pointer !important;
+    transition: all 0.18s ease;
+}
+a.ticker-chip-down:hover {
+    background: rgba(255, 82, 82, 0.28);
+    transform: scale(1.05);
+}
+/* ফ্লোটিং Back to Top বাটন */
+.back-to-top {
+    position: fixed;
+    bottom: 25px;
+    right: 25px;
+    background: linear-gradient(135deg, #38bdf8 0%, #2563eb 100%);
+    color: #ffffff !important;
+    padding: 10px 16px;
+    border-radius: 99px;
+    font-weight: 800;
+    font-size: 13.5px;
+    text-decoration: none !important;
+    box-shadow: 0 4px 20px rgba(56, 189, 248, 0.5);
+    z-index: 99999;
+    transition: transform 0.2s ease;
+}
+.back-to-top:hover {
+    transform: scale(1.08);
+}
+@keyframes ticker {
+    0% { transform: translateX(0%); }
+    100% { transform: translateX(-50%); }
+}
+</style>
+"""
+
+final_css = (
+    css_template.replace("__BG_COLOR__", bg_color)
+    .replace("__CARD_BG__", card_bg)
+    .replace("__INPUT_BG__", input_bg)
+    .replace("__TEXT_COLOR__", text_color)
+    .replace("__SUB_TEXT__", sub_text)
+    .replace("__BORDER_COL__", border_col)
+    .replace("__ACCENT_COL__", accent_col)
+    .replace("__SHADOW_CSS__", shadow_css)
+)
+st.markdown(final_css, unsafe_allow_html=True)
+
+# ફ্লোটিং ব্যাক-টু-টপ বাটন রেন্ডার করা
+st.markdown('<a class="back-to-top" href="#" target="_self">🚀 ওপরে যান (Top)</a>', unsafe_allow_html=True)
+
+# ==============================================================================
+# ৫. ডেটা ইঞ্জিন (Close, High, Low, Open, Volume)
+# ==============================================================================
+@st.cache_data(ttl=3600)
+def load_full_market_data():
+    raw = yf.download(all_tickers, period="5y", interval="1d", auto_adjust=True, progress=False)
+    if isinstance(raw.columns, pd.MultiIndex):
+        lvl0 = raw.columns.levels[0]
+        close_df = raw["Close"].ffill() if "Close" in lvl0 else pd.DataFrame()
+        high_df = raw["High"].ffill() if "High" in lvl0 else close_df.copy()
+        low_df = raw["Low"].ffill() if "Low" in lvl0 else close_df.copy()
+        open_df = raw["Open"].ffill() if "Open" in lvl0 else close_df.copy()
+        vol_df = raw["Volume"].fillna(0) if "Volume" in lvl0 else pd.DataFrame()
+    else:
+        close_df = raw.ffill()
+        high_df = close_df.copy()
+        low_df = close_df.copy()
+        open_df = close_df.copy()
+        vol_df = pd.DataFrame(index=close_df.index)
+    return close_df, high_df, low_df, open_df, vol_df
+
+with st.spinner("মার্কেট ডেটা, প্রাইস অ্যাকশন ও ইন্ট্রাডে টার্নঅ্যারাউন্ড রাডার প্রস্তুত হচ্ছে..."):
+    full_df, full_high_df, full_low_df, full_open_df, full_vol_df = load_full_market_data()
+
+tf_days_map = {
+    "1D": 2, "1W": 6, "1M": 22, "3M": 64, "6M": 126, "1Y": 252, "3Y": 756, "5Y": len(full_df)
+}
+
+def calc_return(series, days):
+    s = series.dropna()
+    if len(s) < 2:
+        return 0.0
+    sub = s.tail(min(days, len(s)))
+    if len(sub) < 2 or sub.iloc[0] == 0:
+        return 0.0
+    return round(((sub.iloc[-1] / sub.iloc[0]) - 1) * 100, 2)
+
+def calc_rsi(series, period=14):
+    s = series.dropna()
+    if len(s) < period + 2:
+        return 50.0
+    delta = s.diff()
+    gain = delta.clip(lower=0).rolling(window=period).mean()
+    loss = (-delta.clip(upper=0)).rolling(window=period).mean()
+    last_g = float(gain.iloc[-1]) if not pd.isna(gain.iloc[-1]) else 0.0
+    last_l = float(loss.iloc[-1]) if not pd.isna(loss.iloc[-1]) else 0.0
+    if last_l == 0:
+        return 100.0 if last_g > 0 else 50.0
+    rs = last_g / last_l
+    return round(100.0 - (100.0 / (1.0 + rs)), 1)
+
+def calc_rvol(t_sym):
+    if full_vol_df is None or t_sym not in full_vol_df.columns:
+        return 1.0, "📊 1.0x (Normal)"
+    v = full_vol_df[t_sym].replace(0, np.nan).dropna()
+    if len(v) < 21:
+        return 1.0, "📊 1.0x (Normal)"
+    curr_v = float(v.iloc[-1])
+    avg_v = float(v.iloc[-21:-1].mean())
+    if avg_v <= 0:
+        return 1.0, "📊 1.0x (Normal)"
+    ratio = round(curr_v / avg_v, 2)
+    if ratio >= 2.0:
+        return ratio, f"🔥 {ratio}x (Huge Vol)"
+    elif ratio >= 1.35:
+        return ratio, f"⚡ {ratio}x (High Vol)"
+    elif ratio <= 0.55:
+        return ratio, f"💤 {ratio}x (Low Vol)"
+    return ratio, f"📊 {ratio}x (Normal)"
+
+def style_colored_table(df_in, primary_col):
+    if df_in is None or df_in.empty:
+        return df_in
+
+    clean_df = df_in.loc[:, ~df_in.columns.duplicated()].copy().reset_index(drop=True)
+    pct_candidates = ["1D %", "1W %", "1M %", "3M %", "6M %", "1Y %", "5Y %", "From 52W High %", "Day Range Pos %"]
+    pct_cols = [c for c in pct_candidates if c in clean_df.columns]
+
+    price_candidates = ["CMP (₹)", "Buy Above (₹)", "Sell Below (₹)", "Stop Loss (₹)", "Target 1 (₹)", "Target 2 (₹)"]
+    price_cols = [c for c in price_candidates if c in clean_df.columns]
+
+    fmt = {}
+    for pc in price_cols:
+        fmt[pc] = "₹{:.2f}"
+    if "RSI (14)" in clean_df.columns:
+        fmt["RSI (14)"] = "{:.1f}"
+    if "Meter Score" in clean_df.columns:
+        fmt["Meter Score"] = "{:.0f}/100"
+    if "Now Meter (0-100)" in clean_df.columns:
+        fmt["Now Meter (0-100)"] = "{:.1f}"
+    if "Prev Meter" in clean_df.columns:
+        fmt["Prev Meter"] = "{:.1f}"
+    if "Shift (Δ)" in clean_df.columns:
+        fmt["Shift (Δ)"] = "{:+.1f}"
+    if "Avg RSI" in clean_df.columns:
+        fmt["Avg RSI"] = "{:.1f}"
+    for c in pct_cols:
+        if c == "Day Range Pos %":
+            fmt[c] = "{:.0f}%"
+        else:
+            fmt[c] = "{:+.2f}%"
+
+    def row_tint(row):
+        val = row.get(primary_col, 0.0)
+        if not isinstance(val, (int, float, np.number)) or pd.isna(val):
+            return [""] * len(row)
+        if val >= 0:
+            return ["background-color: rgba(0, 230, 118, 0.12);"] * len(row)
+        return ["background-color: rgba(255, 82, 82, 0.12);"] * len(row)
+
+    def cell_tint(val):
+        if not isinstance(val, (int, float, np.number)) or pd.isna(val):
+            return ""
+        if val > 0:
+            return "background-color: rgba(0, 230, 118, 0.24); color: #00e676; font-weight: 700;"
+        elif val < 0:
+            return "background-color: rgba(255, 82, 82, 0.24); color: #ff5252; font-weight: 700;"
+        return ""
+
+    tint_subset = [c for c in pct_cols if c != "Day Range Pos %"]
+    try:
+        styler = clean_df.style.apply(row_tint, axis=1)
+        if tint_subset:
+            if hasattr(styler, "map"):
+                styler = styler.map(cell_tint, subset=tint_subset)
+            else:
+                styler = styler.applymap(cell_tint, subset=tint_subset)
+        return styler.format(fmt)
+    except Exception:
+        return clean_df
+
+def make_analog_gauge(score, prev_score, title_txt, height_px=215):
+    if score >= 60:
+        bar_col = "#00e676"
+    elif score >= 48:
+        bar_col = "#84cc16"
+    elif score >= 38:
+        bar_col = "#f59e0b"
+    else:
+        bar_col = "#ff5252"
+
+    fig_g = go.Figure(
+        go.Indicator(
+            mode="gauge+number+delta",
+            value=score,
+            delta={
+                "reference": prev_score,
+                "increasing": {"color": "#00e676"},
+                "decreasing": {"color": "#ff5252"},
+                "valueformat": ".1f",
+            },
+            title={"text": title_txt, "font": {"size": 12, "color": text_color}},
+            number={"font": {"size": 23, "color": text_color}, "valueformat": ".0f"},
+            gauge={
+                "axis": {"range": [0, 100], "tickwidth": 1, "tickcolor": sub_text},
+                "bar": {"color": bar_col, "thickness": 0.32},
+                "bgcolor": chart_bg,
+                "borderwidth": 1,
+                "bordercolor": border_col,
+                "steps": [
+                    {"range": [0, 38], "color": "rgba(255, 82, 82, 0.22)"},
+                    {"range": [38, 48], "color": "rgba(245, 158, 11, 0.22)"},
+                    {"range": [48, 60], "color": "rgba(132, 204, 22, 0.22)"},
+                    {"range": [60, 100], "color": "rgba(0, 230, 118, 0.28)"},
+                ],
+                "threshold": {
+                    "line": {"color": text_color, "width": 4},
+                    "thickness": 0.82,
+                    "value": score,
+                },
+            },
+        )
+    )
+    fig_g.update_layout(
+        paper_bgcolor=chart_bg,
+        plot_bgcolor=chart_bg,
+        font={"color": text_color},
+        height=height_px,
+        margin=dict(t=32, b=8, l=18, r=18),
+    )
+    return fig_g
+
+# ==============================================================================
+# ৬. ম্যাক্রো মার্কেট পালস রিবন
+# ==============================================================================
+def get_macro_stat(sym):
+    if sym not in full_df.columns or len(full_df[sym].dropna()) < 3:
+        return 0.0, 0.0
+    s = full_df[sym].dropna()
+    return round(float(s.iloc[-1]), 2), calc_return(s, 2)
+
+n50_lvl, n50_1d = get_macro_stat("^NSEI")
+bnk_lvl, bnk_1d = get_macro_stat("^NSEBANK")
+vix_lvl, vix_1d = get_macro_stat("^INDIAVIX")
+usd_lvl, usd_1d = get_macro_stat("USDINR=X")
+
+vix_mood = "🟢 স্বস্তিদায়ক (Low Fear)" if vix_lvl < 15 else ("🟡 সতর্কতা (Moderate)" if vix_lvl < 20 else "🔴 উচ্চ ঝুঁকি (High Fear)")
+n50_col_str = "#00e676" if n50_1d >= 0 else "#ff5252"
+bnk_col_str = "#00e676" if bnk_1d >= 0 else "#ff5252"
+vix_col_str = "#ff5252" if vix_1d > 0 else "#00e676"
 
 st.markdown(
     f"""
-    <style>
-        html, body, [data-testid="stAppViewContainer"], .main {{
-            background-color: {BG_MAIN} !important;
-            color: {TEXT_MAIN} !important;
-            scroll-behavior: smooth !important;
-        }}
-        .block-container {{
-            padding-top: 1.2rem !important;
-            padding-bottom: 5rem !important;
-            max-width: 97% !important;
-        }}
-        /* সাইডবার অটো-হাইড ও ক্লিন ইউআই */
-        [data-testid="stSidebar"] {{
-            background-color: {BG_CARD} !important;
-        }}
-        /* মার্কেট পালস রিবন */
-        .pulse-ribbon {{
-            background: {BG_CARD};
-            border: 1px solid {BORDER_COL};
-            border-radius: 12px;
-            padding: 10px 18px;
-            margin: 8px 0 14px 0;
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: space-between;
-            align-items: center;
-            gap: 12px;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.22);
-        }}
-        .pulse-item {{
-            font-size: 0.9rem;
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }}
-        /* ইন্ট্রাডে বুলিশ ও বেয়ারিশ ফোকাস বক্স */
-        .focus-box-bull {{
-            background: linear-gradient(145deg, rgba(6, 78, 59, 0.25), rgba(15, 22, 38, 0.92));
-            border: 1.5px solid #10b981;
-            border-radius: 14px;
-            padding: 14px 16px;
-            box-shadow: 0 0 18px rgba(16, 185, 129, 0.14);
-            height: 100%;
-        }}
-        .focus-box-bear {{
-            background: linear-gradient(145deg, rgba(127, 29, 29, 0.25), rgba(15, 22, 38, 0.92));
-            border: 1.5px solid #ef4444;
-            border-radius: 14px;
-            padding: 14px 16px;
-            box-shadow: 0 0 18px rgba(239, 68, 68, 0.14);
-            height: 100%;
-        }}
-        .focus-title-bull {{
-            color: #34d399;
-            font-size: 0.95rem;
-            font-weight: 800;
-            margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 6px;
-        }}
-        .focus-title-bear {{
-            color: #f87171;
-            font-size: 0.95rem;
-            font-weight: 800;
-            margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 6px;
-        }}
-        .pill-wrap {{
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-        }}
-        a.stock-pill-bull {{
-            text-decoration: none !important;
-            background: rgba(16, 185, 129, 0.14);
-            border: 1px solid #10b981;
-            color: #ecfdf5 !important;
-            padding: 6px 12px;
-            border-radius: 999px;
-            font-size: 0.80rem;
-            font-weight: 700;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            transition: all 0.2s ease;
-        }}
-        a.stock-pill-bull:hover {{
-            background: #10b981;
-            color: #04130d !important;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
-        }}
-        a.stock-pill-bear {{
-            text-decoration: none !important;
-            background: rgba(239, 68, 68, 0.14);
-            border: 1px solid #ef4444;
-            color: #fef2f2 !important;
-            padding: 6px 12px;
-            border-radius: 999px;
-            font-size: 0.80rem;
-            font-weight: 700;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            transition: all 0.2s ease;
-        }}
-        a.stock-pill-bear:hover {{
-            background: #ef4444;
-            color: #ffffff !important;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35);
-        }}
-        .candle-tag {{
-            background: rgba(255,255,255,0.14);
-            padding: 1px 6px;
-            border-radius: 6px;
-            font-size: 0.72rem;
-            font-weight: 600;
-        }}
-        /* ক্লিকেবল সেক্টর মার্কি বার */
-        .sector-marquee-box {{
-            background: {BG_CARD};
-            border: 1px solid {BORDER_COL};
-            border-radius: 12px;
-            padding: 10px 12px;
-            overflow: hidden;
-            white-space: nowrap;
-            margin: 8px 0 16px 0;
-        }}
-        .sector-marquee-track {{
-            display: inline-block;
-            animation: marquee-scroll 48s linear infinite;
-        }}
-        .sector-marquee-box:hover .sector-marquee-track {{
-            animation-play-state: paused;
-        }}
-        @keyframes marquee-scroll {{
-            0% {{ transform: translateX(0%); }}
-            100% {{ transform: translateX(-50%); }}
-        }}
-        a.sector-chip {{
-            text-decoration: none !important;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 6px 14px;
-            margin-right: 10px;
-            border-radius: 999px;
-            font-size: 0.82rem;
-            font-weight: 700;
-            transition: all 0.2s ease;
-        }}
-        a.sector-chip-up {{
-            background: rgba(16, 185, 129, 0.13);
-            border: 1px solid #10b981;
-            color: #34d399 !important;
-        }}
-        a.sector-chip-down {{
-            background: rgba(239, 68, 68, 0.13);
-            border: 1px solid #ef4444;
-            color: #f87171 !important;
-        }}
-        a.sector-chip:hover {{
-            transform: scale(1.04);
-            filter: brightness(1.2);
-        }}
-        /* ৪টি সামারি কার্ড */
-        .kpi-card {{
-            background: {BG_CARD};
-            border: 1.5px solid {ACCENT_BLUE}55;
-            border-radius: 14px;
-            padding: 14px 16px;
-            min-height: 128px;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
-        }}
-        .kpi-label {{
-            color: {TEXT_MUTED};
-            font-size: 0.83rem;
-            font-weight: 700;
-        }}
-        .kpi-main {{
-            font-size: 1.38rem;
-            font-weight: 800;
-            margin: 6px 0;
-        }}
-        .kpi-badge-up {{
-            display: inline-block;
-            background: rgba(16, 185, 129, 0.16);
-            color: #34d399;
-            border: 1px solid #10b98155;
-            padding: 3px 9px;
-            border-radius: 8px;
-            font-size: 0.76rem;
-            font-weight: 700;
-            width: fit-content;
-        }}
-        .kpi-badge-down {{
-            display: inline-block;
-            background: rgba(239, 68, 68, 0.16);
-            color: #f87171;
-            border: 1px solid #ef444455;
-            padding: 3px 9px;
-            border-radius: 8px;
-            font-size: 0.76rem;
-            font-weight: 700;
-            width: fit-content;
-        }}
-        /* সেক্টর কার্ড */
-        .sec-card {{
-            background: {BG_CARD};
-            border: 1px solid {BORDER_COL};
-            border-radius: 14px;
-            padding: 14px;
-            margin-bottom: 12px;
-            transition: border 0.2s ease, transform 0.2s ease;
-        }}
-        .sec-card:hover {{
-            border-color: {ACCENT_BLUE};
-            transform: translateY(-2px);
-        }}
-    </style>
+    <div class="macro-strip">
+        <div class="macro-item">🇮🇳 <b>Nifty 50:</b> {n50_lvl:,.1f} <span style="color:{n50_col_str};">({n50_1d:+.2f}%)</span></div>
+        <div class="macro-item">🏦 <b>Bank Nifty:</b> {bnk_lvl:,.1f} <span style="color:{bnk_col_str};">({bnk_1d:+.2f}%)</span></div>
+        <div class="macro-item">⚡ <b>India VIX:</b> {vix_lvl:.2f} <span style="color:{vix_col_str};">({vix_1d:+.2f}%)</span> — {vix_mood}</div>
+        <div class="macro-item">💵 <b>USD/INR:</b> ₹{usd_lvl:.2f} <span style="color:{sub_text};">({usd_1d:+.2f}%)</span></div>
+    </div>
     """,
-    unsafe_allow_html=True
+    unsafe_allow_html=True,
 )
 
 # ==============================================================================
-# ৬. ডেটা ডাউনলোড ও ক্যান্ডেলস্টিক + টার্নঅ্যারাউন্ড অ্যানালাইসিস ইঞ্জিন
+# ৭. ৫টি মূল কন্ট্রোল মেনু
 # ==============================================================================
-@st.cache_data(ttl=300, show_spinner=False)
-def fetch_market_pulse():
-    idx_map = {
-        "NIFTY": "^NSEI",
-        "BANKNIFTY": "^NSEBANK",
-        "VIX": "^INDIAVIX",
-        "USDINR": "INR=X"
-    }
-    out = {}
+if "ctrl_sec_jump" not in st.session_state:
+    st.session_state["ctrl_sec_jump"] = "সবগুলো সেক্টর (Show All 32)"
+
+def reset_single_sector_lock():
+    st.session_state["ctrl_sec_jump"] = "সবগুলো সেক্টর (Show All 32)"
     try:
-        raw = yf.download(list(idx_map.values()), period="1y", interval="1d", progress=False, group_by="ticker", threads=True)
-        for name, sym in idx_map.items():
-            try:
-                df = raw[sym].dropna(how="all") if len(idx_map) > 1 else raw.dropna(how="all")
-                if len(df) >= 2:
-                    last_c = float(df["Close"].iloc[-1])
-                    prev_c = float(df["Close"].iloc[-2])
-                    chg_1d = ((last_c - prev_c) / prev_c) * 100.0
-                    chg_1w = ((last_c - float(df["Close"].iloc[-6])) / float(df["Close"].iloc[-6])) * 100.0 if len(df) >= 6 else chg_1d
-                    chg_1y = ((last_c - float(df["Close"].iloc[0])) / float(df["Close"].iloc[0])) * 100.0
-                    out[name] = {"price": last_c, "chg_1d": chg_1d, "chg_1w": chg_1w, "chg_1y": chg_1y}
-            except Exception:
-                pass
+        if "focus_sec" in st.query_params:
+            del st.query_params["focus_sec"]
     except Exception:
         pass
 
-    defaults = {
-        "NIFTY": {"price": 23146.2, "chg_1d": 0.65, "chg_1w": 2.78, "chg_1y": -1.2},
-        "BANKNIFTY": {"price": 55844.0, "chg_1d": 0.06, "chg_1w": 1.85, "chg_1y": 4.2},
-        "VIX": {"price": 14.02, "chg_1d": -0.04, "chg_1w": -3.1, "chg_1y": -5.0},
-        "USDINR": {"price": 84.95, "chg_1d": -0.21, "chg_1w": -0.1, "chg_1y": 1.5}
-    }
-    for k, v in defaults.items():
-        if k not in out:
-            out[k] = v
-    return out
+all_unique_stock_names = sorted(list(set([t.replace(".NS", "") for s in sectors.values() for t in s])))
 
-
-def compute_rsi(series: pd.Series, period: int = 14) -> float:
-    if len(series) < period + 1:
-        return 50.0
-    delta = series.diff()
-    gain = delta.clip(lower=0).rolling(window=period).mean()
-    loss = (-delta.clip(upper=0)).rolling(window=period).mean()
-    rs = gain / loss.replace(0, np.nan)
-    rsi = 100.0 - (100.0 / (1.0 + rs))
-    val = rsi.iloc[-1]
-    return float(val) if not np.isnan(val) else 50.0
-
-
-def detect_candle_and_streak(df: pd.DataFrame):
-    """
-    ক্যান্ডেলস্টিক প্যাটার্ন (Doji, Dragonfly Doji, Hammer, Shooting Star, Gravestone Doji, Tight Base)
-    এবং টানা কতদিন শেয়ারটি উপরে বা নিচে গেছে (Consecutive Up/Down Days) তা নির্ণয় করে।
-    """
-    closes = df["Close"].values
-    opens = df["Open"].values
-    highs = df["High"].values
-    lows = df["Low"].values
-
-    # টানা কত দিন উপরে বা নিচে গেছে তার হিসাব
-    consec_up = 0
-    consec_down = 0
-    for i in range(len(closes) - 1, 0, -1):
-        if closes[i] > closes[i - 1]:
-            if consec_down == 0:
-                consec_up += 1
-            else:
-                break
-        elif closes[i] < closes[i - 1]:
-            if consec_up == 0:
-                consec_down += 1
-            else:
-                break
-        else:
-            break
-
-    o, h, l, c = float(opens[-1]), float(highs[-1]), float(lows[-1]), float(closes[-1])
-    rng = max(h - l, 1e-6)
-    body = abs(c - o)
-    body_pct = body / rng
-    lower_wick = min(o, c) - l
-    upper_wick = h - max(o, c)
-    lower_pct = lower_wick / rng
-    upper_pct = upper_wick / rng
-
-    # গত ৩ দিনের কনসোলিডেশন রেঞ্জ (Tight Base) চেক
-    recent_rng_pct = 99.0
-    if len(closes) >= 4:
-        r_high = float(np.max(highs[-3:]))
-        r_low = float(np.min(lows[-3:]))
-        recent_rng_pct = ((r_high - r_low) / max(r_low, 1.0)) * 100.0
-
-    bull_pattern = None
-    bear_pattern = None
-
-    # বুলিশ ডজি / হ্যামার / কনসোলিডেশন ক্যান্ডেল ডিটেকশন
-    if body_pct <= 0.25 and lower_pct >= 0.45:
-        bull_pattern = "🐉 Dragonfly Doji"
-    elif body_pct <= 0.28:
-        bull_pattern = "🕯️ Bullish Doji"
-    elif lower_pct >= 0.50 and body_pct <= 0.42:
-        bull_pattern = "🔨 Hammer Reversal"
-    elif recent_rng_pct <= 4.2 and c >= o:
-        bull_pattern = "📦 Tight Base Doji"
-    elif lower_pct >= 0.35 and c >= o:
-        bull_pattern = "🔄 Bottom Rejection"
-
-    # বেয়ারিশ ডজি / শুটিং স্টার / ডিস্ট্রিবিউশন ক্যান্ডেল ডিটেকশন
-    if body_pct <= 0.25 and upper_pct >= 0.45:
-        bear_pattern = "🪦 Gravestone Doji"
-    elif body_pct <= 0.28:
-        bear_pattern = "🕯️ Exhaustion Doji"
-    elif upper_pct >= 0.50 and body_pct <= 0.42:
-        bear_pattern = "🌠 Shooting Star"
-    elif recent_rng_pct <= 4.2 and c <= o:
-        bear_pattern = "📉 Top Stall Base"
-    elif upper_pct >= 0.35 and c <= o:
-        bear_pattern = "⚠️ Upper Wick Supply"
-
-    # ATR (14) হিসাব - ইন্ট্রাডে এন্ট্রি, স্টপলস ও টার্গেটের জন্য
-    if len(df) >= 15:
-        tr1 = df["High"] - df["Low"]
-        tr2 = (df["High"] - df["Close"].shift(1)).abs()
-        tr3 = (df["Low"] - df["Close"].shift(1)).abs()
-        atr = float(pd.concat([tr1, tr2, tr3], axis=1).max(axis=1).rolling(14).mean().iloc[-1])
-    else:
-        atr = rng
-
-    return {
-        "consec_up": consec_up,
-        "consec_down": consec_down,
-        "body_pct": body_pct,
-        "lower_pct": lower_pct,
-        "upper_pct": upper_pct,
-        "bull_pattern": bull_pattern,
-        "bear_pattern": bear_pattern,
-        "atr": atr if not np.isnan(atr) and atr > 0 else max(c * 0.018, 1.0),
-        "day_high": h,
-        "day_low": l,
-        "day_open": o
-    }
-
-
-@st.cache_data(ttl=300, show_spinner=False)
-def load_all_market_data():
-    raw = yf.download(ALL_TICKERS, period="1y", interval="1d", progress=False, group_by="ticker", threads=True)
-    rows = []
-
-    for ticker in ALL_TICKERS:
-        try:
-            df = raw[ticker].dropna(how="all") if len(ALL_TICKERS) > 1 else raw.dropna(how="all")
-            if df is None or len(df) < 25:
-                continue
-
-            closes = df["Close"]
-            vols = df["Volume"]
-            last_c = float(closes.iloc[-1])
-            prev_c = float(closes.iloc[-2])
-
-            def pct_return(days):
-                idx = max(0, len(closes) - 1 - days)
-                base = float(closes.iloc[idx])
-                return ((last_c - base) / base) * 100.0 if base > 0 else 0.0
-
-            ret_1d = ((last_c - prev_c) / prev_c) * 100.0 if prev_c > 0 else 0.0
-            ret_1w = pct_return(5)
-            ret_1m = pct_return(21)
-            ret_3m = pct_return(63)
-            ret_6m = pct_return(126)
-            ret_1y = pct_return(250)
-
-            dma_20 = float(closes.rolling(20).mean().iloc[-1])
-            dma_50 = float(closes.rolling(50).mean().iloc[-1]) if len(closes) >= 50 else dma_20
-            dma_200 = float(closes.rolling(200).mean().iloc[-1]) if len(closes) >= 200 else dma_50
-
-            avg_vol_20 = float(vols.iloc[-21:-1].mean()) if len(vols) >= 22 else float(vols.mean())
-            curr_vol = float(vols.iloc[-1])
-            vol_ratio = round(curr_vol / avg_vol_20, 2) if avg_vol_20 > 0 else 1.0
-
-            rsi_14 = round(compute_rsi(closes, 14), 1)
-            c_info = detect_candle_and_streak(df)
-
-            dist_20dma = ((last_c - dma_20) / dma_20) * 100.0 if dma_20 > 0 else 0.0
-
-            rows.append({
-                "Ticker": ticker,
-                "Symbol": ticker.replace(".NS", ""),
-                "Sector": TICKER_TO_SECTOR.get(ticker, "Others"),
-                "Price": round(last_c, 2),
-                "1D": round(ret_1d, 2),
-                "1W": round(ret_1w, 2),
-                "1M": round(ret_1m, 2),
-                "3M": round(ret_3m, 2),
-                "6M": round(ret_6m, 2),
-                "1Y": round(ret_1y, 2),
-                "Vol_Ratio": vol_ratio,
-                "RSI": rsi_14,
-                "DMA20": round(dma_20, 2),
-                "DMA50": round(dma_50, 2),
-                "DMA200": round(dma_200, 2),
-                "Above_50DMA": last_c >= dma_50,
-                "Dist_20DMA": round(dist_20dma, 2),
-                "Consec_Up": c_info["consec_up"],
-                "Consec_Down": c_info["consec_down"],
-                "Bull_Pattern": c_info["bull_pattern"],
-                "Bear_Pattern": c_info["bear_pattern"],
-                "Body_Pct": round(c_info["body_pct"], 2),
-                "Lower_Wick_Pct": round(c_info["lower_pct"], 2),
-                "Upper_Wick_Pct": round(c_info["upper_pct"], 2),
-                "ATR": round(c_info["atr"], 2),
-                "Day_High": round(c_info["day_high"], 2),
-                "Day_Low": round(c_info["day_low"], 2),
-            })
-        except Exception:
-            continue
-
-    stocks_df = pd.DataFrame(rows)
-    if stocks_df.empty:
-        return pd.DataFrame(), pd.DataFrame()
-
-    # ৩২টি সেক্টরের অ্যাগ্রিগেটেড পারফরম্যান্স ও টার্নঅ্যারাউন্ড জোন নির্ণয়
-    sec_rows = []
-    for sec_name, sec_df in stocks_df.groupby("Sector"):
-        r1d = float(sec_df["1D"].mean())
-        r1w = float(sec_df["1W"].mean())
-        r1m = float(sec_df["1M"].mean())
-        r3m = float(sec_df["3M"].mean())
-        r6m = float(sec_df["6M"].mean())
-        r1y = float(sec_df["1Y"].mean())
-        avg_vol = float(sec_df["Vol_Ratio"].mean())
-        avg_rsi = float(sec_df["RSI"].mean())
-        breadth_50 = float((sec_df["Above_50DMA"].sum() / len(sec_df)) * 100.0)
-
-        # সেক্টর টার্নঅ্যারাউন্ড লজিক:
-        # বুলিশ টার্নঅ্যারাউন্ড: সেক্টরটি ১ সপ্তাহ বা ১ মাসে ডাউনে ছিল (<= 0.5%), কিন্তু আজ নিচ থেকে ঘুরছে (1D >= -0.2% বা 1D > 1W/5)
-        is_bull_turnaround = (r1w <= 1.2 or r1m <= 1.5) and (r1d >= -0.15 or r1d > (r1w / 5.0))
-        # বেয়ারিশ রোলওভার: সেক্টরটি আগে উপরে ছিল (1W >= 0.5% বা 1M >= 1.5%), কিন্তু আজ দুর্বল হয়ে নিচে নামছে (1D <= 0.25%)
-        is_bear_rollover = (r1w >= 0.0 or r1m >= 1.0) and (r1d <= 0.35 or r1d < (r1w / 5.0))
-
-        # রোটেশন মিটার স্কোর (0 - 100)
-        meter_score = int(np.clip(50 + (r1w * 3.5) + (r1d * 6.0) + ((avg_rsi - 50) * 0.6), 5, 98))
-
-        if is_bull_turnaround and r1d >= 0:
-            zone = "🔄 Turnaround Zone (ডাউন থেকে ঘুরে দাঁড়ানো)"
-        elif r1w >= 2.0 and r1d >= 0:
-            zone = "🚀 Leading Zone (টপ মোমেন্টাম)"
-        elif is_bear_rollover and r1d < 0:
-            zone = "⚠️ Exhaustion Zone (ওপর থেকে নিচে নামা)"
-        else:
-            zone = "💎 Value / Oversold Zone (ডিপ ডাউন / কনসোলিডেশন)"
-
-        sec_rows.append({
-            "Sector": sec_name,
-            "Stock_Count": len(sec_df),
-            "1D": round(r1d, 2),
-            "1W": round(r1w, 2),
-            "1M": round(r1m, 2),
-            "3M": round(r3m, 2),
-            "6M": round(r6m, 2),
-            "1Y": round(r1y, 2),
-            "Avg_Vol_Ratio": round(avg_vol, 2),
-            "Avg_RSI": round(avg_rsi, 1),
-            "Breadth_50DMA": round(breadth_50, 1),
-            "Meter": meter_score,
-            "Zone": zone,
-            "Bull_Turnaround": is_bull_turnaround,
-            "Bear_Rollover": is_bear_rollover
-        })
-
-    sectors_df = pd.DataFrame(sec_rows)
-
-    # সেক্টরের টার্নঅ্যারাউন্ড তথ্য প্রতিটি শেয়ারের সাথে যুক্ত করা
-    sec_lookup = sectors_df.set_index("Sector")[["1D", "1W", "1M", "Zone", "Bull_Turnaround", "Bear_Rollover"]].to_dict("index")
-    stocks_df["Sec_1D"] = stocks_df["Sector"].map(lambda s: sec_lookup.get(s, {}).get("1D", 0.0))
-    stocks_df["Sec_1W"] = stocks_df["Sector"].map(lambda s: sec_lookup.get(s, {}).get("1W", 0.0))
-    stocks_df["Sec_1M"] = stocks_df["Sector"].map(lambda s: sec_lookup.get(s, {}).get("1M", 0.0))
-    stocks_df["Sec_Zone"] = stocks_df["Sector"].map(lambda s: sec_lookup.get(s, {}).get("Zone", ""))
-    stocks_df["Sec_Bull_Turn"] = stocks_df["Sector"].map(lambda s: sec_lookup.get(s, {}).get("Bull_Turnaround", False))
-    stocks_df["Sec_Bear_Roll"] = stocks_df["Sector"].map(lambda s: sec_lookup.get(s, {}).get("Bear_Rollover", False))
-
-    return stocks_df, sectors_df
-
-
-# ==============================================================================
-# ৭. ইন্ট্রাডে বুলিশ ও বেয়ারিশ ডজি/কনসোলিডেশন ফিল্টারিং ইঞ্জিন (তোমার নির্দেশ অনুযায়ী)
-# ==============================================================================
-def get_intraday_reversal_focus(stocks_df: pd.DataFrame):
-    """
-    ১. বুলিশ সাইড:
-       - টানা ৩-৪ দিন উপরে যাওয়া শেয়ার সম্পূর্ণ বাদ (Consec_Up <= 2)
-       - অতিরিক্ত বেড়ে যাওয়া শেয়ার বাদ (-1.8% <= 1D <= +4.0%)
-       - নিচে কনসোলিডেট করছে বা ডজি / হ্যামার / টাইট বেস তৈরি করেছে (Bull_Pattern != None)
-       - ভলিউম তৈরি হচ্ছে (Vol_Ratio >= 1.10x, অগ্রাধিকার উচ্চ ভলিউমে)
-       - ডাউন সেক্টর যা নিচ থেকে আপের দিকে মুভ করছে (Sec_1W বা 1W ডাউন/ফ্ল্যাট থেকে 1D পজিটিভ মোমেন্টাম)
-    ২. বেয়ারিশ সাইড:
-       - টানা ৩-৪ দিন নিচে পড়া শেয়ার সম্পূর্ণ বাদ (Consec_Down <= 2)
-       - অতিরিক্ত পড়ে যাওয়া শেয়ার বাদ (-4.0% <= 1D <= +1.8%)
-       - ওপরে গিয়ে ডজি / শুটিং স্টার / সাপ্লাই রিজেকশন তৈরি করেছে (Bear_Pattern != None)
-       - ভলিউম তৈরি হচ্ছে এবং সেক্টর ওপর থেকে নিচে ঘুরছে
-    """
-    if stocks_df.empty:
-        return pd.DataFrame(), pd.DataFrame()
-
-    df = stocks_df.copy()
-
-    # বুলিশ স্কোরিং ও ফিল্টারিং
-    bull_cond = (
-        (df["Consec_Up"] <= 2) &                      # টানা ৩-৪ দিন বাড়া শেয়ার বাদ
-        (df["1D"] >= -1.6) & (df["1D"] <= 4.0) &      # অতিরিক্ত ভাগা শেয়ার বাদ, নিচে কনসোলিডেট করা শেয়ার
-        (df["1W"] <= 4.5) &                           # আগে থেকেই অতিরিক্ত র‍্যালি না করা
-        (df["Bull_Pattern"].notna()) &                # ডজি / হ্যামার / টাইট বেস ক্যান্ডেল
-        (df["Vol_Ratio"] >= 1.05)                     # ভলিউম তৈরি হচ্ছে
+c1, c2, c3, c4, c5 = st.columns([0.9, 1.35, 1.35, 1.25, 1.25])
+with c1:
+    tf_option = st.selectbox(
+        "📅 ১. টাইমফ্রেম:",
+        ["1D", "1W", "1M", "3M", "6M", "1Y", "5Y"],
+        index=1,
+        key="ctrl_tf",
     )
-    bull_df = df[bull_cond].copy()
-
-    # যদি মার্কেট কন্ডিশনে ৬টির কম পাওয়া যায়, তবে নিকটতম ডজি/কনসোলিডেশন শেয়ার নেওয়া (তবে টানা ৩-৪ দিন বাড়া কখনোই নয়)
-    if len(bull_df) < 6:
-        fallback_bull = df[
-            (df["Consec_Up"] <= 2) &
-            (df["1D"] >= -2.0) & (df["1D"] <= 4.2) &
-            (df["Vol_Ratio"] >= 0.95)
-        ].copy()
-        fallback_bull["Bull_Pattern"] = fallback_bull["Bull_Pattern"].fillna("🕯️ Base Consolidation")
-        bull_df = pd.concat([bull_df, fallback_bull]).drop_duplicates(subset=["Ticker"])
-
-    # বুলিশ র‍্যাঙ্কিং স্কোর: ডাউন সেক্টর আপ মুভ + ডজি ক্যান্ডেল + ভলিউম বিল্ডআপ
-    bull_df["Bull_Score"] = (
-        (bull_df["Vol_Ratio"] * 30.0)
-        + np.where(bull_df["Sec_Bull_Turn"], 25.0, 0.0)
-        + np.where(bull_df["1W"] < 0, 18.0, 5.0)
-        + ((1.0 - bull_df["Body_Pct"]) * 20.0)
-        + (bull_df["Lower_Wick_Pct"] * 15.0)
-    )
-    bull_df = bull_df.sort_values("Bull_Score", ascending=False).head(8)
-
-    # বেয়ারিশ স্কোরিং ও ফিল্টারিং (ঠিক বিপরীত লজিক)
-    bear_cond = (
-        (df["Consec_Down"] <= 2) &                    # টানা ৩-৪ দিন পড়া শেয়ার বাদ
-        (df["1D"] <= 1.6) & (df["1D"] >= -4.0) &      # ইতিমধ্যে ধসে যাওয়া শেয়ার বাদ
-        (df["1W"] >= -4.5) &                          # ওপরে বা রেজিস্ট্যান্সের কাছে থাকা শেয়ার
-        (df["Bear_Pattern"].notna()) &                # শুটিং স্টার / গ্রেভস্টোন ডজি / টপ স্টল ক্যান্ডেল
-        (df["Vol_Ratio"] >= 1.05)                     # ডিস্ট্রিবিউশন ভলিউম তৈরি হচ্ছে
-    )
-    bear_df = df[bear_cond].copy()
-
-    if len(bear_df) < 6:
-        fallback_bear = df[
-            (df["Consec_Down"] <= 2) &
-            (df["1D"] <= 2.0) & (df["1D"] >= -4.2) &
-            (df["Vol_Ratio"] >= 0.95)
-        ].copy()
-        fallback_bear["Bear_Pattern"] = fallback_bear["Bear_Pattern"].fillna("🕯️ Top Stall Doji")
-        bear_df = pd.concat([bear_df, fallback_bear]).drop_duplicates(subset=["Ticker"])
-
-    bear_df["Bear_Score"] = (
-        (bear_df["Vol_Ratio"] * 30.0)
-        + np.where(bear_df["Sec_Bear_Roll"], 25.0, 0.0)
-        + np.where(bear_df["1W"] > 0, 18.0, 5.0)
-        + ((1.0 - bear_df["Body_Pct"]) * 20.0)
-        + (bear_df["Upper_Wick_Pct"] * 15.0)
-    )
-    bear_df = bear_df.sort_values("Bear_Score", ascending=False).head(8)
-
-    return bull_df, bear_df
-
-
-with st.spinner("⚡ ৩২টি সেক্টর, ক্যান্ডেলস্টিক ডজি প্যাটার্ন ও লাইভ ভলিউম ডেটা বিশ্লেষণ করা হচ্ছে..."):
-    pulse_data = fetch_market_pulse()
-    stocks_df, sectors_df = load_all_market_data()
-
-if stocks_df.empty or sectors_df.empty:
-    st.error("⚠️ লাইভ মার্কেট ডেটা লোড করতে সাময়িক সমস্যা হয়েছে। অনুগ্রহ করে পেজটি রিলোড করুন।")
-    st.stop()
-
-# ==============================================================================
-# ৮. লাইভ মার্কেট পালস রিবন + অটো মার্কেট বায়াস ইন্ডিকেটর
-# ==============================================================================
-nifty_d = pulse_data["NIFTY"]
-bnf_d = pulse_data["BANKNIFTY"]
-vix_d = pulse_data["VIX"]
-usd_d = pulse_data["USDINR"]
-
-adv_1d = int((stocks_df["1D"] > 0).sum())
-dec_1d = int((stocks_df["1D"] < 0).sum())
-
-if nifty_d["chg_1d"] >= 0.25 and adv_1d >= dec_1d:
-    mkt_bias_txt = "🟢 আজকের মার্কেট বায়াস: BULLISH (বুলিশ রিভার্সাল শেয়ার ট্র্যাক করুন)"
-    mkt_bias_col = "#34d399"
-elif nifty_d["chg_1d"] <= -0.25 and dec_1d > adv_1d:
-    mkt_bias_txt = "🔴 আজকের মার্কেট বায়াস: BEARISH (বেয়ারিশ ব্রেকডাউন শেয়ার ট্র্যাক করুন)"
-    mkt_bias_col = "#f87171"
-else:
-    mkt_bias_txt = "⚖️ আজকের মার্কেট বায়াস: SIDEWAYS / ROTATIONAL (সেক্টর দেখে বুলিশ/বেয়ারিশ ট্র্যাক করুন)"
-    mkt_bias_col = "#fbbf24"
-
-vix_status = "🟢 স্বস্তিদায়ক (Low Fear)" if vix_d["price"] < 15.5 else ("🟡 সতর্কতা (Moderate)" if vix_d["price"] < 19 else "🔴 উচ্চ ঝুঁকি (High Fear)")
-
-st.markdown(
-    f"""
-    <div class="pulse-ribbon">
-        <div class="pulse-item">
-            <span>🇮🇳 Nifty 50:</span>
-            <span style="color:{'#34d399' if nifty_d['chg_1d']>=0 else '#f87171'};">
-                {nifty_d['price']:,.1f} ({nifty_d['chg_1d']:+.2f}%)
-            </span>
-        </div>
-        <div class="pulse-item">
-            <span>🏛️ Bank Nifty:</span>
-            <span style="color:{'#34d399' if bnf_d['chg_1d']>=0 else '#f87171'};">
-                {bnf_d['price']:,.1f} ({bnf_d['chg_1d']:+.2f}%)
-            </span>
-        </div>
-        <div class="pulse-item">
-            <span>⚡ India VIX:</span>
-            <span style="color:{'#34d399' if vix_d['chg_1d']<=0 else '#fbbf24'};">
-                {vix_d['price']:.2f} ({vix_d['chg_1d']:+.2f}%) — {vix_status}
-            </span>
-        </div>
-        <div class="pulse-item">
-            <span>💵 USD/INR:</span>
-            <span style="color:#94a3b8;">₹{usd_d['price']:.2f} ({usd_d['chg_1d']:+.2f}%)</span>
-        </div>
-        <div class="pulse-item" style="color:{mkt_bias_col}; background:rgba(255,255,255,0.05); padding:4px 10px; border-radius:8px;">
-            {mkt_bias_txt}
-        </div>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
-
-# ==============================================================================
-# ৯. ৫-কলাম প্রো কন্ট্রোল ও ফিল্টার বার
-# ==============================================================================
-f_col1, f_col2, f_col3, f_col4, f_col5 = st.columns([1.2, 2.2, 2.2, 2.2, 2.2])
-
-with f_col1:
-    tf_selected = st.selectbox("📅 ১. টাইমফ্রেম:", list(TIMEFRAME_MAP.keys()), index=1)
-
-with f_col2:
-    sort_selected = st.selectbox(
-        "🔄 ২. সাজানোর ক্রম (Sort By):",
+with c2:
+    sort_option = st.selectbox(
+        "🔃 ২. সাজানোর ক্রম (Sort By):",
         [
-            "🚀 Top Gainers (সবচেয়ে বেশি বাড়া আগে)",
-            "📉 Top Losers (সবচেয়ে বেশি ডাউন আগে)",
-            "🔄 Bottom Turnaround (ডাউন থেকে আপ মুভ আগে)",
-            "🔥 Volume Shockers (সবচেয়ে বেশি ভলিউম আগে)",
-            "🎛️ Rotation Meter (মিটার স্কোর অনুযায়ী)"
+            "🚀 Top Gainers (সবচেয়ে বেশি বাড়া আগে)",
+            "📉 Top Losers (সবচেয়ে বেশি ডাউন আগে)",
+            "🔄 Red ➔ Green (নিচ থেকে ঘুরছে আগে)",
+            "⚠️ Green ➔ Red (উপর থেকে নামছে আগে)",
+            "🧭 Meter: High to Low (সর্বোচ্চ মিটার আগে)",
+            "🧭 Meter: Low to High (সর্বনিম্ন মিটার আগে)",
         ],
-        index=0
+        key="ctrl_sort",
+        on_change=reset_single_sector_lock,
     )
-
-with f_col3:
-    zone_selected = st.selectbox(
+with c3:
+    zone_filter_choice = st.selectbox(
         "🎯 ৩. রোটেশন জোন ফিল্টার:",
         [
             "🌐 সব সেক্টর (All 32 Sectors)",
-            "🔄 Turnaround Zone (ডাউন থেকে ঘুরে দাঁড়ানো)",
-            "🚀 Leading Zone (টপ মোমেন্টাম)",
-            "⚠️ Exhaustion Zone (ওপর থেকে নিচে নামা)",
-            "💎 Value / Oversold Zone (ডিপ ডাউন / কনসোলিডেশন)"
+            "🚀 Strong Green (আপট্রেন্ড লিডার)",
+            "🔄 Red ➔ Green (টার্নঅ্যারাউন্ড জোন)",
+            "🟡 Yellow Zone (ওয়াচলিস্ট জোন)",
+            "⚠️ Green ➔ Red (কুলিং অফ জোন)",
+            "🔴 Red Zone (ডিপ ভ্যালু / ডাউন)",
         ],
-        index=0
+        key="ctrl_zone",
+        on_change=reset_single_sector_lock,
+    )
+with c4:
+    quick_sec_jump = st.selectbox(
+        "🔍 ৪. নির্দিষ্ট সেক্টর খুঁজুন:",
+        ["সবগুলো সেক্টর (Show All 32)"] + sorted(list(sectors.keys())),
+        key="ctrl_sec_jump",
+    )
+with c5:
+    instant_stock_search = st.selectbox(
+        "⚡ ৫. যেকোনো শেয়ার খুঁজুন (Stock Search):",
+        ["শেয়ার টাইপ করুন..."] + all_unique_stock_names,
+        key="ctrl_stk_search",
     )
 
-with f_col4:
-    sector_options = ["সবগুলো সেক্টর (Show All 32)"] + sorted(list(SECTOR_STOCKS.keys()))
-    sec_idx = sector_options.index(st.session_state.selected_sector) if st.session_state.selected_sector in sector_options else 0
-    chosen_sector = st.selectbox("🔍 ৪. নির্দিষ্ট সেক্টর খুঁজুন:", sector_options, index=sec_idx)
-    st.session_state.selected_sector = chosen_sector
+ret_key = f"{tf_option} %"
 
-with f_col5:
-    stock_options = ["শেয়ার টাইপ করুন..."] + [f"{row['Symbol']} — ({row['Sector']})" for _, row in stocks_df.sort_values("Symbol").iterrows()]
-    curr_st_idx = 0
-    if st.session_state.selected_stock != "শেয়ার টাইপ করুন...":
-        sym_clean = st.session_state.selected_stock.replace(".NS", "")
-        for i, opt in enumerate(stock_options):
-            if opt.startswith(f"{sym_clean} —"):
-                curr_st_idx = i
-                break
-    chosen_stock_label = st.selectbox("⚡ ৫. যেকোনো শেয়ার খুঁজুন (Stock Search):", stock_options, index=curr_st_idx)
-    if chosen_stock_label != "শেয়ার টাইপ করুন...":
-        st.session_state.selected_stock = chosen_stock_label.split(" — ")[0].strip() + ".NS"
+# ==============================================================================
+# ৮. সেক্টর ও স্টকের সম্পূর্ণ ক্যালকুলেশন (নিচ থেকে ঘুরে দাঁড়ানো Turnaround Reversal লজিকসহ)
+# ==============================================================================
+nifty_col = full_df[benchmark] if benchmark in full_df.columns else pd.Series(dtype=float)
+nifty_multi_ret = {tf: calc_return(nifty_col, d) for tf, d in tf_days_map.items()}
+nifty_curr_val = nifty_multi_ret[tf_option]
+
+sector_master = []
+all_stocks_master = {}
+
+ticker_to_sector = {}
+for s_nm, t_list in sectors.items():
+    for t_sym in t_list:
+        if t_sym not in ticker_to_sector:
+            ticker_to_sector[t_sym] = s_nm
+
+def compute_stock_row(t, s_name_label):
+    s_price = full_df[t].dropna()
+    curr_p = round(float(s_price.iloc[-1]), 2)
+    high_52w = float(s_price.tail(252).max())
+    low_52w = float(s_price.tail(252).min())
+    dd_52w = round(((curr_p / high_52w) - 1) * 100, 2) if high_52w > 0 else 0.0
+
+    day_high = float(full_high_df[t].dropna().iloc[-1]) if t in full_high_df.columns and len(full_high_df[t].dropna()) > 0 else curr_p
+    day_low = float(full_low_df[t].dropna().iloc[-1]) if t in full_low_df.columns and len(full_low_df[t].dropna()) > 0 else curr_p
+    day_open = float(full_open_df[t].dropna().iloc[-1]) if t in full_open_df.columns and len(full_open_df[t].dropna()) > 0 else curr_p
+
+    day_range = max(day_high - day_low, 0.01)
+    clv_pct = round(float(np.clip(((curr_p - day_low) / day_range) * 100.0, 0.0, 100.0)), 1)
+
+    if t in full_high_df.columns and t in full_low_df.columns:
+        recent_ranges = (full_high_df[t].tail(14) - full_low_df[t].tail(14)).dropna()
+        atr_val = float(recent_ranges.mean()) if len(recent_ranges) > 0 else curr_p * 0.02
     else:
-        st.session_state.selected_stock = "শেয়ার টাইপ করুন..."
+        atr_val = curr_p * 0.02
+    atr_val = max(atr_val, curr_p * 0.012)
+
+    buy_above = round(max(day_high, curr_p) * 1.001, 2)
+    bull_sl = round(buy_above - (atr_val * 0.65), 2)
+    bull_t1 = round(buy_above + (atr_val * 0.85), 2)
+    bull_t2 = round(buy_above + (atr_val * 1.65), 2)
+
+    sell_below = round(min(day_low, curr_p) * 0.999, 2)
+    bear_sl = round(sell_below + (atr_val * 0.65), 2)
+    bear_t1 = round(sell_below - (atr_val * 0.85), 2)
+    bear_t2 = round(sell_below - (atr_val * 1.65), 2)
+
+    sma50_val = float(s_price.tail(50).mean()) if len(s_price) >= 50 else curr_p
+    sma200_val = float(s_price.tail(200).mean()) if len(s_price) >= 200 else curr_p
+    above_50dma = curr_p >= sma50_val
+    above_200dma = curr_p >= sma200_val
+
+    rsi_14 = calc_rsi(s_price, 14)
+    rvol_num, rvol_label = calc_rvol(t)
+
+    r_map = {
+        "1D %": calc_return(s_price, 2),
+        "1W %": calc_return(s_price, 6),
+        "1M %": calc_return(s_price, 22),
+        "3M %": calc_return(s_price, 64),
+        "6M %": calc_return(s_price, 126),
+        "1Y %": calc_return(s_price, 252),
+        "5Y %": calc_return(s_price, len(full_df)),
+    }
+
+    r_1d = r_map["1D %"]
+    r_1w = r_map["1W %"]
+    r_sel = r_map[ret_key]
+    st_score = float(np.clip(50 + (r_sel * 2.0) + (r_1w * 1.2) + ((rsi_14 - 50) * 0.3), 2, 98))
+    st_prev = float(np.clip(50 + (r_map["3M %"] * 0.9) + (r_map["1Y %"] * 0.3), 2, 98))
+
+    # ইন্ট্রাডে টার্নঅ্যারাউন্ড ও রিভার্সাল ফোকাস লজিক (যা অলরেডি ৩-৪ দিন বেড়ে যাওয়া স্টক ফিল্টার করে বাদ দেবে এবং নিচ থেকে ঘুরে দাঁড়ানো স্টক খুঁজবে)
+    # বুলিশ টার্নঅ্যারাউন্ড: গত ১ সপ্তাহ মাইনাস বা ফ্ল্যাট ছিল, কিন্তু আজ ভলিউম নিয়ে পজিটিভ হয়েছে এবং ডে-হাইয়ের কাছে ক্লোজ হয়েছে
+    turnaround_bull_score = round(
+        (rvol_num * 5.0) + ((clv_pct - 50.0) * 0.25) + (r_1d * 2.5) + (2.0 if r_1w < 2.0 else -2.0), 2
+    )
+    # বেয়ারিশ টার্নঅ্যারাউন্ড: গত ১ সপ্তাহ পজিটিভ ছিল, কিন্তু আজ ভলিউম নিয়ে ব্রেকডাউন করেছে এবং ডে-লোর কাছে ক্লোজ হয়েছে
+    turnaround_bear_score = round(
+        (rvol_num * 5.0) + ((50.0 - clv_pct) * 0.25) + ((-r_1d) * 2.5) + (2.0 if r_1w > -2.0 else -2.0), 2
+    )
+
+    if r_1d >= 1.0 and r_1w <= 3.0 and rvol_num >= 1.25 and clv_pct >= 65:
+        intraday_catalyst = f"🔄 নিচ থেকে রিভার্সাল (Turnaround Reversal | Vol {rvol_num}x)"
+    elif r_1d >= 2.0 and rvol_num >= 1.4:
+        intraday_catalyst = f"🔥 হেভি ভলিউম ব্রেকআউট ({rvol_num}x Vol)"
+    elif r_1d <= -1.0 and r_1w >= -3.0 and rvol_num >= 1.25 and clv_pct <= 35:
+        intraday_catalyst = f"📉 উপর থেকে রিভার্সাল সেল (Bearish Reversal | Vol {rvol_num}x)"
+    else:
+        intraday_catalyst = f"📊 নরমাল ইন্ট্রাডে রেঞ্জ (CLV: {clv_pct:.0f}% | Vol {rvol_num}x)"
+
+    if above_50dma and r_sel > 2.0 and rvol_num >= 1.25:
+        action_sig = "🔥 ভলিউম ব্রেকআউট (Vol Breakout)"
+    elif dd_52w < -12 and r_1d > 0.5:
+        action_sig = "🔄 নিচ থেকে ঘুরছে (Turnaround)"
+    elif dd_52w < -25 or rsi_14 < 35:
+        action_sig = "💎 ওভারসোল্ড / ভ্যালু (Deep Value)"
+    elif above_50dma:
+        action_sig = "🟢 পজিটিভ ট্রেন্ড (Positive)"
+    else:
+        action_sig = "⚠️ দুর্বল / ডাউন (Weak Trend)"
+
+    return {
+        "Ticker": t,
+        "Stock": t.replace(".NS", ""),
+        "Sector": s_name_label,
+        "Signal (সিগন্যাল)": action_sig,
+        "Intraday Catalyst": intraday_catalyst,
+        "CMP (₹)": curr_p,
+        "Day High": round(day_high, 2),
+        "Day Low": round(day_low, 2),
+        "Day Open": round(day_open, 2),
+        "Day Range Pos %": clv_pct,
+        "Buy Above (₹)": buy_above,
+        "Sell Below (₹)": sell_below,
+        "Bull SL (₹)": bull_sl,
+        "Bull T1 (₹)": bull_t1,
+        "Bull T2 (₹)": bull_t2,
+        "Bear SL (₹)": bear_sl,
+        "Bear T1 (₹)": bear_t1,
+        "Bear T2 (₹)": bear_t2,
+        "Turnaround_Bull_Score": turnaround_bull_score,
+        "Turnaround_Bear_Score": turnaround_bear_score,
+        "RSI (14)": rsi_14,
+        "Volume Action": rvol_label,
+        "RVOL_Num": rvol_num,
+        "Meter Score": round(st_score, 1),
+        "Prev Meter": round(st_prev, 1),
+        **r_map,
+        "From 52W High %": dd_52w,
+        "52W High": round(high_52w, 2),
+        "52W Low": round(low_52w, 2),
+        "50 DMA Trend": "🟢 Above 50DMA" if above_50dma else "🔴 Below 50DMA",
+        "200 DMA Trend": "🟢 Above 200DMA" if above_200dma else "🔴 Below 200DMA",
+        "Above_50": above_50dma,
+        "Is_Nifty50": t in NIFTY_50_TICKERS,
+    }
+
+for s_name, tickers in sectors.items():
+    valid = [t for t in tickers if t in full_df.columns and len(full_df[t].dropna()) > 5]
+    if not valid:
+        continue
+
+    st_rows = []
+    for t in valid:
+        row_dict = compute_stock_row(t, s_name)
+        st_rows.append(row_dict)
+        all_stocks_master[t] = row_dict
+
+    st_df = pd.DataFrame(st_rows)
+    sec_rets = {tf: round(float(st_df[f"{tf} %"].mean()), 2) for tf in ["1D", "1W", "1M", "3M", "6M", "1Y", "5Y"]}
+    avg_dd_52w = round(float(st_df["From 52W High %"].mean()), 2)
+    avg_rsi = round(float(st_df["RSI (14)"].mean()), 1)
+
+    sel_ret = sec_rets[tf_option]
+    alpha_sel = sel_ret - nifty_curr_val
+    breadth_sel = float((st_df[ret_key] >= 0).mean()) * 100
+
+    curr_meter = float(np.clip(50 + (alpha_sel * 2.2) + (sel_ret * 1.1) + ((breadth_sel - 50) * 0.25), 3, 98))
+    prev_meter = float(np.clip(50 + ((sec_rets["3M"] - nifty_multi_ret["3M"]) * 1.2) + ((sec_rets["1Y"] - nifty_multi_ret["1Y"]) * 0.4), 3, 98))
+    meter_diff = round(curr_meter - prev_meter, 1)
+
+    turnaround_score = round((sec_rets["1W"] * 1.8 + sec_rets["1M"] * 1.2) - (sec_rets["3M"] * 0.6) + abs(min(0, avg_dd_52w)) * 0.3, 2)
+    cooling_score = round((sec_rets["1Y"] * 0.4 + sec_rets["3M"] * 0.8) - (sec_rets["1W"] * 1.8 + sec_rets["1M"] * 1.2), 2)
+
+    is_turnaround = (avg_dd_52w < -8.0 or sec_rets["3M"] < 0 or prev_meter < 48) and (sec_rets["1W"] > 0 or sec_rets["1M"] > 0 or sel_ret > 0)
+    is_cooling = (sec_rets["1Y"] > 8.0 or sec_rets["3M"] > 4.0 or prev_meter >= 52) and (sec_rets["1W"] < 0 or sec_rets["1M"] < 0 or sel_ret < nifty_curr_val)
+    is_strong_green = (sel_ret >= nifty_curr_val and sel_ret > 0) or curr_meter >= 58
+    is_red_zone = sel_ret < 0 or curr_meter < 42
+    is_yellow = (38 <= curr_meter <= 62) or (-3.0 <= sel_ret <= 4.0)
+
+    if is_turnaround and meter_diff > 0:
+        stage_label = "🔄 Red ➔ Green Turnaround"
+        meter_status = "🔴 রেড জোন থেকে ঘুরে 🟢 গ্রিন জোনে উঠছে (Bullish Turnaround)"
+    elif is_strong_green:
+        stage_label = "🚀 Strong Green Leader"
+        meter_status = "🟢 ফুল গ্রিন জোন — মার্কেটকে লিড দিচ্ছে (Strong Leader)"
+    elif is_cooling and meter_diff < 0:
+        stage_label = "⚠️ Green ➔ Red Cooling"
+        meter_status = "🟢 গ্রিন থেকে কমে 🟡 নিচে নামছে (Cooling Off)"
+    elif is_red_zone:
+        stage_label = "🔴 Red Zone / Deep Value"
+        meter_status = "🔴 রেড জোন — এখন ডাউন বা ভ্যালু জোনে আছে (Beaten Down)"
+    else:
+        stage_label = "🟡 Yellow Watchlist Zone"
+        meter_status = "🟡 ইয়েলো জোন — ব্রেকআউটের অপেক্ষায় (Watchlist)"
+
+    sector_master.append({
+        "Sector": s_name,
+        "Stage": stage_label,
+        "Meter_Status": meter_status,
+        "Curr_Meter": round(curr_meter, 1),
+        "Prev_Meter": round(prev_meter, 1),
+        "Meter_Diff": meter_diff,
+        "Avg RSI": avg_rsi,
+        "Turnaround_Score": turnaround_score,
+        "Cooling_Score": cooling_score,
+        "Is_Turnaround": is_turnaround,
+        "Is_Cooling": is_cooling,
+        "Is_Strong_Green": is_strong_green,
+        "Is_Yellow": is_yellow,
+        "Is_Red_Zone": is_red_zone,
+        "valid_tickers": valid,
+        "stocks_df": st_df,
+        **{f"{k} %": v for k, v in sec_rets.items()},
+    })
+
+nifty50_rows = []
+for t in NIFTY_50_TICKERS:
+    if t in all_stocks_master:
+        nifty50_rows.append(all_stocks_master[t])
+    elif t in full_df.columns and len(full_df[t].dropna()) > 5:
+        r_d = compute_stock_row(t, ticker_to_sector.get(t, "Nifty 50 Core"))
+        nifty50_rows.append(r_d)
+nifty50_df_global = pd.DataFrame(nifty50_rows)
+all_st_df_global = pd.DataFrame(list(all_stocks_master.values()))
 
 # ==============================================================================
-# ১০. ইন্ট্রাডে বুলিশ ও বেয়ারিশ রিভার্সাল ফোকাস (Doji + Consolidation + Sector Turnaround)
+# ৯. ইনস্ট্যান্ট স্টক সার্চ প্যানেল
 # ==============================================================================
-st.markdown('<div id="intraday-focus-section"></div>', unsafe_allow_html=True)
-
-bull_focus_df, bear_focus_df = get_intraday_reversal_focus(stocks_df)
-
-mode_col1, mode_col2 = st.columns([6.5, 3.5])
-with mode_col1:
-    st.markdown(
-        "<div style='font-size:0.86rem; color:#94a3b8; margin-bottom:4px;'>"
-        "💡 <b>ইন্ট্রাডে স্মার্ট ফিল্টার লজিক:</b> টানা ৩-৪ দিন ধরে বাড়া বা পড়া শেয়ারগুলো বাদ দিয়ে, যে শেয়ারগুলো ডজি (Doji) / হ্যামার / শুটিং স্টার তৈরি করে কনসোলিডেট করছে, ভলিউম তৈরি হচ্ছে এবং সেক্টর ঘুরছে—শুধুমাত্র সেগুলোই নিচে রাখা হয়েছে (যেকোনো শেয়ারে ক্লিক করলেই ট্রেড সেটআপ ও চার্ট খুলে যাবে):"
-        "</div>",
-        unsafe_allow_html=True
-    )
-with mode_col2:
-    intraday_view_mode = st.radio(
-        "ইন্ট্রাডে ট্র্যাকিং মোড:",
-        ["🌗 উভয় সাইড (Both)", "🟢 বুলিশ ডে মোড (Bullish)", "🔴 বেয়ারিশ ডে মোড (Bearish)"],
-        horizontal=True,
-        label_visibility="collapsed"
-    )
-
-def build_focus_pills_html(df_sub: pd.DataFrame, is_bull: bool) -> str:
-    pills = []
-    cls_name = "stock-pill-bull" if is_bull else "stock-pill-bear"
-    dot_icon = "🟢" if is_bull else "🔴"
-    pat_col = "Bull_Pattern" if is_bull else "Bear_Pattern"
-
-    for _, r in df_sub.iterrows():
-        sym = r["Symbol"]
-        q_sym = urllib.parse.quote(r["Ticker"])
-        chg_str = f"{r['1D']:+.1f}%"
-        vol_str = f"{r['Vol_Ratio']:.2f}x Vol"
-        pat_str = r[pat_col] if pd.notna(r[pat_col]) else "🕯️ Doji"
-        sec_hint = "🔄Sec↑" if (is_bull and r["Sec_Bull_Turn"]) else ("📉Sec↓" if (not is_bull and r["Sec_Bear_Roll"]) else "")
-        tooltip = (
-            f"সেক্টর: {r['Sector']} (1W: {r['Sec_1W']:+.1f}%, আজ: {r['Sec_1D']:+.1f}%) | "
-            f"প্যাটার্ন: {pat_str} | RSI: {r['RSI']} | টানা দিন: {r['Consec_Up'] if is_bull else r['Consec_Down']}"
-        )
-        pills.append(
-            f'<a class="{cls_name}" href="?focus_stock={q_sym}" target="_self" title="{tooltip}">'
-            f'{dot_icon} <b>{sym}</b> ({chg_str} | {vol_str}) '
-            f'<span class="candle-tag">{pat_str} {sec_hint}</span>'
-            f'</a>'
-        )
-    return "".join(pills)
-
-bull_pills_html = build_focus_pills_html(bull_focus_df, is_bull=True)
-bear_pills_html = build_focus_pills_html(bear_focus_df, is_bull=False)
-
-if intraday_view_mode == "🟢 বুলিশ ডে মোড (Bullish)":
-    st.markdown(
-        f"""
-        <div class="focus-box-bull">
-            <div class="focus-title-bull">
-                <span>🔄 ইন্ট্রাডে বুলিশ রিভার্সাল ফোকাস (Bottom Turnaround — নিচে ডজি/হ্যামার তৈরি করে ভলিউমসহ ঘুরে দাঁড়ানো স্টক)</span>
-                <span style="font-size:0.78rem; color:#a7f3d0;">✅ টানা ৩-৪ দিন বাড়া শেয়ার বাদ দেওয়া হয়েছে</span>
-            </div>
-            <div class="pill-wrap">{bull_pills_html}</div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-elif intraday_view_mode == "🔴 বেয়ারিশ ডে মোড (Bearish)":
-    st.markdown(
-        f"""
-        <div class="focus-box-bear">
-            <div class="focus-title-bear">
-                <span>📉 ইন্ট্রাডে বেয়ারিশ রিভার্সাল ফোকাস (Top Breakdown — ওপরে ডজি/শুটিং স্টার তৈরি করে নিচে নামার প্রস্তুতি নেওয়া স্টক)</span>
-                <span style="font-size:0.78rem; color:#fecaca;">✅ টানা ৩-৪ দিন পড়া শেয়ার বাদ দেওয়া হয়েছে</span>
-            </div>
-            <div class="pill-wrap">{bear_pills_html}</div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-else:
-    fbox1, fbox2 = st.columns(2)
-    with fbox1:
-        st.markdown(
-            f"""
-            <div class="focus-box-bull">
-                <div class="focus-title-bull">
-                    <span>🔄 ইন্ট্রাডে বুলিশ রিভার্সাল ফোকাস (Bottom Turnaround – অতিরিক্ত না বেড়ে নিচ থেকে ঘুরে দাঁড়ানো স্টক)</span>
-                </div>
-                <div class="pill-wrap">{bull_pills_html}</div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-    with fbox2:
-        st.markdown(
-            f"""
-            <div class="focus-box-bear">
-                <div class="focus-title-bear">
-                    <span>📉 ইন্ট্রাডে বেয়ারিশ রিভার্সাল ফোকাস (Top Breakdown – ওপর থেকে নিচে নামার প্রস্তুতি নেওয়া স্টক)</span>
-                </div>
-                <div class="pill-wrap">{bear_pills_html}</div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-# ==============================================================================
-# ১১. সিলেক্টেড শেয়ারের লাইভ ট্রেড প্ল্যান (Entry, SL, Target) ও ক্যান্ডেলস্টিক চার্ট প্যানেল
-# ==============================================================================
-@st.cache_data(ttl=300, show_spinner=False)
-def get_single_stock_history(ticker: str):
-    try:
-        df = yf.download(ticker, period="6mo", interval="1d", progress=False)
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = [c[0] for c in df.columns]
-        return df.dropna(how="all")
-    except Exception:
-        return pd.DataFrame()
-
-if st.session_state.selected_stock != "শেয়ার টাইপ করুন..." and st.session_state.selected_stock in stocks_df["Ticker"].values:
-    st_row = stocks_df[stocks_df["Ticker"] == st.session_state.selected_stock].iloc[0]
-    sym_only = st_row["Symbol"]
-    price_now = st_row["Price"]
-    atr_val = st_row["ATR"]
-
-    # বুলিশ ও বেয়ারিশ উভয় সেটআপ লেভেল হিসাব
-    bull_entry = round(max(price_now, st_row["Day_High"] * 0.998), 2)
-    bull_sl = round(min(st_row["Day_Low"], bull_entry - (1.2 * atr_val)), 2)
-    bull_t1 = round(bull_entry + (1.5 * atr_val), 2)
-    bull_t2 = round(bull_entry + (2.5 * atr_val), 2)
-
-    bear_entry = round(min(price_now, st_row["Day_Low"] * 1.002), 2)
-    bear_sl = round(max(st_row["Day_High"], bear_entry + (1.2 * atr_val)), 2)
-    bear_t1 = round(bear_entry - (1.5 * atr_val), 2)
-    bear_t2 = round(bear_entry - (2.5 * atr_val), 2)
-
-    with st.container():
-        st.markdown("---")
-        insp_hdr1, insp_hdr2 = st.columns([8, 2])
-        with insp_hdr1:
+if not instant_stock_search.startswith("শেয়ার"):
+    st_sym_lookup = instant_stock_search + ".NS"
+    if st_sym_lookup in all_stocks_master:
+        st_obj = all_stocks_master[st_sym_lookup]
+        stk_nm_clean = st_obj["Stock"]
+        st.markdown('<div class="focus-drawer">', unsafe_allow_html=True)
+        sh_c1, sh_c2 = st.columns([4.5, 1.5])
+        with sh_c1:
             st.markdown(
-                f"### 🎯 লাইভ ইন্ট্রাডে ও সুইং ট্রেড ইন্সপেক্টর: **{sym_only}** "
-                f"<span style='font-size:0.95rem; color:#38bdf8;'>({st_row['Sector']})</span>",
-                unsafe_allow_html=True
+                f"### ⚡ কুইক স্টক প্রোফাইল: **{stk_nm_clean}** ({st_obj['Sector']}) — `{st_obj['Signal (সিগন্যাল)']}`"
             )
-        with insp_hdr2:
-            if st.button("✖️ ইন্সপেক্টর বন্ধ করুন", use_container_width=True):
-                st.session_state.selected_stock = "শেয়ার টাইপ করুন..."
+            st.caption(f"🎯 ইন্ট্রাডে ক্যাটালিস্ট: **{st_obj['Intraday Catalyst']}**")
+        with sh_c2:
+            st.markdown(
+                f'<a class="action-btn" href="https://in.tradingview.com/chart/?symbol=NSE:{stk_nm_clean}" target="_blank">📈 TradingView</a> '
+                f'<a class="action-btn" href="https://www.screener.in/company/{stk_nm_clean}/" target="_blank">📊 Screener</a> '
+                f'<a class="action-btn" href="https://www.google.com/search?q={stk_nm_clean}+share+news+india&tbm=nws" target="_blank">📰 News</a>',
+                unsafe_allow_html=True,
+            )
+        qm1, qm2, qm3, qm4, qm5, qm6 = st.columns(6)
+        qm1.metric("বর্তমান দাম (CMP)", f"₹{st_obj['CMP (₹)']}")
+        qm2.metric("1D / ইন্ট্রাডে মুভ", f"{st_obj['1D %']:+.2f}%", f"Day Pos: {st_obj['Day Range Pos %']:.0f}%")
+        qm3.metric("Buy Above (বুলিশ)", f"₹{st_obj['Buy Above (₹)']}", f"T1: ₹{st_obj['Bull T1 (₹)']}")
+        qm4.metric("Sell Below (বেয়ারিশ)", f"₹{st_obj['Sell Below (₹)']}", f"T1: ₹{st_obj['Bear T1 (₹)']}")
+        qm5.metric("RSI (14)", f"{st_obj['RSI (14)']}")
+        qm6.metric("Volume Action", st_obj["Volume Action"])
+        st.markdown("</div>", unsafe_allow_html=True)
+
+# ==============================================================================
+# ১০. নতুন ইন্ট্রাডে ফোকাস বার (যাতে অলরেডি ৪-৫ দিন বেড়ে যাওয়া স্টক বাদ দিয়ে নিচ থেকে ঘুরে দাঁড়ানো স্টক আসে)
+# ==============================================================================
+# বুলিশ টার্নঅ্যারাউন্ড ফিল্টার (যে স্টকগুলো গত ৩-৪ দিন অতিরিক্ত বা ধারাবাহিক বাড়েনি, কিন্তু আজ ভলিউম নিয়ে নিচ থেকে ঘুরছে)
+bull_turnaround_pool = all_st_df_global[
+    (all_st_df_global["1D %"] > 0.2) & (all_st_df_global["1W %"] < 6.0) & (all_st_df_global["Day Range Pos %"] >= 65)
+].sort_values(by="Turnaround_Bull_Score", ascending=False)
+if len(bull_turnaround_pool) < 6:
+    bull_turnaround_pool = all_st_df_global.sort_values(by="Turnaround_Bull_Score", ascending=False)
+top_6_bull_intraday = bull_turnaround_pool.head(6).reset_index(drop=True)
+
+# বেয়ারিশ টার্নঅ্যারাউন্ড ফিল্টার
+bear_turnaround_pool = all_st_df_global[
+    (all_st_df_global["1D %"] < -0.2) & (all_st_df_global["1W %"] > -6.0) & (all_st_df_global["Day Range Pos %"] <= 35)
+].sort_values(by="Turnaround_Bear_Score", ascending=False)
+if len(bear_turnaround_pool) < 6:
+    bear_turnaround_pool = all_st_df_global.sort_values(by="Turnaround_Bear_Score", ascending=False)
+top_6_bear_intraday = bear_turnaround_pool.head(6).reset_index(drop=True)
+
+ib_col1, ib_col2 = st.columns(2)
+with ib_col1:
+    bull_pills_html = ""
+    for _, brow in top_6_bull_intraday.iterrows():
+        b_stk = brow["Stock"]
+        b_ret = brow["1D %"]
+        b_rvol = brow["RVOL_Num"]
+        b_lvl = brow["Buy Above (₹)"]
+        bull_pills_html += (
+            f'<a class="focus-pill-bull" href="https://in.tradingview.com/chart/?symbol=NSE:{b_stk}" target="_blank" '
+            f'title="Buy Above: ₹{b_lvl} | Vol: {b_rvol}x | ক্লিক করে চার্ট খুলুন">'
+            f'🟢 {b_stk} ({b_ret:+.1f}% | {b_rvol}x Vol)</a>'
+        )
+    st.markdown(
+        f"""
+        <div class="intraday-bull-box">
+            <div style="font-size:13.5px; font-weight:800; color:#00e676; margin-bottom:4px;">
+                🔄 ইন্ট্রাডে বুলিশ রিভার্সাল ফোকাস (Bottom Turnaround — অতিরিক্ত না বেড়ে নিচ থেকে ঘুরে দাঁড়ানো স্টক)
+            </div>
+            <div>{bull_pills_html}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+with ib_col2:
+    bear_pills_html = ""
+    for _, srow in top_6_bear_intraday.iterrows():
+        s_stk = srow["Stock"]
+        s_ret = srow["1D %"]
+        s_rvol = srow["RVOL_Num"]
+        s_lvl = srow["Sell Below (₹)"]
+        bear_pills_html += (
+            f'<a class="focus-pill-bear" href="https://in.tradingview.com/chart/?symbol=NSE:{s_stk}" target="_blank" '
+            f'title="Sell Below: ₹{s_lvl} | Vol: {s_rvol}x | ক্লিক করে চার্ট খুলুন">'
+            f'🔴 {s_stk} ({s_ret:+.1f}% | {s_rvol}x Vol)</a>'
+        )
+    st.markdown(
+        f"""
+        <div class="intraday-bear-box">
+            <div style="font-size:13.5px; font-weight:800; color:#ff5252; margin-bottom:4px;">
+                📉 ইন্ট্রাডে বেয়ারিশ রিভার্সাল ফোকাস (Top Breakdown — ওপর থেকে নিচে নামার প্রস্তুতি নেওয়া স্টক)
+            </div>
+            <div>{bear_pills_html}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+# ==============================================================================
+# ১১. ১০০% ক্লিকেবল স্ক্রলিং সেক্টর বার (ব্যাকস্ল্যাশ মুক্ত ও সম্পূর্ণ নিরাপদ)
+# ==============================================================================
+pos_secs = sorted([s for s in sector_master if s[ret_key] >= 0], key=lambda x: x[ret_key], reverse=True)
+neg_secs = sorted([s for s in sector_master if s[ret_key] < 0], key=lambda x: x[ret_key], reverse=False)
+
+mixed_ticker_secs = []
+max_len = max(len(pos_secs), len(neg_secs))
+for i in range(max_len):
+    if i < len(pos_secs):
+        mixed_ticker_secs.append(pos_secs[i])
+    if i < len(neg_secs):
+        mixed_ticker_secs.append(neg_secs[i])
+
+ticker_items = []
+for s in mixed_ticker_secs:
+    r_val = s[ret_key]
+    sec_name_clean = s["Sector"]
+    sec_encoded = quote(sec_name_clean)
+    if r_val >= 0:
+        chip_html = (
+            f'<a class="ticker-chip-up" href="?focus_sec={sec_encoded}" target="_self" '
+            f'title="ক্লিক করে {sec_name_clean}-এর সব শেয়ার ও চার্ট দেখুন">'
+            f'🟢 {sec_name_clean}: ▲ {r_val:+.2f}% 🔍</a>'
+        )
+        ticker_items.append(chip_html)
+    else:
+        chip_html = (
+            f'<a class="ticker-chip-down" href="?focus_sec={sec_encoded}" target="_self" '
+            f'title="ক্লিক করে {sec_name_clean}-এর সব শেয়ার ও চার্ট দেখুন">'
+            f'🔴 {sec_name_clean}: ▼ {r_val:+.2f}% 🔍</a>'
+        )
+        ticker_items.append(chip_html)
+
+st.caption("💡 **ক্লিকেবল সেক্টর বার:** নিচের চলমান বারের ওপর মাউস রাখলে সেটি থেমে যাবে এবং **যেকোনো সেক্টরের ওপর ক্লিক করলেই** সাথে সাথে সেই সেক্টরের সব শেয়ার ও চার্ট খুলে যাবে:")
+st.markdown(
+    f'<div class="ticker-wrap"><div class="ticker-move">{"".join(ticker_items * 2)}</div></div>',
+    unsafe_allow_html=True,
+)
+
+# টিকার বারে ক্লিক করলে তার ডিটেইলস প্যানেল
+clicked_sec_raw = None
+try:
+    q_val = st.query_params.get("focus_sec", None)
+    if isinstance(q_val, list):
+        clicked_sec_raw = unquote(q_val[0]) if q_val else None
+    elif q_val:
+        clicked_sec_raw = unquote(q_val)
+except Exception:
+    clicked_sec_raw = None
+
+if clicked_sec_raw:
+    clicked_sec_obj = next((s for s in sector_master if s["Sector"] == clicked_sec_raw), None)
+    if clicked_sec_obj is not None:
+        st.markdown('<div class="focus-drawer">', unsafe_allow_html=True)
+        dr_c1, dr_c2 = st.columns([4.8, 1.2])
+        with dr_c1:
+            s_r_now = clicked_sec_obj[ret_key]
+            st.markdown(
+                f"### 🎯 নির্বাচিত সেক্টর ডিপ-ডাইভ: **{clicked_sec_obj['Sector']}** "
+                f"({tf_option}: `{s_r_now:+.2f}%` | মিটার স্কোর: `{clicked_sec_obj['Curr_Meter']}/100` | গড় RSI: `{clicked_sec_obj['Avg RSI']}`)"
+            )
+            st.markdown(f"**রোটেশন স্ট্যাটাস:** {clicked_sec_obj['Meter_Status']}")
+        with dr_c2:
+            if st.button("✖ এই সেক্টর ভিউ বন্ধ করুন", key="btn_close_ticker_sec"):
+                try:
+                    st.query_params.clear()
+                except Exception:
+                    pass
                 st.rerun()
 
-        ic1, ic2, ic3, ic4 = st.columns(4)
-        with ic1:
-            st.markdown(
-                f"""
-                <div class="sec-card">
-                    <div style="color:#94a3b8; font-size:0.8rem;">বর্তমান দাম ও ভলিউম স্পাইক</div>
-                    <div style="font-size:1.4rem; font-weight:800; margin:4px 0;">₹{price_now:,.2f} ({st_row['1D']:+.2f}%)</div>
-                    <div style="font-size:0.82rem; color:#38bdf8;">📊 ভলিউম রেশিও: <b>{st_row['Vol_Ratio']}x</b> | RSI: <b>{st_row['RSI']}</b></div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-        with ic2:
-            pat_txt = st_row["Bull_Pattern"] or st_row["Bear_Pattern"] or "🕯️ Neutral / Range Candle"
-            st.markdown(
-                f"""
-                <div class="sec-card">
-                    <div style="color:#94a3b8; font-size:0.8rem;">ক্যান্ডেলস্টিক ও কনসোলিডেশন স্ট্যাটাস</div>
-                    <div style="font-size:1.15rem; font-weight:800; margin:6px 0; color:#fbbf24;">{pat_txt}</div>
-                    <div style="font-size:0.8rem;">টানা আপ দিন: <b>{st_row['Consec_Up']}</b> | টানা ডাউন দিন: <b>{st_row['Consec_Down']}</b></div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-        with ic3:
-            st.markdown(
-                f"""
-                <div class="sec-card" style="border-color:#10b98188;">
-                    <div style="color:#34d399; font-size:0.82rem; font-weight:700;">🟢 বুলিশ ইন্ট্রাডে সেটআপ (Buy Setup)</div>
-                    <div style="font-size:0.84rem; margin-top:4px;">
-                        🔹 <b>Entry:</b> ₹{bull_entry} &nbsp;|&nbsp; 🛑 <b>SL:</b> ₹{bull_sl}<br>
-                        🎯 <b>Target 1:</b> ₹{bull_t1} &nbsp;|&nbsp; 🚀 <b>Target 2:</b> ₹{bull_t2}
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-        with ic4:
-            st.markdown(
-                f"""
-                <div class="sec-card" style="border-color:#ef444488;">
-                    <div style="color:#f87171; font-size:0.82rem; font-weight:700;">🔴 বেয়ারিশ ইন্ট্রাডে সেটআপ (Short Setup)</div>
-                    <div style="font-size:0.84rem; margin-top:4px;">
-                        🔹 <b>Short Below:</b> ₹{bear_entry} &nbsp;|&nbsp; 🛑 <b>SL:</b> ₹{bear_sl}<br>
-                        🎯 <b>Target 1:</b> ₹{bear_t1} &nbsp;|&nbsp; 📉 <b>Target 2:</b> ₹{bear_t2}
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
+        c_st_df = clicked_sec_obj["stocks_df"].sort_values(by=ret_key, ascending=False).reset_index(drop=True)
+        c_up = int((c_st_df[ret_key] >= 0).sum())
+        c_dn = len(c_st_df) - c_up
+        st.markdown(
+            f"📊 **সেক্টর ব্রেডথ ({tf_option}):** মোট **{len(c_st_df)}টি শেয়ারের** মধ্যে "
+            f"<span style='color:#00e676; font-weight:800;'>🟢 {c_up}টি শেয়ার উপরে মুভ করছে</span> এবং "
+            f"<span style='color:#ff5252; font-weight:800;'>🔴 {c_dn}টি শেয়ার ডাউন আছে</span>।",
+            unsafe_allow_html=True,
+        )
 
-        hist_df = get_single_stock_history(st_row["Ticker"])
-        if not hist_df.empty and len(hist_df) >= 20:
-            hist_df["DMA20"] = hist_df["Close"].rolling(20).mean()
-            hist_df["DMA50"] = hist_df["Close"].rolling(50).mean()
-            plot_df = hist_df.tail(75)
+        sub_tk = full_df.tail(tf_days_map[tf_option]).copy()
+        norm_tk = pd.DataFrame(
+            {c: (sub_tk[c] / sub_tk[c].dropna().iloc[0]) * 100 for c in clicked_sec_obj["valid_tickers"] if len(sub_tk[c].dropna()) > 0},
+            index=sub_tk.index,
+        )
 
-            fig = make_subplots(
-                rows=2, cols=1, shared_xaxes=True,
-                vertical_spacing=0.04, row_heights=[0.74, 0.26]
+        tk_col1, tk_col2 = st.columns([1, 2.1])
+        with tk_col1:
+            fig_tk_g = make_analog_gauge(
+                clicked_sec_obj["Curr_Meter"],
+                clicked_sec_obj["Prev_Meter"],
+                f"Prev: {clicked_sec_obj['Prev_Meter']} ➔ Now: {clicked_sec_obj['Curr_Meter']}",
+                height_px=270,
             )
-            fig.add_trace(
-                go.Candlestick(
-                    x=plot_df.index, open=plot_df["Open"], high=plot_df["High"],
-                    low=plot_df["Low"], close=plot_df["Close"], name="Price"
-                ),
-                row=1, col=1
+            st.plotly_chart(fig_tk_g, use_container_width=True, theme=None, key="ticker_clicked_gauge")
+        with tk_col2:
+            fig_tk_lines = go.Figure()
+            for t_c in norm_tk.columns:
+                sn = t_c.replace(".NS", "")
+                sr = all_stocks_master[t_c][ret_key]
+                fig_tk_lines.add_trace(
+                    go.Scatter(x=norm_tk.index, y=norm_tk[t_c], name=f"{sn} ({sr:+.1f}%)", mode="lines", line=dict(width=2.3))
+                )
+            fig_tk_lines.update_layout(
+                title=f"{clicked_sec_obj['Sector']} — কোন শেয়ারগুলো মুভ করছে তার লাইভ তুলনামূলক চার্ট ({tf_option})",
+                paper_bgcolor=chart_bg,
+                plot_bgcolor=chart_bg,
+                font=dict(color=text_color, size=11),
+                height=270,
+                hovermode="x unified",
+                margin=dict(t=35, b=12, l=10, r=10),
+                xaxis=dict(gridcolor=grid_col),
+                yaxis=dict(gridcolor=grid_col, title="Base 100"),
             )
-            fig.add_trace(
-                go.Scatter(x=plot_df.index, y=plot_df["DMA20"], mode="lines", name="20 DMA", line=dict(color="#38bdf8", width=1.6)),
-                row=1, col=1
-            )
-            fig.add_trace(
-                go.Scatter(x=plot_df.index, y=plot_df["DMA50"], mode="lines", name="50 DMA", line=dict(color="#f59e0b", width=1.6)),
-                row=1, col=1
-            )
-            vol_colors = ["#10b981" if c >= o else "#ef4444" for c, o in zip(plot_df["Close"], plot_df["Open"])]
-            fig.add_trace(
-                go.Bar(x=plot_df.index, y=plot_df["Volume"], name="Volume", marker_color=vol_colors),
-                row=2, col=1
-            )
-            fig.update_layout(
-                height=420,
-                template="plotly_dark" if "Clean Light" not in theme_choice else "plotly_white",
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                margin=dict(l=10, r=10, t=25, b=10),
-                xaxis_rangeslider_visible=False,
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-            )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig_tk_lines, use_container_width=True, theme=None, key="ticker_clicked_chart")
 
-        ext1, ext2, ext3 = st.columns(3)
-        with ext1:
-            st.link_button(f"📈 TradingView-এ {sym_only} চার্ট খুলুন", f"https://in.tradingview.com/chart/?symbol=NSE%3A{sym_only}", use_container_width=True)
-        with ext2:
-            st.link_button(f"📊 Screener.in-এ {sym_only} ফান্ডামেন্টাল দেখুন", f"https://www.screener.in/company/{sym_only}/", use_container_width=True)
-        with ext3:
-            st.link_button(f"📰 Google Finance-এ {sym_only} নিউজ দেখুন", f"https://www.google.com/finance/quote/{sym_only}:NSE", use_container_width=True)
-        st.markdown("---")
+        tk_disp_cols = [
+            "Stock", "Signal (সিগন্যাল)", "CMP (₹)", "RSI (14)", "Volume Action",
+            "Meter Score", "1D %", "1W %", "1M %", "3M %", "1Y %", "From 52W High %", "50 DMA Trend"
+        ]
+        st.dataframe(
+            style_colored_table(c_st_df[tk_disp_cols], ret_key),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        st.markdown("##### 🔗 সরাসরি চার্ট (TradingView), ফান্ডামেন্টাল (Screener) ও লাইভ নিউজ খুলুন:")
+        tk_btns = ""
+        for _, r in c_st_df.iterrows():
+            stk_c = r["Stock"]
+            tk_btns += (
+                f'<a class="action-btn" href="https://in.tradingview.com/chart/?symbol=NSE:{stk_c}" target="_blank">📈 {stk_c} (TV)</a>'
+                f'<a class="action-btn" href="https://www.screener.in/company/{stk_c}/" target="_blank">📊 Screener</a>'
+                f'<a class="action-btn" href="https://www.google.com/search?q={stk_c}+share+news+india&tbm=nws" target="_blank">📰 News</a> &nbsp;'
+            )
+        st.markdown(tk_btns, unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
 # ==============================================================================
-# ১২. ক্লিকেবল সেক্টর বার (URL-Encoded — `&` এরর সম্পূর্ণ ফিক্সড)
+# ১২. ক্লিকেবল ৪টি মেইন KPI কার্ড
 # ==============================================================================
-st.markdown(
-    "<div style='font-size:0.86rem; color:#cbd5e1; margin-top:8px;'>"
-    "📍 <b>ক্লিকেবল সেক্টর বার:</b> নিচের চলমান বারের ওপর মাউস রাখলে সেটি থেমে যাবে এবং <b>যেকোনো সেক্টরের ওপর ক্লিক করলেই</b> সাথে সাথে সেই সেক্টরের সব শেয়ার ও চার্ট খুলে যাবে:"
-    "</div>",
-    unsafe_allow_html=True
-)
+adv_count = int((all_st_df_global[ret_key] >= 0).sum())
+dec_count = len(all_st_df_global) - adv_count
+pct_above_50 = round(float(all_st_df_global["Above_50"].mean()) * 100, 1)
+best_sec_now = max(sector_master, key=lambda x: x[ret_key])
+worst_sec_now = min(sector_master, key=lambda x: x[ret_key])
 
-sorted_marquee_secs = sectors_df.sort_values(tf_selected, ascending=False)
-marquee_chips = []
-for _, srow in sorted_marquee_secs.iterrows():
-    sname = srow["Sector"]
-    sval = srow[tf_selected]
-    q_sec = urllib.parse.quote(sname)
-    is_pos = sval >= 0
-    chip_cls = "sector-chip sector-chip-up" if is_pos else "sector-chip sector-chip-down"
-    arrow = "▲" if is_pos else "▼"
-    dot = "🟢" if is_pos else "🔴"
-    marquee_chips.append(
-        f'<a class="{chip_cls}" href="?focus_sector={q_sec}" target="_self">'
-        f'{dot} {sname}: {arrow} {sval:+.2f}% 🔍'
-        f'</a>'
-    )
+if "active_kpi_panel" not in st.session_state:
+    st.session_state["active_kpi_panel"] = None
 
-marquee_inner = "".join(marquee_chips) * 2
-st.markdown(
-    f"""
-    <div class="sector-marquee-box">
-        <div class="sector-marquee-track">{marquee_inner}</div>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+def toggle_kpi(panel_name):
+    if st.session_state["active_kpi_panel"] == panel_name:
+        st.session_state["active_kpi_panel"] = None
+    else:
+        st.session_state["active_kpi_panel"] = panel_name
 
-# ==============================================================================
-# ১৩. ৪টি প্রধান সামারি KPI কার্ড এবং তাদের ওয়ার্কিং অ্যাকশন বাটন
-# ==============================================================================
-adv_tf = int((stocks_df[tf_selected] > 0).sum())
-dec_tf = int((stocks_df[tf_selected] < 0).sum())
-pct_above_50 = round((stocks_df["Above_50DMA"].sum() / len(stocks_df)) * 100.0, 1)
+k1, k2, k3, k4 = st.columns(4)
 
-top_sec_row = sectors_df.sort_values(tf_selected, ascending=False).iloc[0]
-bot_sec_row = sectors_df.sort_values(tf_selected, ascending=True).iloc[0]
-
-nifty_tf_val = nifty_d["chg_1w"] if tf_selected == "1W" else nifty_d["chg_1d"]
-
-k_col1, k_col2, k_col3, k_col4 = st.columns(4)
-
-with k_col1:
+with k1:
+    sub_cls = "kpi-sub-pos" if nifty_multi_ret["1W"] >= 0 else "kpi-sub-neg"
+    main_col = "#00e676" if nifty_curr_val >= 0 else "#ff5252"
     st.markdown(
         f"""
         <div class="kpi-card">
-            <div class="kpi-label">Nifty 50 Benchmark ({tf_selected})</div>
-            <div class="kpi-main" style="color:{'#34d399' if nifty_tf_val>=0 else '#f87171'};">
-                {nifty_tf_val:+.2f}%
-            </div>
-            <div class="{'kpi-badge-up' if nifty_tf_val>=0 else 'kpi-badge-down'}">
-                1W: {nifty_d['chg_1w']:+.2f}% | 1Y: {nifty_d['chg_1y']:+.1f}%
-            </div>
+            <div class="kpi-title">Nifty 50 Benchmark ({tf_option})</div>
+            <div class="kpi-main" style="color:{main_col} !important;">{nifty_curr_val:+.2f}%</div>
+            <span class="{sub_cls}">1W: {nifty_multi_ret['1W']:+.2f}% | 1Y: {nifty_multi_ret['1Y']:+.1f}%</span>
         </div>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
-    if st.button("📊 নিফটি ও মার্কেট মুভার্স লিস্ট দেখুন", key="btn_kpi_1", use_container_width=True):
-        st.session_state.active_modal = "movers" if st.session_state.active_modal != "movers" else None
+    if st.button("📊 নিফটি ৫০ মুভার্স লিস্ট দেখুন ▾", key="btn_kpi_nifty"):
+        toggle_kpi("nifty")
 
-with k_col2:
+with k2:
     st.markdown(
         f"""
         <div class="kpi-card">
-            <div class="kpi-label">মার্কেট ব্রেডথ ({tf_selected} Adv vs Dec)</div>
-            <div class="kpi-main">
-                <span style="color:#34d399;">🟢 {adv_tf} উপরে</span> | <span style="color:#f87171;">🔴 {dec_tf} নিচে</span>
-            </div>
-            <div class="kpi-badge-up">
-                {pct_above_50}% শেয়ার 50-DMA এর উপরে
-            </div>
+            <div class="kpi-title">মার্কেট ব্রেডথ ({tf_option} Adv vs Dec)</div>
+            <div class="kpi-main"><span style="color:#00e676 !important;">🟢 {adv_count} উপরে</span> | <span style="color:#ff5252 !important;">🔴 {dec_count} নিচে</span></div>
+            <span class="kpi-sub-pos">{pct_above_50}% শেয়ার 50-DMA এর উপরে</span>
         </div>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
-    if st.button("📈 বাড়তে থাকা ও ডাউন শেয়ার দেখুন", key="btn_kpi_2", use_container_width=True):
-        st.session_state.active_modal = "breadth" if st.session_state.active_modal != "breadth" else None
+    if st.button("📋 বাড়তে থাকা ও ডাউন শেয়ার দেখুন ▾", key="btn_kpi_breadth"):
+        toggle_kpi("breadth")
 
-with k_col3:
+with k3:
     st.markdown(
         f"""
         <div class="kpi-card">
-            <div class="kpi-label">টপ লিডার সেক্টর ({tf_selected})</div>
-            <div class="kpi-main">👑 {top_sec_row['Sector']}</div>
-            <div class="kpi-badge-up">
-                ▲ {top_sec_row[tf_selected]:+.2f}% (Meter: {top_sec_row['Meter']})
-            </div>
+            <div class="kpi-title">টপ লিডার সেক্টর ({tf_option})</div>
+            <div class="kpi-main" style="color:#00e676 !important;">👑 {best_sec_now['Sector']}</div>
+            <span class="kpi-sub-pos">▲ {best_sec_now[ret_key]:+.2f}% (Meter: {best_sec_now['Curr_Meter']:.0f})</span>
         </div>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
-    if st.button(f"🔍 {top_sec_row['Sector']}-এর শেয়ার দেখুন", key="btn_kpi_3", use_container_width=True):
-        st.session_state.selected_sector = top_sec_row["Sector"]
-        st.rerun()
+    if st.button(f"🔍 {best_sec_now['Sector']}-এর শেয়ার দেখুন ▾", key="btn_kpi_leader"):
+        toggle_kpi("leader")
 
-with k_col4:
+with k4:
     st.markdown(
         f"""
         <div class="kpi-card">
-            <div class="kpi-label">সবচেয়ে ডাউন সেক্টর ({tf_selected})</div>
-            <div class="kpi-main">📉 {bot_sec_row['Sector']}</div>
-            <div class="kpi-badge-down">
-                ▼ {bot_sec_row[tf_selected]:+.2f}% (Turnaround Watch)
-            </div>
+            <div class="kpi-title">সবচেয়ে ডাউন সেক্টর ({tf_option})</div>
+            <div class="kpi-main" style="color:#ff5252 !important;">📉 {worst_sec_now['Sector']}</div>
+            <span class="kpi-sub-neg">▼ {worst_sec_now[ret_key]:+.2f}% (Value Zone)</span>
         </div>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
-    if st.button(f"🔍 {bot_sec_row['Sector']}-এর শেয়ার দেখুন", key="btn_kpi_4", use_container_width=True):
-        st.session_state.selected_sector = bot_sec_row["Sector"]
-        st.rerun()
+    if st.button(f"🔍 {worst_sec_now['Sector']}-এর শেয়ার দেখুন ▾", key="btn_kpi_laggard"):
+        toggle_kpi("laggard")
 
-# KPI বাটনের পপ-আপ / এক্সপান্ডেবল ডিটেইল ভিউ
-if st.session_state.active_modal == "movers":
-    with st.expander("📊 টপ ১০ গেইনার এবং টপ ১০ লুজার শেয়ার (ক্লিক করে বন্ধ করুন)", expanded=True):
-        mc1, mc2 = st.columns(2)
-        with mc1:
-            st.markdown("#### 🚀 টপ ১০ গেইনার")
-            st.dataframe(
-                stocks_df.sort_values(tf_selected, ascending=False)[["Symbol", "Sector", "Price", tf_selected, "Vol_Ratio", "RSI"]].head(10),
-                use_container_width=True, hide_index=True
-            )
-        with mc2:
-            st.markdown("#### 📉 টপ ১০ লুজার")
-            st.dataframe(
-                stocks_df.sort_values(tf_selected, ascending=True)[["Symbol", "Sector", "Price", tf_selected, "Vol_Ratio", "RSI"]].head(10),
-                use_container_width=True, hide_index=True
-            )
-elif st.session_state.active_modal == "breadth":
-    with st.expander("📈 মার্কেট ব্রেডথ বিশ্লেষণ: 50-DMA এর উপরে ও নিচে থাকা শেয়ার", expanded=True):
-        bc1, bc2 = st.columns(2)
-        with bc1:
-            st.markdown("#### 🟢 50-DMA এর উপরে থাকা শক্তিশালী শেয়ার")
-            st.dataframe(
-                stocks_df[stocks_df["Above_50DMA"]].sort_values("Vol_Ratio", ascending=False)[["Symbol", "Sector", "Price", "1D", "1W", "Vol_Ratio", "RSI"]].head(15),
-                use_container_width=True, hide_index=True
-            )
-        with bc2:
-            st.markdown("#### 🔴 50-DMA এর নিচে থাকা ওভারসোল্ড শেয়ার")
-            st.dataframe(
-                stocks_df[~stocks_df["Above_50DMA"]].sort_values("RSI", ascending=True)[["Symbol", "Sector", "Price", "1D", "1W", "Vol_Ratio", "RSI"]].head(15),
-                use_container_width=True, hide_index=True
-            )
-
-st.markdown('<div id="sector-matrix-section"></div>', unsafe_allow_html=True)
-
-# ==============================================================================
-# ১৪. ৪টি প্রফেশনাল টার্মিনাল ট্যাব
-# ==============================================================================
-tab1, tab2, tab3, tab4 = st.tabs([
-    "🧭 ১. ৩২ সেক্টর রোটেশন ও অ্যানালগ মিটার",
-    "🎯 ২. ইন্ট্রাডে ডজি ও টার্নঅ্যারাউন্ড স্ক্যানার (Bullish & Bearish)",
-    "📈 ৩. সুইং ও পজিশনাল স্ক্যানার (20/50 DMA Support)",
-    "📋 ৪. ৩২ সেক্টরের পূর্ণাঙ্গ তুলনামূলক ম্যাট্রিক্স"
-])
-
-# ------------------------------------------------------------------------------
-# ট্যাব ১: ৩২ সেক্টর কার্ড, রোটেশন মিটার ও সেক্টর ড্রিলডাউন
-# ------------------------------------------------------------------------------
-with tab1:
-    view_sec_df = sectors_df.copy()
-
-    # জোন ফিল্টার প্রয়োগ
-    if zone_selected != "🌐 সব সেক্টর (All 32 Sectors)":
-        view_sec_df = view_sec_df[view_sec_df["Zone"] == zone_selected]
-
-    # নির্দিষ্ট সেক্টর ফিল্টার প্রয়োগ
-    if st.session_state.selected_sector != "সবগুলো সেক্টর (Show All 32)":
-        view_sec_df = view_sec_df[view_sec_df["Sector"] == st.session_state.selected_sector]
-        if st.button("🔄 সবগুলো সেক্টর আবার একসাথে দেখুন (Reset Sector Filter)"):
-            st.session_state.selected_sector = "সবগুলো সেক্টর (Show All 32)"
+active_p = st.session_state["active_kpi_panel"]
+if active_p is not None:
+    st.markdown('<div class="focus-drawer">', unsafe_allow_html=True)
+    top_bar_c1, top_bar_c2 = st.columns([5, 1])
+    with top_bar_c2:
+        if st.button("✖ লিস্ট বন্ধ করুন", key="close_kpi_panel"):
+            st.session_state["active_kpi_panel"] = None
             st.rerun()
 
-    # সর্টিং প্রয়োগ
-    if "Top Gainers" in sort_selected:
-        view_sec_df = view_sec_df.sort_values(tf_selected, ascending=False)
-    elif "Top Losers" in sort_selected:
-        view_sec_df = view_sec_df.sort_values(tf_selected, ascending=True)
-    elif "Bottom Turnaround" in sort_selected:
-        view_sec_df = view_sec_df.sort_values(["Bull_Turnaround", "1D"], ascending=[False, False])
-    elif "Volume Shockers" in sort_selected:
-        view_sec_df = view_sec_df.sort_values("Avg_Vol_Ratio", ascending=False)
-    else:
-        view_sec_df = view_sec_df.sort_values("Meter", ascending=False)
+    disp_cols_kpi = [
+        "Stock", "Sector", "Signal (সিগন্যাল)", "CMP (₹)", "RSI (14)", "Volume Action",
+        "1D %", "1W %", "1M %", "3M %", "1Y %", "From 52W High %"
+    ]
 
-    def render_svg_gauge(score: int) -> str:
-        """হালকা ও দ্রুতগতির SVG অ্যানালগ মিটার যা পিসি কখনোই স্লো করবে না"""
-        angle = -90 + (score * 1.8)
-        col = "#10b981" if score >= 60 else ("#fbbf24" if score >= 40 else "#ef4444")
-        return f"""
-        <div style="text-align:center; margin:4px 0;">
-            <svg width="120" height="68" viewBox="0 0 120 68">
-                <path d="M 12 58 A 48 48 0 0 1 108 58" fill="none" stroke="#1e293b" stroke-width="10" stroke-linecap="round"/>
-                <path d="M 12 58 A 48 48 0 0 1 42 16" fill="none" stroke="#ef4444" stroke-width="6" stroke-linecap="round" opacity="0.7"/>
-                <path d="M 42 16 A 48 48 0 0 1 78 16" fill="none" stroke="#fbbf24" stroke-width="6" stroke-linecap="round" opacity="0.7"/>
-                <path d="M 78 16 A 48 48 0 0 1 108 58" fill="none" stroke="#10b981" stroke-width="6" stroke-linecap="round" opacity="0.7"/>
-                <g transform="translate(60, 58) rotate({angle})">
-                    <line x1="0" y1="0" x2="0" y2="-40" stroke="{col}" stroke-width="3.2" stroke-linecap="round"/>
-                    <circle cx="0" cy="0" r="4.5" fill="{col}"/>
-                </g>
-                <text x="60" y="54" text-anchor="middle" fill="{col}" font-size="12" font-weight="800">{score}</text>
-            </svg>
-        </div>
-        """
+    if active_p == "nifty":
+        n50_up = int((nifty50_df_global[ret_key] >= 0).sum())
+        n50_dn = len(nifty50_df_global) - n50_up
+        with top_bar_c1:
+            st.markdown(
+                f"### 📊 আসল Nifty 50 শেয়ার মুভার্স লিস্ট ({tf_option}: {nifty_curr_val:+.2f}% | 🟢 {n50_up}টি প্লাসে, 🔴 {n50_dn}টি মাইনাসে)"
+            )
+        nc1, nc2 = st.columns(2)
+        with nc1:
+            st.markdown(f"#### 🟢 নিফটি ৫০ টপ গেইনার্স ({tf_option})")
+            top_pull = nifty50_df_global.sort_values(by=ret_key, ascending=False).head(25).reset_index(drop=True)
+            st.dataframe(style_colored_table(top_pull[disp_cols_kpi], ret_key), use_container_width=True, height=380, hide_index=True)
+        with nc2:
+            st.markdown(f"#### 🔴 নিফটি ৫০ টপ লুজার্স ({tf_option})")
+            top_drag = nifty50_df_global.sort_values(by=ret_key, ascending=True).head(25).reset_index(drop=True)
+            st.dataframe(style_colored_table(top_drag[disp_cols_kpi], ret_key), use_container_width=True, height=380, hide_index=True)
 
-    grid_cols = st.columns(3)
-    for idx, (_, srow) in enumerate(view_sec_df.iterrows()):
-        sec_name = srow["Sector"]
-        sec_ret = srow[tf_selected]
-        sec_stocks = stocks_df[stocks_df["Sector"] == sec_name].sort_values("1D", ascending=False)
-        gauge_html = render_svg_gauge(int(srow["Meter"])) if show_analog_meter else ""
+    elif active_p == "breadth":
+        with top_bar_c1:
+            st.markdown(f"### 📋 মার্কেট ব্রেডথ রিপোর্ট: 🟢 {adv_count}টি শেয়ার উপরে | 🔴 {dec_count}টি শেয়ার নিচে ({tf_option})")
+        bc1, bc2 = st.columns(2)
+        with bc1:
+            st.markdown(f"#### 🟢 বাড়তে থাকা শেয়ারসমূহ ({adv_count}টি)")
+            adv_df = all_st_df_global[all_st_df_global[ret_key] >= 0].sort_values(by=ret_key, ascending=False).reset_index(drop=True)
+            st.dataframe(style_colored_table(adv_df[disp_cols_kpi], ret_key), use_container_width=True, height=380, hide_index=True)
+        with bc2:
+            st.markdown(f"#### 🔴 ডাউন বা মাইনাসে থাকা শেয়ারসমূহ ({dec_count}টি)")
+            dec_df = all_st_df_global[all_st_df_global[ret_key] < 0].sort_values(by=ret_key, ascending=True).reset_index(drop=True)
+            st.dataframe(style_colored_table(dec_df[disp_cols_kpi], ret_key), use_container_width=True, height=380, hide_index=True)
 
-        stock_chips = []
-        for _, st_r in sec_stocks.iterrows():
-            q_t = urllib.parse.quote(st_r["Ticker"])
-            s_col = "#34d399" if st_r["1D"] >= 0 else "#f87171"
-            pat_icon = "🕯️" if (pd.notna(st_r["Bull_Pattern"]) or pd.notna(st_r["Bear_Pattern"])) else ""
-            stock_chips.append(
-                f'<a href="?focus_stock={q_t}" target="_self" '
-                f'style="text-decoration:none; background:rgba(255,255,255,0.05); border:1px solid {s_col}55; '
-                f'color:{s_col}; padding:3px 8px; border-radius:8px; font-size:0.75rem; font-weight:700;">'
-                f'{st_r["Symbol"]} ({st_r["1D"]:+.1f}% | {st_r["Vol_Ratio"]}x) {pat_icon}</a>'
+    elif active_p in ["leader", "laggard"]:
+        target_sec = best_sec_now if active_p == "leader" else worst_sec_now
+        sec_title_prefix = "👑 টপ লিডার সেক্টর" if active_p == "leader" else "📉 সবচেয়ে ডাউন সেক্টর"
+        with top_bar_c1:
+            st.markdown(
+                f"### {sec_title_prefix}: **{target_sec['Sector']}** ({tf_option} রিটার্ন: {target_sec[ret_key]:+.2f}%)"
             )
 
-        with grid_cols[idx % 3]:
+        t_df = target_sec["stocks_df"].sort_values(by=ret_key, ascending=False).reset_index(drop=True)
+        lc1, lc2 = st.columns([1.25, 1.75])
+        with lc1:
+            sub_k = full_df.tail(tf_days_map[tf_option]).copy()
+            norm_k = pd.DataFrame(
+                {c: (sub_k[c] / sub_k[c].dropna().iloc[0]) * 100 for c in target_sec["valid_tickers"] if len(sub_k[c].dropna()) > 0},
+                index=sub_k.index,
+            )
+            fig_k = go.Figure()
+            for t_c in norm_k.columns:
+                sn = t_c.replace(".NS", "")
+                sr = all_stocks_master[t_c][ret_key]
+                fig_k.add_trace(go.Scatter(x=norm_k.index, y=norm_k[t_c], name=f"{sn} ({sr:+.1f}%)", mode="lines", line=dict(width=2.2)))
+            fig_k.update_layout(
+                title=f"{target_sec['Sector']} - শেয়ারগুলোর তুলনামূলক চার্ট ({tf_option})",
+                paper_bgcolor=chart_bg,
+                plot_bgcolor=chart_bg,
+                font=dict(color=text_color, size=11),
+                height=310,
+                hovermode="x unified",
+                margin=dict(t=35, b=15, l=10, r=10),
+                xaxis=dict(gridcolor=grid_col),
+                yaxis=dict(gridcolor=grid_col, title="Base 100"),
+            )
+            st.plotly_chart(fig_k, use_container_width=True, theme=None, key=f"kpi_chart_{active_p}_{tf_option}")
+        with lc2:
+            cols_sec_show = ["Stock", "Signal (সিগন্যাল)", "CMP (₹)", "RSI (14)", "Volume Action", "1D %", "1W %", "1M %", "1Y %", "From 52W High %"]
+            st.dataframe(style_colored_table(t_df[cols_sec_show], ret_key), use_container_width=True, height=310, hide_index=True)
+            btn_links = ""
+            for _, r in t_df.iterrows():
+                stk_c = r["Stock"]
+                btn_links += (
+                    f'<a class="action-btn" href="https://in.tradingview.com/chart/?symbol=NSE:{stk_c}" target="_blank">📈 {stk_c} (TV)</a>'
+                    f'<a class="action-btn" href="https://www.screener.in/company/{stk_c}/" target="_blank">📊 Screener</a>'
+                    f'<a class="action-btn" href="https://www.google.com/search?q={stk_c}+share+news+india&tbm=nws" target="_blank">📰 News</a> &nbsp;'
+                )
+            st.markdown(btn_links, unsafe_allow_html=True)
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# ==============================================================================
+# ১৩. গ্লোবাল ফিল্টারিং ও সর্টিং লজিক
+# ==============================================================================
+if not quick_sec_jump.startswith("সবগুলো"):
+    filtered_sectors = [s for s in sector_master if s["Sector"] == quick_sec_jump]
+else:
+    if "Strong Green" in zone_filter_choice:
+        filtered_sectors = [s for s in sector_master if s["Is_Strong_Green"]]
+    elif "Red ➔ Green" in zone_filter_choice:
+        filtered_sectors = [s for s in sector_master if s["Is_Turnaround"]]
+        if not filtered_sectors:
+            filtered_sectors = sorted(sector_master, key=lambda x: x["Turnaround_Score"], reverse=True)[:10]
+    elif "Yellow" in zone_filter_choice:
+        filtered_sectors = [s for s in sector_master if s["Is_Yellow"]]
+    elif "Green ➔ Red" in zone_filter_choice:
+        filtered_sectors = [s for s in sector_master if s["Is_Cooling"]]
+        if not filtered_sectors:
+            filtered_sectors = sorted(sector_master, key=lambda x: x["Cooling_Score"], reverse=True)[:10]
+    elif "Red Zone" in zone_filter_choice:
+        filtered_sectors = [s for s in sector_master if s["Is_Red_Zone"]]
+    else:
+        filtered_sectors = list(sector_master)
+
+if "Top Gainers" in sort_option:
+    filtered_sectors = sorted(filtered_sectors, key=lambda x: x[ret_key], reverse=True)
+elif "Top Losers" in sort_option:
+    filtered_sectors = sorted(filtered_sectors, key=lambda x: x[ret_key], reverse=False)
+elif "Red ➔ Green" in sort_option:
+    filtered_sectors = sorted(filtered_sectors, key=lambda x: (x["Is_Turnaround"], x["Turnaround_Score"], x["Meter_Diff"]), reverse=True)
+elif "Green ➔ Red" in sort_option:
+    filtered_sectors = sorted(filtered_sectors, key=lambda x: (x["Is_Cooling"], x["Cooling_Score"], -x["Meter_Diff"]), reverse=True)
+elif "Meter: High to Low" in sort_option:
+    filtered_sectors = sorted(filtered_sectors, key=lambda x: x["Curr_Meter"], reverse=True)
+elif "Meter: Low to High" in sort_option:
+    filtered_sectors = sorted(filtered_sectors, key=lambda x: x["Curr_Meter"], reverse=False)
+
+# ==============================================================================
+# ১৪. ৫টি প্রো ট্যাব
+# ==============================================================================
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "🧭 ১. সেক্টর চার্ট, মিটার ও শেয়ার তালিকা",
+    "⚡ ২. ইন্ট্রাডে ও সুইং রাডার (Next-Day Bullish/Bearish)",
+    "🔥 ৩. লং ও শর্ট-টার্ম স্ক্যানার (Volume, RSI & Value)",
+    "📊 ৪. সব সেক্টরের তুলনামূলক টেবিল",
+    "📈 ৫. শেয়ারের নিজস্ব চার্ট ও মুভিং অ্যাভারেজ",
+])
+
+# ==============================================================================
+# TAB 1: সেক্টর গ্রিড + অ্যানালগ মিটার + সব শেয়ারের চার্ট ও সবুজ/লাল টেবিল
+# ==============================================================================
+with tab1:
+    days_sel = tf_days_map[tf_option]
+    nifty_curr_ret = nifty_multi_ret[tf_option]
+
+    sub_df = full_df.tail(days_sel).copy()
+    norm_sub = pd.DataFrame(index=sub_df.index)
+    for col in sub_df.columns:
+        s = sub_df[col].dropna()
+        if len(s) > 0 and s.iloc[0] != 0:
+            norm_sub[col] = (sub_df[col] / s.iloc[0]) * 100
+
+    nifty_norm_line = norm_sub[benchmark] if benchmark in norm_sub.columns else None
+
+    if len(filtered_sectors) == 1:
+        cols = [st.container()]
+    else:
+        cols = st.columns(2)
+
+    for idx, sec in enumerate(filtered_sectors):
+        target_col = cols[0] if len(filtered_sectors) == 1 else cols[idx % 2]
+        with target_col:
+            s_name = sec["Sector"]
+            s_ret = sec[ret_key]
+            alpha_val = round(s_ret - nifty_curr_ret, 2)
+            outperform = s_ret >= nifty_curr_ret
+            st_df = sec["stocks_df"].sort_values(by=ret_key, ascending=False).reset_index(drop=True)
+
+            up_cnt = int((st_df[ret_key] >= 0).sum())
+            dn_cnt = len(st_df) - up_cnt
+            badge_cls = "badge-green" if s_ret >= 0 else "badge-red"
+            arrow_sym = "▲" if s_ret >= 0 else "▼"
+
             st.markdown(
                 f"""
-                <div class="sec-card">
-                    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                        <div>
-                            <div style="font-size:1.02rem; font-weight:800;">{sec_name}</div>
-                            <div style="font-size:0.75rem; color:#94a3b8; margin-top:2px;">{srow['Zone']}</div>
-                        </div>
-                        <div style="text-align:right;">
-                            <span style="font-size:1.08rem; font-weight:800; color:{'#34d399' if sec_ret>=0 else '#f87171'};">
-                                {sec_ret:+.2f}%
-                            </span>
-                            <div style="font-size:0.72rem; color:#94a3b8;">1D: {srow['1D']:+.2f}% | 1W: {srow['1W']:+.2f}%</div>
-                        </div>
+                <div class="pro-card">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size:19px; font-weight:800; color:{text_color};">#{idx+1} {s_name}</span>
+                        <span class="{badge_cls}">{arrow_sym} {s_ret:+.2f}% ({tf_option})</span>
                     </div>
-                    {gauge_html}
-                    <div style="display:flex; justify-content:space-between; font-size:0.76rem; color:#94a3b8; margin:6px 0 8px 0;">
-                        <span>📊 Avg Vol: <b>{srow['Avg_Vol_Ratio']}x</b></span>
-                        <span>⚡ RSI: <b>{srow['Avg_RSI']}</b></span>
-                        <span>📈 >50DMA: <b>{srow['Breadth_50DMA']}%</b></span>
-                    </div>
-                    <div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:6px;">
-                        {"".join(stock_chips)}
+                    <div class="stage-banner">{sec['Meter_Status']}</div>
+                    <div style="font-size:13px; color:{sub_text}; margin-top:4px;">
+                        <b>Alpha vs Nifty:</b> {alpha_val:+.2f}% &nbsp;|&nbsp;
+                        <span style="color:#00e676; font-weight:700;">🟢 উপরে: {up_cnt}টি</span> &nbsp;|&nbsp;
+                        <span style="color:#ff5252; font-weight:700;">🔴 নিচে: {dn_cnt}টি</span> &nbsp;|&nbsp;
+                        <b>Avg RSI:</b> {sec['Avg RSI']} &nbsp;|&nbsp;
+                        🧭 <b>Meter:</b> {sec['Curr_Meter']}/100
                     </div>
                 </div>
                 """,
-                unsafe_allow_html=True
+                unsafe_allow_html=True,
             )
 
-# ------------------------------------------------------------------------------
-# ট্যাব ২: ইন্ট্রাডে ডজি ও টার্নঅ্যারাউন্ড স্ক্যানার (পূর্ণাঙ্গ ট্রেডিং টেবিল)
-# ------------------------------------------------------------------------------
+            valid_cols = [t for t in sec["valid_tickers"] if t in norm_sub.columns]
+            sec_line = norm_sub[valid_cols].mean(axis=1)
+            unique_key_suffix = f"{s_name}_{tf_option}_{idx}"
+
+            if show_card_meter:
+                ch_col, mt_col = st.columns([1.65, 1])
+            else:
+                ch_col = st.container()
+
+            with ch_col:
+                fig = go.Figure()
+                fig.add_trace(
+                    go.Scatter(
+                        x=norm_sub.index,
+                        y=sec_line,
+                        name=f"{s_name} ({s_ret:+.1f}%)",
+                        line=dict(color="#00e676" if outperform else "#ff5252", width=2.8),
+                    )
+                )
+                if nifty_norm_line is not None:
+                    fig.add_trace(
+                        go.Scatter(
+                            x=norm_sub.index,
+                            y=nifty_norm_line,
+                            name=f"Nifty 50 ({nifty_curr_ret:+.1f}%)",
+                            line=dict(color=nifty_col_line, width=1.8, dash="dot"),
+                        )
+                    )
+                fig.update_layout(
+                    paper_bgcolor=chart_bg,
+                    plot_bgcolor=chart_bg,
+                    font=dict(color=text_color),
+                    height=225,
+                    hovermode="x unified",
+                    margin=dict(t=22, b=12, l=10, r=10),
+                    legend=dict(orientation="h", y=1.15, x=0, font=dict(size=11, color=text_color)),
+                    xaxis=dict(gridcolor=grid_col),
+                    yaxis=dict(gridcolor=grid_col, title="Base 100"),
+                )
+                st.plotly_chart(fig, use_container_width=True, theme=None, key=f"sec_ch_{unique_key_suffix}")
+
+            if show_card_meter:
+                with mt_col:
+                    fig_gauge = make_analog_gauge(
+                        sec["Curr_Meter"],
+                        sec["Prev_Meter"],
+                        "Rotation Meter",
+                        height_px=225,
+                    )
+                    st.plotly_chart(fig_gauge, use_container_width=True, theme=None, key=f"sec_g_{unique_key_suffix}")
+
+            top_st = st_df.iloc[0]
+            bot_st = st_df.iloc[-1]
+            st.markdown(
+                f"🟢 **টপ গেইনার:** `{top_st['Stock']} ({top_st[ret_key]:+.1f}%)` &nbsp;|&nbsp; "
+                f"🔴 **সবচেয়ে ডাউন:** `{bot_st['Stock']} ({bot_st[ret_key]:+.1f}%)`"
+            )
+
+            is_expanded_default = len(filtered_sectors) == 1
+            with st.expander(
+                f"🔍 {s_name} ওপেন করুন — সব শেয়ারের সিগন্যাল, RSI, ভলিউম ও চার্ট ({len(st_df)}টি শেয়ার)",
+                expanded=is_expanded_default,
+            ):
+                ex_c1, ex_c2 = st.columns([1, 2])
+                with ex_c1:
+                    big_gauge = make_analog_gauge(
+                        sec["Curr_Meter"],
+                        sec["Prev_Meter"],
+                        f"Prev: {sec['Prev_Meter']} ➔ Now: {sec['Curr_Meter']}",
+                        height_px=250,
+                    )
+                    st.plotly_chart(big_gauge, use_container_width=True, theme=None, key=f"big_g_{unique_key_suffix}")
+
+                with ex_c2:
+                    fig_st = go.Figure()
+                    for t in valid_cols:
+                        st_name = t.replace(".NS", "")
+                        st_r = all_stocks_master[t][ret_key]
+                        fig_st.add_trace(
+                            go.Scatter(
+                                x=norm_sub.index,
+                                y=norm_sub[t],
+                                name=f"{st_name} ({st_r:+.1f}%)",
+                                mode="lines",
+                                line=dict(width=2),
+                            )
+                        )
+                    fig_st.update_layout(
+                        title=f"{s_name} - কোন শেয়ার উপরে ও কোন শেয়ার নিচে ({tf_option})",
+                        paper_bgcolor=chart_bg,
+                        plot_bgcolor=chart_bg,
+                        font=dict(color=text_color, size=11),
+                        height=250,
+                        hovermode="x unified",
+                        margin=dict(t=35, b=12, l=10, r=10),
+                        xaxis=dict(gridcolor=grid_col),
+                        yaxis=dict(gridcolor=grid_col, title="Base 100"),
+                    )
+                    st.plotly_chart(fig_st, use_container_width=True, theme=None, key=f"st_cmp_{unique_key_suffix}")
+
+                disp_cols = [
+                    "Stock", "Signal (সিগন্যাল)", "CMP (₹)", "RSI (14)", "Volume Action",
+                    "Meter Score", "1D %", "1W %", "1M %", "3M %", "1Y %", "From 52W High %"
+                ]
+                st.dataframe(
+                    style_colored_table(st_df[disp_cols], ret_key),
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
+                st.markdown("##### 🔗 এক ক্লিকে চার্ট (TradingView), ফান্ডামেন্টাল (Screener) ও নিউজ খুলুন:")
+                btn_html = ""
+                for _, r in st_df.iterrows():
+                    stk_c = r["Stock"]
+                    btn_html += (
+                        f'<a class="action-btn" href="https://in.tradingview.com/chart/?symbol=NSE:{stk_c}" target="_blank">📈 {stk_c} (TV)</a>'
+                        f'<a class="action-btn" href="https://www.screener.in/company/{stk_c}/" target="_blank">📊 Screener</a>'
+                        f'<a class="action-btn" href="https://www.google.com/search?q={stk_c}+share+news+india&tbm=nws" target="_blank">📰 News</a> &nbsp;'
+                    )
+                st.markdown(btn_html, unsafe_allow_html=True)
+
+            st.markdown("<br>", unsafe_allow_html=True)
+
+# ==============================================================================
+# TAB 2: ইন্ট্রাডে ও সুইং রাডার (Next-Day Bullish/Bearish Action Plan + News)
+# ==============================================================================
 with tab2:
-    st.markdown("#### 🎯 ইন্ট্রাডে ডজি, কনসোলিডেশন ও সেক্টর টার্নঅ্যারাউন্ড স্ক্যানার (Entry, SL ও Target সহ)")
+    st.subheader("⚡ আগামীকালের ইন্ট্রাডে ও সুইং ট্রেডিং ফোকাস রাডার (Volume + Price Action + News)")
+    st.markdown(
+        "**কীভাবে ব্যবহার করবেন:**\n"
+        "- 🟢 **মার্কেট যদি বুলিশ (উপরে) থাকে:** বামপাশের **বুলিশ ফোকাস তালিকা** থেকে যে শেয়ারগুলো আজকের দিনের হাই (`Buy Above`)-এর ওপরে ট্রেড করবে, সেগুলোতে Buy/Long ইন্ট্রাডে বা সুইং ট্রেড নেওয়া যাবে।\n"
+        "- 🔴 **মার্কেট যদি বেয়ারিশ (নিচে) থাকে:** ডানপাশের **বেয়ারিশ ফোকাস তালিকা** থেকে যে শেয়ারগুলো আজকের দিনের লো (`Sell Below`)-এর নিচে নামবে, সেগুলোতে Short/Sell ইন্ট্রাডে ট্রেড নেওয়া যাবে।"
+    )
+
+    in_c1, in_c2 = st.columns(2)
+
+    with in_c1:
+        st.markdown("#### 🚀 ১. বুলিশ ইন্ট্রাডে ও সুইং ফোকাস (Top 10 Bullish Setups)")
+        st.caption("নিচ থেকে ঘুরে দাঁড়ানো (Turnaround Reversal) + হেভি ভলিউম স্টক:")
+        top_10_bull = top_6_bull_intraday.head(10).reset_index(drop=True).copy()
+        top_10_bull_disp = top_10_bull[[
+            "Stock", "Sector", "CMP (₹)", "1D %", "Volume Action", "Day Range Pos %",
+            "Buy Above (₹)", "Bull SL (₹)", "Bull T1 (₹)", "Bull T2 (₹)", "Intraday Catalyst"
+        ]].rename(columns={
+            "Bull SL (₹)": "Stop Loss (₹)",
+            "Bull T1 (₹)": "Target 1 (₹)",
+            "Bull T2 (₹)": "Target 2 (₹)",
+        })
+        st.dataframe(
+            style_colored_table(top_10_bull_disp, "1D %"),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        st.markdown("##### 🔗 বুলিশ ফোকাস শেয়ারগুলোর লাইভ চার্ট ও ব্রেকিং নিউজ চেক করুন:")
+        bull_links_str = ""
+        for _, r in top_10_bull.head(6).iterrows():
+            st_c = r["Stock"]
+            bull_links_str += (
+                f'<a class="action-btn" href="https://in.tradingview.com/chart/?symbol=NSE:{st_c}" target="_blank">📈 {st_c} Chart</a>'
+                f'<a class="action-btn" href="https://www.google.com/search?q={st_c}+share+news+india&tbm=nws" target="_blank">📰 {st_c} News</a> &nbsp;'
+            )
+        st.markdown(bull_links_str, unsafe_allow_html=True)
+
+    with in_c2:
+        st.markdown("#### 📉 ২. বেয়ারিশ ইন্ট্রাডে ফোকাস (Top 10 Bearish Breakdown Setups)")
+        st.caption("ওপর থেকে নিচে নামার প্রস্তুতি নেওয়া (Top Reversal) দুর্বল শেয়ার:")
+        top_10_bear = top_6_bear_intraday.head(10).reset_index(drop=True).copy()
+        top_10_bear_disp = top_10_bear[[
+            "Stock", "Sector", "CMP (₹)", "1D %", "Volume Action", "Day Range Pos %",
+            "Sell Below (₹)", "Bear SL (₹)", "Bear T1 (₹)", "Bear T2 (₹)", "Intraday Catalyst"
+        ]].rename(columns={
+            "Bear SL (₹)": "Stop Loss (₹)",
+            "Bear T1 (₹)": "Target 1 (₹)",
+            "Bear T2 (₹)": "Target 2 (₹)",
+        })
+        st.dataframe(
+            style_colored_table(top_10_bear_disp, "1D %"),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        st.markdown("##### 🔗 বেয়ারিশ ফোকাস শেয়ারগুলোর লাইভ চার্ট ও ব্রেকিং নিউজ চেক করুন:")
+        bear_links_str = ""
+        for _, r in top_10_bear.head(6).iterrows():
+            st_c = r["Stock"]
+            bear_links_str += (
+                f'<a class="action-btn" href="https://in.tradingview.com/chart/?symbol=NSE:{st_c}" target="_blank">📉 {st_c} Chart</a>'
+                f'<a class="action-btn" href="https://www.google.com/search?q={st_c}+share+news+india&tbm=nws" target="_blank">📰 {st_c} News</a> &nbsp;'
+            )
+        st.markdown(bear_links_str, unsafe_allow_html=True)
+
+    st.markdown("---")
+    st.markdown("#### 🌊 ৩. সুইং ট্রেডিং স্পেশাল: ভলিউম ও প্রাইস শক স্ক্যানার (Unusual Volume + Big Move)")
+    st.caption("যে শেয়ারগুলোতে আজ সাধারণ সময়ের চেয়ে দেড় গুণ বা দ্বিগুণের বেশি ভলিউম হয়েছে:")
+    swing_shock_df = (
+        all_st_df_global[all_st_df_global["RVOL_Num"] >= 1.3]
+        .sort_values(by="RVOL_Num", ascending=False)
+        .head(15)
+        .reset_index(drop=True)
+    )
+    if swing_shock_df.empty:
+        swing_shock_df = all_st_df_global.sort_values(by="RVOL_Num", ascending=False).head(12).reset_index(drop=True)
+
+    swing_cols = [
+        "Stock", "Sector", "Signal (সিগন্যাল)", "CMP (₹)", "1D %", "1W %",
+        "Volume Action", "Day Range Pos %", "RSI (14)", "Intraday Catalyst"
+    ]
+    st.dataframe(
+        style_colored_table(swing_shock_df[swing_cols], "1D %"),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+# ==============================================================================
+# TAB 3: লং ও শর্ট-টার্ম স্ক্যানার
+# ==============================================================================
+with tab3:
+    st.subheader("🔥 লং-টার্ম ও পজিশনাল শেয়ার স্ক্যানার (Breakout, Turnaround & Deep Value)")
+    cols_scanner = []
+    for c_item in ["Stock", "Sector", "Signal (সিগন্যাল)", "CMP (₹)", "RSI (14)", "Volume Action", ret_key, "1W %", "From 52W High %"]:
+        if c_item not in cols_scanner:
+            cols_scanner.append(c_item)
 
     sc_col1, sc_col2 = st.columns(2)
     with sc_col1:
-        st.markdown("##### 🟢 বুলিশ রিভার্সাল ও ডজি কনসোলিডেশন শেয়ার (Buy Radar)")
-        bull_table = bull_focus_df[["Symbol", "Sector", "Price", "1D", "1W", "Vol_Ratio", "RSI", "Consec_Up", "Bull_Pattern", "ATR"]].copy()
-        bull_table["Entry (₹)"] = (bull_table["Price"] * 1.001).round(2)
-        bull_table["StopLoss (₹)"] = (bull_table["Price"] - 1.2 * bull_table["ATR"]).round(2)
-        bull_table["Target 1 (₹)"] = (bull_table["Price"] + 1.6 * bull_table["ATR"]).round(2)
-        st.dataframe(
-            bull_table.drop(columns=["ATR"]),
-            use_container_width=True,
-            hide_index=True
+        st.markdown(f"#### 🔥 ১. ইনস্টিটিউশনাল ভলিউম ব্রেকআউট (High Volume Buying - {tf_option})")
+        vol_brk_df = (
+            all_st_df_global[all_st_df_global["1D %"] > 0]
+            .sort_values(by=["RVOL_Num", ret_key], ascending=[False, False])
+            .head(15)
+            .reset_index(drop=True)
         )
+        st.dataframe(style_colored_table(vol_brk_df[cols_scanner], ret_key), use_container_width=True, hide_index=True)
 
     with sc_col2:
-        st.markdown("##### 🔴 বেয়ারিশ ব্রেকডাউন ও টপ স্টল শেয়ার (Short Radar)")
-        bear_table = bear_focus_df[["Symbol", "Sector", "Price", "1D", "1W", "Vol_Ratio", "RSI", "Consec_Down", "Bear_Pattern", "ATR"]].copy()
-        bear_table["Short Below (₹)"] = (bear_table["Price"] * 0.999).round(2)
-        bear_table["StopLoss (₹)"] = (bear_table["Price"] + 1.2 * bear_table["ATR"]).round(2)
-        bear_table["Target 1 (₹)"] = (bear_table["Price"] - 1.6 * bear_table["ATR"]).round(2)
-        st.dataframe(
-            bear_table.drop(columns=["ATR"]),
-            use_container_width=True,
-            hide_index=True
+        st.markdown(f"#### 🚀 ২. পজিশনাল মোমেন্টাম লিডার (Top Breakouts - {tf_option})")
+        brk_df = (
+            all_st_df_global[all_st_df_global["Above_50"]]
+            .sort_values(by=ret_key, ascending=False)
+            .head(15)
+            .reset_index(drop=True)
         )
+        st.dataframe(style_colored_table(brk_df[cols_scanner], ret_key), use_container_width=True, hide_index=True)
 
-    # ১-ক্লিকে ওয়াচলিস্ট এক্সপোর্ট
-    tv_bull_list = ",".join([f"NSE:{s}" for s in bull_focus_df["Symbol"].tolist()])
-    tv_bear_list = ",".join([f"NSE:{s}" for s in bear_focus_df["Symbol"].tolist()])
-    dl1, dl2 = st.columns(2)
-    with dl1:
-        st.download_button(
-            "📥 বুলিশ ফোকাস ওয়াচলিস্ট ডাউনলোড করুন (TradingView .txt)",
-            data=tv_bull_list,
-            file_name="alphapulse_bullish_intraday.txt",
-            mime="text/plain",
-            use_container_width=True
+    st.markdown("---")
+    sc_col3, sc_col4 = st.columns(2)
+    with sc_col3:
+        st.markdown("#### 🔄 ৩. নিচ থেকে ঘুরে দাঁড়ানো শেয়ার (Turnaround Gems)")
+        turn_df = (
+            all_st_df_global[(all_st_df_global["From 52W High %"] < -10) & (all_st_df_global["1W %"] > 0)]
+            .sort_values(by="1W %", ascending=False)
+            .head(15)
+            .reset_index(drop=True)
         )
-    with dl2:
-        st.download_button(
-            "📥 বেয়ারিশ ফোকাস ওয়াচলিস্ট ডাউনলোড করুন (TradingView .txt)",
-            data=tv_bear_list,
-            file_name="alphapulse_bearish_intraday.txt",
-            mime="text/plain",
-            use_container_width=True
-        )
+        st.dataframe(style_colored_table(turn_df[cols_scanner], "1W %"), use_container_width=True, hide_index=True)
 
-# ------------------------------------------------------------------------------
-# ট্যাব ৩: সুইং ও পজিশনাল স্ক্যানার (20-DMA Pullback & Volume Buildup)
-# ------------------------------------------------------------------------------
-with tab3:
-    st.markdown("#### 📈 সুইং ও পজিশনাল ট্রেডিং রাডার (20-DMA সাপোর্টের কাছে কনসোলিডেট করা ও ভলিউম বাড়তে থাকা শেয়ার)")
-    swing_df = stocks_df[
-        (stocks_df["Above_50DMA"]) &
-        (stocks_df["Dist_20DMA"] >= -3.5) &
-        (stocks_df["Dist_20DMA"] <= 4.5) &
-        (stocks_df["RSI"] >= 42) &
-        (stocks_df["RSI"] <= 66) &
-        (stocks_df["Vol_Ratio"] >= 1.0)
-    ].sort_values("Vol_Ratio", ascending=False)
+    with sc_col4:
+        st.markdown("#### 💎 ৪. লং-টার্ম ভ্যালু ও লো-RSI শেয়ার (Oversold / Deep Value)")
+        val_df = all_st_df_global.sort_values(by="From 52W High %", ascending=True).head(15).reset_index(drop=True)
+        st.dataframe(style_colored_table(val_df[cols_scanner], "From 52W High %"), use_container_width=True, hide_index=True)
 
-    st.dataframe(
-        swing_df[["Symbol", "Sector", "Price", "1D", "1W", "1M", "Vol_Ratio", "RSI", "DMA20", "DMA50", "Dist_20DMA", "Bull_Pattern"]],
-        use_container_width=True,
-        hide_index=True
+    csv_bytes = all_st_df_global.to_csv(index=False).encode("utf-8")
+    st.download_button(
+        label="📥 সব শেয়ারের সম্পূর্ণ ডেটা (Intraday Levels, RSI ও Volume সহ) Excel/CSV ডাউনলোড করুন",
+        data=csv_bytes,
+        file_name="AlphaPulse_Full_Screener.csv",
+        mime="text/csv",
     )
 
-# ------------------------------------------------------------------------------
-# ট্যাব ৪: ৩২ সেক্টরের পূর্ণাঙ্গ তুলনামূলক ম্যাট্রিক্স
-# ------------------------------------------------------------------------------
+# ==============================================================================
+# TAB 4: সব সেক্টরের তুলনামূলক টেবিল ও বার চার্ট
+# ==============================================================================
 with tab4:
-    st.markdown("#### 📋 ৩২টি সেক্টরের মাল্টি-টাইমফ্রেম রোটেশন ম্যাট্রিক্স (1D থেকে 1Y)")
+    st.subheader(f"📊 ৩২টি সেক্টরের এক নজরে র‍্যাঙ্কিং ও তুলনামূলক টেবিল ({tf_option})")
+
+    bar_secs = sorted(sector_master, key=lambda x: x[ret_key], reverse=True)
+    bar_names = [s["Sector"] for s in bar_secs]
+    bar_vals = [s[ret_key] for s in bar_secs]
+    bar_cols = ["#00e676" if v >= 0 else "#ff5252" for v in bar_vals]
+
+    fig_bar = go.Figure(
+        go.Bar(
+            x=bar_names,
+            y=bar_vals,
+            marker_color=bar_cols,
+            text=[f"{v:+.1f}%" for v in bar_vals],
+            textposition="outside",
+        )
+    )
+    fig_bar.update_layout(
+        title=f"সব সেক্টরের আপসাইড (সবুজ) বনাম ডাউনসাইড (লাল) তুলনা ({tf_option})",
+        paper_bgcolor=chart_bg,
+        plot_bgcolor=chart_bg,
+        font=dict(color=text_color, size=11),
+        height=360,
+        margin=dict(t=40, b=80, l=15, r=15),
+        xaxis=dict(tickangle=-35, gridcolor=grid_col),
+        yaxis=dict(gridcolor=grid_col, title=f"Return ({tf_option}) %"),
+    )
+    st.plotly_chart(fig_bar, use_container_width=True, theme=None, key=f"bar_rank_{tf_option}")
+
+    mat_df = pd.DataFrame(filtered_sectors)[
+        ["Sector", "Stage", "Curr_Meter", "Prev_Meter", "Meter_Diff", "Avg RSI", "1D %", "1W %", "1M %", "3M %", "6M %", "1Y %", "5Y %"]
+    ].rename(
+        columns={
+            "Curr_Meter": "Now Meter (0-100)",
+            "Prev_Meter": "Prev Meter",
+            "Meter_Diff": "Shift (Δ)",
+        }
+    ).reset_index(drop=True)
+
     st.dataframe(
-        sectors_df.sort_values(tf_selected, ascending=False)[
-            ["Sector", "Zone", "Meter", "1D", "1W", "1M", "3M", "6M", "1Y", "Avg_Vol_Ratio", "Avg_RSI", "Breadth_50DMA"]
-        ],
+        style_colored_table(mat_df, ret_key),
         use_container_width=True,
-        hide_index=True
+        height=640,
+        hide_index=True,
     )
 
 # ==============================================================================
-# ১৫. ফ্লোটিং ‘ওপরে যান (Top)’ ও কুইক নেভিগেশন বার (১০০% কার্যকরী ও নন-ওভারল্যাপিং)
+# TAB 5: যেকোনো শেয়ারের নিজস্ব চার্ট, RSI, ভলিউম এবং স্টকের অ্যানালগ মিটার
 # ==============================================================================
-components.html(
-    """
-    <script>
-    (function() {
-        const parentDoc = window.parent.document;
-        const oldNav = parentDoc.getElementById("alphapulse-floating-dock");
-        if (oldNav) {
-            oldNav.remove();
-        }
+with tab5:
+    st.subheader("📈 সিঙ্গেল স্টক চার্ট, RSI, ভলিউম এবং মুভিং অ্যাভারেজ (DMA)")
 
-        const dock = parentDoc.createElement("div");
-        dock.id = "alphapulse-floating-dock";
-        dock.style.cssText = `
-            position: fixed;
-            bottom: 64px;
-            right: 22px;
-            z-index: 999999;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        `;
+    sc1, sc2, sc3 = st.columns(3)
+    with sc1:
+        chosen_sec = st.selectbox("১. সেক্টর বেছে নিন:", list(sectors.keys()), key="t4_sec")
+    with sc2:
+        sec_tickers = [t.replace(".NS", "") for t in sectors[chosen_sec] if t in full_df.columns]
+        chosen_stock = st.selectbox("২. শেয়ার বেছে নিন:", sec_tickers, key="t4_stk")
+    with sc3:
+        chart_tf = st.selectbox("৩. চার্টের সময়কাল:", ["3M", "6M", "1Y", "3Y", "5Y"], index=2, key="t4_tf")
 
-        function createJumpBtn(label, bgGradient, targetId) {
-            const btn = parentDoc.createElement("button");
-            btn.innerHTML = label;
-            btn.style.cssText = `
-                background: ${bgGradient};
-                color: #ffffff;
-                border: 1px solid rgba(255,255,255,0.25);
-                border-radius: 999px;
-                padding: 9px 16px;
-                font-size: 13px;
-                font-weight: 800;
-                cursor: pointer;
-                box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
-                transition: transform 0.2s ease, box-shadow 0.2s ease;
-                font-family: sans-serif;
-            `;
-            btn.onmouseenter = () => { btn.style.transform = "translateY(-2px) scale(1.04)"; };
-            btn.onmouseleave = () => { btn.style.transform = "translateY(0) scale(1)"; };
-            btn.onclick = () => {
-                if (targetId === "TOP") {
-                    const anchor = parentDoc.getElementById("alphapulse-top");
-                    if (anchor) anchor.scrollIntoView({ behavior: "smooth", block: "start" });
-                    const containers = [
-                        parentDoc.querySelector('[data-testid="stAppViewContainer"]'),
-                        parentDoc.querySelector('[data-testid="stMain"]'),
-                        parentDoc.querySelector('section.main'),
-                        parentDoc.documentElement,
-                        parentDoc.body
-                    ];
-                    containers.forEach(el => {
-                        if (el) el.scrollTo({ top: 0, behavior: "smooth" });
-                    });
-                    window.parent.scrollTo({ top: 0, behavior: "smooth" });
-                } else {
-                    const el = parentDoc.getElementById(targetId);
-                    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-                }
-            };
-            return btn;
-        }
+    if chosen_stock:
+        t_sym = chosen_stock + ".NS"
+        s_info = all_stocks_master.get(t_sym, {})
 
-        const topBtn = createJumpBtn("🚀 ওপরে যান (Top)", "linear-gradient(135deg, #0284c7, #2563eb)", "TOP");
-        const focusBtn = createJumpBtn("🎯 ইন্ট্রাডে ফোকাস", "linear-gradient(135deg, #059669, #10b981)", "intraday-focus-section");
+        m1, m2, m3, m4, m5, m6 = st.columns(6)
+        m1.metric("বর্তমান দাম (CMP)", f"₹{s_info.get('CMP (₹)', 0)}")
+        m2.metric("RSI (14)", f"{s_info.get('RSI (14)', 50)}")
+        m3.metric("Volume Action", s_info.get("Volume Action", ""))
+        m4.metric("1M Return", f"{s_info.get('1M %', 0):+.2f}%")
+        m5.metric("52W High থেকে দূরত্ব", f"{s_info.get('From 52W High %', 0):+.2f}%")
+        m6.metric("সিগন্যাল", s_info.get("Signal (সিগন্যাল)", ""))
 
-        dock.appendChild(focusBtn);
-        dock.appendChild(topBtn);
-        parentDoc.body.appendChild(dock);
-    })();
-    </script>
-    """,
-    height=0,
-    width=0
-)
+        st.markdown(
+            f'<a class="action-btn" href="https://in.tradingview.com/chart/?symbol=NSE:{chosen_stock}" target="_blank">📈 TradingView-তে {chosen_stock}-এর পূর্ণাঙ্গ চার্ট খুলুন</a> '
+            f'<a class="action-btn" href="https://www.screener.in/company/{chosen_stock}/" target="_blank">📊 Screener.in-এ {chosen_stock}-এর ফান্ডামেন্টাল দেখুন</a> '
+            f'<a class="action-btn" href="https://www.google.com/search?q={chosen_stock}+share+news+india&tbm=nws" target="_blank">📰 {chosen_stock}-এর ব্রেকিং নিউজ দেখুন</a>',
+            unsafe_allow_html=True,
+        )
+
+        s_full = full_df[t_sym].dropna()
+        sma20 = s_full.rolling(20).mean()
+        sma50 = s_full.rolling(50).mean()
+        sma200 = s_full.rolling(200).mean()
+
+        d_cnt = tf_days_map[chart_tf]
+        s_sub = s_full.tail(d_cnt)
+
+        ind_c1, ind_c2 = st.columns([2.35, 1])
+        with ind_c1:
+            fig_ind = go.Figure()
+            fig_ind.add_trace(
+                go.Scatter(x=s_sub.index, y=s_sub, name=f"{chosen_stock} Price", line=dict(color=accent_col, width=2.8))
+            )
+            fig_ind.add_trace(
+                go.Scatter(x=s_sub.index, y=sma20.tail(d_cnt), name="20 DMA", line=dict(color="#f59e0b", width=1.5, dash="dot"))
+            )
+            fig_ind.add_trace(
+                go.Scatter(x=s_sub.index, y=sma50.tail(d_cnt), name="50 DMA", line=dict(color="#00e676", width=1.8))
+            )
+            fig_ind.add_trace(
+                go.Scatter(x=s_sub.index, y=sma200.tail(d_cnt), name="200 DMA", line=dict(color="#ff5252", width=2.0))
+            )
+            fig_ind.update_layout(
+                title=f"{chosen_stock} ({chosen_sec}) - প্রাইস ও মুভিং অ্যাভারেজ চার্ট ({chart_tf})",
+                paper_bgcolor=chart_bg,
+                plot_bgcolor=chart_bg,
+                font=dict(color=text_color),
+                height=400,
+                hovermode="x unified",
+                margin=dict(t=45, b=20, l=15, r=15),
+                xaxis=dict(gridcolor=grid_col),
+                yaxis=dict(gridcolor=grid_col, title="Price (₹)"),
+                legend=dict(orientation="h", y=1.08, x=0, font=dict(color=text_color)),
+            )
+            st.plotly_chart(fig_ind, use_container_width=True, theme=None, key=f"ind_stock_chart_{chosen_stock}_{chart_tf}")
+
+        with ind_c2:
+            fig_st_gauge = make_analog_gauge(
+                s_info.get("Meter Score", 50.0),
+                s_info.get("Prev Meter", 50.0),
+                f"{chosen_stock} মোমেন্টাম মিটার",
+                height_px=360,
+            )
+            st.plotly_chart(fig_st_gauge, use_container_width=True, theme=None, key=f"ind_stock_gauge_{chosen_stock}_{chart_tf}")
