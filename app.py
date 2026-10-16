@@ -2,9 +2,7 @@ from urllib.parse import quote, unquote
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import streamlit as st
-import streamlit.components.v1 as components
 import yfinance as yf
 
 # ==============================================================================
@@ -16,9 +14,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed",
 )
-
-# পেজের একদম উপরের অ্যাঙ্কর (Back to Top-এর জন্য)
-st.markdown('<div id="top-anchor"></div>', unsafe_allow_html=True)
 
 # ==============================================================================
 # ২. ৩২টি মাইক্রো-সেক্টর, ম্যাক্রো ইনডেক্স এবং আসল NIFTY 50-এর তালিকা
@@ -162,7 +157,7 @@ with top_h3:
     show_card_meter = st.toggle("🎛️ অ্যানালগ মিটার", value=True)
 
 # ==============================================================================
-# ৪. থিম কালার, প্রফেশনাল সিএসএস এবং ১০০% কার্যকরী জাভাস্ক্রিপ্ট Back-to-Top বাটন
+# ৪. থিম কালার ও প্রফেশনাল সিএসএস (ফ্লোটিং Back-to-Top বাটন সহ)
 # ==============================================================================
 if "Pure White" in theme_choice:
     bg_color = "#f4f6f9"
@@ -216,8 +211,8 @@ section[data-testid="stSidebar"],
     color: __TEXT_COLOR__ !important;
 }
 .block-container {
-    padding-top: 0.8rem !important;
-    padding-bottom: 3.5rem !important;
+    padding-top: 0.9rem !important;
+    padding-bottom: 2rem !important;
     padding-left: 1.6rem !important;
     padding-right: 1.6rem !important;
     max-width: 100% !important;
@@ -225,24 +220,7 @@ section[data-testid="stSidebar"],
 h1, h2, h3, h4, h5, h6, label {
     color: __TEXT_COLOR__ !important;
 }
-/* কাস্টম স্ক্রলবার যাতে সহজে মাউস দিয়ে ধরে উপরে-নিচে নামানো যায় */
-::-webkit-scrollbar {
-    width: 12px;
-    height: 12px;
-}
-::-webkit-scrollbar-track {
-    background: __BG_COLOR__;
-}
-::-webkit-scrollbar-thumb {
-    background: __ACCENT_COL__;
-    border-radius: 6px;
-    border: 2px solid __BG_COLOR__;
-}
-::-webkit-scrollbar-thumb:hover {
-    background: #f59e0b;
-}
-div[data-baseweb="select"] > div,
-div[data-baseweb="input"] > div {
+div[data-baseweb="select"] > div {
     background-color: __INPUT_BG__ !important;
     color: __TEXT_COLOR__ !important;
     border: 1.5px solid __BORDER_COL__ !important;
@@ -257,8 +235,7 @@ div[data-baseweb="select"] > div:focus-within {
     border-color: __ACCENT_COL__ !important;
     box-shadow: 0 0 10px rgba(56, 189, 248, 0.28) !important;
 }
-div[data-baseweb="select"] span,
-div[data-baseweb="input"] input {
+div[data-baseweb="select"] span {
     color: __TEXT_COLOR__ !important;
 }
 div[data-baseweb="popover"] ul {
@@ -375,8 +352,8 @@ div[data-testid="stMetricValue"] div {
     box-shadow: 0 10px 30px rgba(56, 189, 248, 0.18);
 }
 .intraday-bull-box {
-    background: linear-gradient(135deg, rgba(0, 230, 118, 0.09) 0%, __CARD_BG__ 100%);
-    border: 1px solid rgba(0, 230, 118, 0.45);
+    background: linear-gradient(135deg, rgba(0, 230, 118, 0.08) 0%, __CARD_BG__ 100%);
+    border: 1px solid rgba(0, 230, 118, 0.4);
     border-left: 5px solid #00e676;
     border-radius: 14px;
     padding: 12px 15px;
@@ -384,8 +361,8 @@ div[data-testid="stMetricValue"] div {
     box-shadow: __SHADOW_CSS__;
 }
 .intraday-bear-box {
-    background: linear-gradient(135deg, rgba(255, 82, 82, 0.09) 0%, __CARD_BG__ 100%);
-    border: 1px solid rgba(255, 82, 82, 0.45);
+    background: linear-gradient(135deg, rgba(255, 82, 82, 0.08) 0%, __CARD_BG__ 100%);
+    border: 1px solid rgba(255, 82, 82, 0.4);
     border-left: 5px solid #ff5252;
     border-radius: 14px;
     padding: 12px 15px;
@@ -403,11 +380,9 @@ div[data-testid="stMetricValue"] div {
     border: 1px solid rgba(0, 230, 118, 0.45);
     color: #00e676 !important;
     text-decoration: none !important;
-    transition: all 0.18s ease;
 }
 .focus-pill-bull:hover {
     background: rgba(0, 230, 118, 0.28);
-    transform: translateY(-2px);
 }
 .focus-pill-bear {
     display: inline-block;
@@ -420,11 +395,9 @@ div[data-testid="stMetricValue"] div {
     border: 1px solid rgba(255, 82, 82, 0.45);
     color: #ff5252 !important;
     text-decoration: none !important;
-    transition: all 0.18s ease;
 }
 .focus-pill-bear:hover {
     background: rgba(255, 82, 82, 0.28);
-    transform: translateY(-2px);
 }
 .macro-strip {
     display: flex;
@@ -584,6 +557,25 @@ a.ticker-chip-down:hover {
     background: rgba(255, 82, 82, 0.28);
     transform: scale(1.05);
 }
+/* ফ্লোটিং Back to Top বাটন */
+.back-to-top {
+    position: fixed;
+    bottom: 25px;
+    right: 25px;
+    background: linear-gradient(135deg, #38bdf8 0%, #2563eb 100%);
+    color: #ffffff !important;
+    padding: 10px 16px;
+    border-radius: 99px;
+    font-weight: 800;
+    font-size: 13.5px;
+    text-decoration: none !important;
+    box-shadow: 0 4px 20px rgba(56, 189, 248, 0.5);
+    z-index: 99999;
+    transition: transform 0.2s ease;
+}
+.back-to-top:hover {
+    transform: scale(1.08);
+}
 @keyframes ticker {
     0% { transform: translateX(0%); }
     100% { transform: translateX(-50%); }
@@ -603,65 +595,8 @@ final_css = (
 )
 st.markdown(final_css, unsafe_allow_html=True)
 
-# ১০০% কার্যকরী জাভাস্ক্রিপ্ট ফ্লোটিং Back-to-Top বাটন (যা Streamlit-এর সব ইন্টারনাল কন্টেইনারকে এক ক্লিকে উপরে নিয়ে আসবে)
-scroll_top_js = """
-<script>
-(function() {
-    const doc = window.parent.document;
-    let btn = doc.getElementById('alpha-floating-top-btn');
-    if (!btn) {
-        btn = doc.createElement('button');
-        btn.id = 'alpha-floating-top-btn';
-        btn.innerHTML = '⬆️ ওপরে যান (Top)';
-        btn.title = 'এক ক্লিকে পেজের একদম উপরে ফিরে যান';
-        doc.body.appendChild(btn);
-    }
-    btn.style.cssText = [
-        'position: fixed',
-        'bottom: 62px',
-        'right: 22px',
-        'z-index: 999999',
-        'background: linear-gradient(135deg, #f59e0b 0%, #ea580c 100%)',
-        'color: #ffffff',
-        'border: 2px solid #fde047',
-        'border-radius: 999px',
-        'padding: 10px 18px',
-        'font-size: 13.5px',
-        'font-weight: 800',
-        'cursor: pointer',
-        'box-shadow: 0 6px 22px rgba(245, 158, 11, 0.55)',
-        'transition: transform 0.2s ease'
-    ].join(';');
-
-    btn.onmouseenter = function() { btn.style.transform = 'scale(1.08)'; };
-    btn.onmouseleave = function() { btn.style.transform = 'scale(1.0)'; };
-
-    btn.onclick = function() {
-        const anchor = doc.getElementById('top-anchor');
-        if (anchor) {
-            anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-        const selectors = [
-            '[data-testid="stAppViewContainer"]',
-            '[data-testid="stMain"]',
-            'section.main',
-            '.main',
-            'html',
-            'body'
-        ];
-        selectors.forEach(function(sel) {
-            const el = doc.querySelector(sel);
-            if (el) {
-                try { el.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e) {}
-                el.scrollTop = 0;
-            }
-        });
-        try { window.parent.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e) {}
-    };
-})();
-</script>
-"""
-components.html(scroll_top_js, height=0)
+# ફ্লোটিং ব্যাক-টু-টপ বাটন রেন্ডার করা
+st.markdown('<a class="back-to-top" href="#" target="_self">🚀 ওপরে যান (Top)</a>', unsafe_allow_html=True)
 
 # ==============================================================================
 # ৫. ডেটা ইঞ্জিন (Close, High, Low, Open, Volume)
@@ -684,7 +619,7 @@ def load_full_market_data():
         vol_df = pd.DataFrame(index=close_df.index)
     return close_df, high_df, low_df, open_df, vol_df
 
-with st.spinner("মার্কেট ডেটা, ডোজি/হ্যামার ক্যান্ডেলস্টিক প্যাটার্ন এবং ইন্ট্রাডে রিভার্সাল রাডার প্রস্তুত হচ্ছে..."):
+with st.spinner("মার্কেট ডেটা, প্রাইস অ্যাকশন ও ইন্ট্রাডে টার্নঅ্যারাউন্ড রাডার প্রস্তুত হচ্ছে..."):
     full_df, full_high_df, full_low_df, full_open_df, full_vol_df = load_full_market_data()
 
 tf_days_map = {
@@ -738,7 +673,7 @@ def style_colored_table(df_in, primary_col):
         return df_in
 
     clean_df = df_in.loc[:, ~df_in.columns.duplicated()].copy().reset_index(drop=True)
-    pct_candidates = ["1D %", "Prior 4D %", "1W %", "1M %", "3M %", "6M %", "1Y %", "5Y %", "From 52W High %", "Day Range Pos %"]
+    pct_candidates = ["1D %", "1W %", "1M %", "3M %", "6M %", "1Y %", "5Y %", "From 52W High %", "Day Range Pos %"]
     pct_cols = [c for c in pct_candidates if c in clean_df.columns]
 
     price_candidates = ["CMP (₹)", "Buy Above (₹)", "Sell Below (₹)", "Stop Loss (₹)", "Target 1 (₹)", "Target 2 (₹)"]
@@ -749,8 +684,6 @@ def style_colored_table(df_in, primary_col):
         fmt[pc] = "₹{:.2f}"
     if "RSI (14)" in clean_df.columns:
         fmt["RSI (14)"] = "{:.1f}"
-    if "Qty (শেয়ার সংখ্যা)" in clean_df.columns:
-        fmt["Qty (শেয়ার সংখ্যা)"] = "{:.0f} টি"
     if "Meter Score" in clean_df.columns:
         fmt["Meter Score"] = "{:.0f}/100"
     if "Now Meter (0-100)" in clean_df.columns:
@@ -946,7 +879,7 @@ with c5:
 ret_key = f"{tf_option} %"
 
 # ==============================================================================
-# ৮. ক্যান্ডেলস্টিক প্যাটার্ন (Doji, Hammer, Shooting Star, Inside Bar) ও মাল্টি-ডে পুলব্যাক ইঞ্জিন
+# ৮. সেক্টর ও স্টকের সম্পূর্ণ ক্যালকুলেশন (নিচ থেকে ঘুরে দাঁড়ানো Turnaround Reversal লজিকসহ)
 # ==============================================================================
 nifty_col = full_df[benchmark] if benchmark in full_df.columns else pd.Series(dtype=float)
 nifty_multi_ret = {tf: calc_return(nifty_col, d) for tf, d in tf_days_map.items()}
@@ -968,75 +901,13 @@ def compute_stock_row(t, s_name_label):
     low_52w = float(s_price.tail(252).min())
     dd_52w = round(((curr_p / high_52w) - 1) * 100, 2) if high_52w > 0 else 0.0
 
-    # আজকের এবং আগের দিনের OHLC ডেটা
-    h_series = full_high_df[t].dropna() if t in full_high_df.columns else s_price
-    l_series = full_low_df[t].dropna() if t in full_low_df.columns else s_price
-    o_series = full_open_df[t].dropna() if t in full_open_df.columns else s_price
+    day_high = float(full_high_df[t].dropna().iloc[-1]) if t in full_high_df.columns and len(full_high_df[t].dropna()) > 0 else curr_p
+    day_low = float(full_low_df[t].dropna().iloc[-1]) if t in full_low_df.columns and len(full_low_df[t].dropna()) > 0 else curr_p
+    day_open = float(full_open_df[t].dropna().iloc[-1]) if t in full_open_df.columns and len(full_open_df[t].dropna()) > 0 else curr_p
 
-    day_high = float(h_series.iloc[-1]) if len(h_series) > 0 else curr_p
-    day_low = float(l_series.iloc[-1]) if len(l_series) > 0 else curr_p
-    day_open = float(o_series.iloc[-1]) if len(o_series) > 0 else curr_p
-
-    prev_high = float(h_series.iloc[-2]) if len(h_series) >= 2 else day_high
-    prev_low = float(l_series.iloc[-2]) if len(l_series) >= 2 else day_low
-    prev_open = float(o_series.iloc[-2]) if len(o_series) >= 2 else day_open
-    prev_close = float(s_price.iloc[-2]) if len(s_price) >= 2 else curr_p
-
-    # ক্যান্ডেলের মাপজোক (Body, Upper Wick, Lower Wick)
     day_range = max(day_high - day_low, 0.01)
-    body_size = abs(curr_p - day_open)
-    body_pct = (body_size / day_range) * 100.0
-    lower_wick = min(day_open, curr_p) - day_low
-    upper_wick = day_high - max(day_open, curr_p)
-    lower_wick_pct = (lower_wick / day_range) * 100.0
-    upper_wick_pct = (upper_wick / day_range) * 100.0
     clv_pct = round(float(np.clip(((curr_p - day_low) / day_range) * 100.0, 0.0, 100.0)), 1)
 
-    # আজকের আগের ৪ দিনে শেয়ারটি কী করেছে? (টানা পড়ছিল নাকি টানা বাড়ছিল?)
-    if len(s_price) >= 6:
-        prior_4d_ret = round(((float(s_price.iloc[-2]) / float(s_price.iloc[-6])) - 1.0) * 100.0, 2)
-        prior_diffs = s_price.iloc[-6:-1].diff().dropna()
-        prior_down_days = int((prior_diffs < 0).sum())
-        prior_up_days = int((prior_diffs > 0).sum())
-    else:
-        prior_4d_ret = 0.0
-        prior_down_days = 0
-        prior_up_days = 0
-
-    # ক্যান্ডেলস্টিক প্যাটার্ন শনাক্তকরণ (Doji, Hammer, Engulfing, Shooting Star, Inside Bar)
-    is_doji = body_pct <= 24.0
-    is_dragonfly_doji = is_doji and lower_wick_pct >= 45.0
-    is_gravestone_doji = is_doji and upper_wick_pct >= 45.0
-    is_hammer = (lower_wick_pct >= 48.0) and (upper_wick_pct <= 25.0) and (clv_pct >= 55.0)
-    is_shooting_star = (upper_wick_pct >= 48.0) and (lower_wick_pct <= 25.0) and (clv_pct <= 45.0)
-    is_inside_bar = (day_high <= prev_high) and (day_low >= prev_low)
-    is_bull_engulf = (prev_close < prev_open) and (curr_p > day_open) and (curr_p >= prev_open) and (day_open <= prev_close)
-    is_bear_engulf = (prev_close > prev_open) and (curr_p < day_open) and (curr_p <= prev_open) and (day_open >= prev_close)
-
-    if is_dragonfly_doji:
-        candle_pattern = "🎯 Dragonfly Doji (বুলিশ ডোজি)"
-    elif is_gravestone_doji:
-        candle_pattern = "🎯 Gravestone Doji (বেয়ারিশ ডোজি)"
-    elif is_doji:
-        candle_pattern = "🎯 Doji Candle (ডোজি - টার্নিং পয়েন্ট)"
-    elif is_hammer:
-        candle_pattern = "🔨 Bullish Hammer (হ্যামার রিভার্সাল)"
-    elif is_bull_engulf:
-        candle_pattern = "🟢 Bullish Engulfing (স্ট্রং রিভার্সাল)"
-    elif is_shooting_star:
-        candle_pattern = "🌠 Shooting Star (টপ রিজেকশন)"
-    elif is_bear_engulf:
-        candle_pattern = "🔴 Bearish Engulfing (ব্রেকডাউন)"
-    elif is_inside_bar:
-        candle_pattern = "📦 Inside Bar (কয়েলড ব্রেকআউট)"
-    elif clv_pct >= 80 and curr_p > day_open:
-        candle_pattern = "🚀 Bullish Marubozu (স্ট্রং বায়িং)"
-    elif clv_pct <= 20 and curr_p < day_open:
-        candle_pattern = "📉 Bearish Marubozu (স্ট্রং সেলিং)"
-    else:
-        candle_pattern = "📊 Standard Candle"
-
-    # ১৪ দিনের গড় দৈনিক রেঞ্জ (ATR)
     if t in full_high_df.columns and t in full_low_df.columns:
         recent_ranges = (full_high_df[t].tail(14) - full_low_df[t].tail(14)).dropna()
         atr_val = float(recent_ranges.mean()) if len(recent_ranges) > 0 else curr_p * 0.02
@@ -1046,15 +917,14 @@ def compute_stock_row(t, s_name_label):
 
     buy_above = round(max(day_high, curr_p) * 1.001, 2)
     bull_sl = round(buy_above - (atr_val * 0.65), 2)
-    bull_t1 = round(buy_above + (atr_val * 0.90), 2)
-    bull_t2 = round(buy_above + (atr_val * 1.75), 2)
+    bull_t1 = round(buy_above + (atr_val * 0.85), 2)
+    bull_t2 = round(buy_above + (atr_val * 1.65), 2)
 
     sell_below = round(min(day_low, curr_p) * 0.999, 2)
     bear_sl = round(sell_below + (atr_val * 0.65), 2)
-    bear_t1 = round(sell_below - (atr_val * 0.90), 2)
-    bear_t2 = round(sell_below - (atr_val * 1.75), 2)
+    bear_t1 = round(sell_below - (atr_val * 0.85), 2)
+    bear_t2 = round(sell_below - (atr_val * 1.65), 2)
 
-    sma20_val = float(s_price.tail(20).mean()) if len(s_price) >= 20 else curr_p
     sma50_val = float(s_price.tail(50).mean()) if len(s_price) >= 50 else curr_p
     sma200_val = float(s_price.tail(200).mean()) if len(s_price) >= 200 else curr_p
     above_50dma = curr_p >= sma50_val
@@ -1079,73 +949,43 @@ def compute_stock_row(t, s_name_label):
     st_score = float(np.clip(50 + (r_sel * 2.0) + (r_1w * 1.2) + ((rsi_14 - 50) * 0.3), 2, 98))
     st_prev = float(np.clip(50 + (r_map["3M %"] * 0.9) + (r_map["1Y %"] * 0.3), 2, 98))
 
-    # ==========================================================================
-    # ইউজারের স্পেশাল লজিক: অনেকদিন পড়ার পর Doji/Hammer বানিয়ে নিচ থেকে ওঠার স্কোর (Bullish Pullback Reversal)
-    # ==========================================================================
-    was_falling_recently = (prior_4d_ret <= -1.0) or (prior_down_days >= 2) or (dd_52w <= -12.0)
-    has_bull_reversal_candle = is_doji or is_hammer or is_bull_engulf or is_inside_bar or (lower_wick_pct >= 38.0)
-    not_overbought = (r_1w <= 4.5) and (rsi_14 <= 66.0)
+    # ইন্ট্রাডে টার্নঅ্যারাউন্ড ও রিভার্সাল ফোকাস লজিক (যা অলরেডি ৩-৪ দিন বেড়ে যাওয়া স্টক ফিল্টার করে বাদ দেবে এবং নিচ থেকে ঘুরে দাঁড়ানো স্টক খুঁজবে)
+    # বুলিশ টার্নঅ্যারাউন্ড: গত ১ সপ্তাহ মাইনাস বা ফ্ল্যাট ছিল, কিন্তু আজ ভলিউম নিয়ে পজিটিভ হয়েছে এবং ডে-হাইয়ের কাছে ক্লোজ হয়েছে
+    turnaround_bull_score = round(
+        (rvol_num * 5.0) + ((clv_pct - 50.0) * 0.25) + (r_1d * 2.5) + (2.0 if r_1w < 2.0 else -2.0), 2
+    )
+    # বেয়ারিশ টার্নঅ্যারাউন্ড: গত ১ সপ্তাহ পজিটিভ ছিল, কিন্তু আজ ভলিউম নিয়ে ব্রেকডাউন করেছে এবং ডে-লোর কাছে ক্লোজ হয়েছে
+    turnaround_bear_score = round(
+        (rvol_num * 5.0) + ((50.0 - clv_pct) * 0.25) + ((-r_1d) * 2.5) + (2.0 if r_1w > -2.0 else -2.0), 2
+    )
 
-    pullback_bull_score = 0.0
-    if was_falling_recently:
-        pullback_bull_score += abs(min(0.0, prior_4d_ret)) * 2.5 + (prior_down_days * 4.0)
-    if has_bull_reversal_candle:
-        pullback_bull_score += 18.0
-    if is_dragonfly_doji or is_hammer or is_bull_engulf:
-        pullback_bull_score += 12.0
-    pullback_bull_score += (rvol_num * 6.5) + (lower_wick_pct * 0.22) + (clv_pct * 0.15)
-    if not not_overbought:
-        pullback_bull_score -= 30.0  # টানা ৩-৪ দিন বেড়ে যাওয়া শেয়ারকে পেনাল্টি দিয়ে নিচে নামিয়ে দেওয়া হচ্ছে!
-
-    # ==========================================================================
-    # ইউজারের স্পেশাল লজিক: টানা বাড়ার পর উপরে Doji/Shooting Star বানিয়ে প্রফিট বুকিং বা বেয়ারিশ হওয়ার স্কোর
-    # ==========================================================================
-    was_rising_recently = (prior_4d_ret >= 1.2) or (prior_up_days >= 2) or (rsi_14 >= 62.0)
-    has_bear_reversal_candle = is_doji or is_shooting_star or is_bear_engulf or (upper_wick_pct >= 38.0)
-
-    exhaustion_bear_score = 0.0
-    if was_rising_recently:
-        exhaustion_bear_score += max(0.0, prior_4d_ret) * 2.5 + (prior_up_days * 4.0)
-    if has_bear_reversal_candle:
-        exhaustion_bear_score += 18.0
-    if is_gravestone_doji or is_shooting_star or is_bear_engulf:
-        exhaustion_bear_score += 12.0
-    exhaustion_bear_score += (rvol_num * 6.0) + (upper_wick_pct * 0.22) + ((100.0 - clv_pct) * 0.15)
-    if r_1d < -0.5 and clv_pct <= 35:
-        exhaustion_bear_score += 10.0
-
-    # ইন্ট্রাডে সেটআপের কারণ (সহজ বাংলায়)
-    if was_falling_recently and (is_doji or is_hammer or is_bull_engulf):
-        intraday_catalyst = f"🔄 {prior_down_days} দিন পতনের পর {candle_pattern.split('(')[0].strip()} + ভলিউম {rvol_num}x"
-    elif was_falling_recently and r_1d > 0:
-        intraday_catalyst = f"🟢 পুলব্যাক সাপোর্ট থেকে বাউন্স (আগের ৪ দিন: {prior_4d_ret:+.1f}% | Vol {rvol_num}x)"
-    elif was_rising_recently and (is_doji or is_shooting_star or is_bear_engulf):
-        intraday_catalyst = f"⚠️ {prior_up_days} দিন র্যালির পর উপরে {candle_pattern.split('(')[0].strip()} (প্রফিট বুকিং চান্স)"
-    elif r_1d <= -1.2 and clv_pct <= 30:
-        intraday_catalyst = f"📉 হেভি সেলিং ব্রেকডাউন (Day Low-এর কাছে ক্লোজ | Vol {rvol_num}x)"
+    if r_1d >= 1.0 and r_1w <= 3.0 and rvol_num >= 1.25 and clv_pct >= 65:
+        intraday_catalyst = f"🔄 নিচ থেকে রিভার্সাল (Turnaround Reversal | Vol {rvol_num}x)"
+    elif r_1d >= 2.0 and rvol_num >= 1.4:
+        intraday_catalyst = f"🔥 হেভি ভলিউম ব্রেকআউট ({rvol_num}x Vol)"
+    elif r_1d <= -1.0 and r_1w >= -3.0 and rvol_num >= 1.25 and clv_pct <= 35:
+        intraday_catalyst = f"📉 উপর থেকে রিভার্সাল সেল (Bearish Reversal | Vol {rvol_num}x)"
     else:
-        intraday_catalyst = f"{candle_pattern} | ভলিউম {rvol_num}x"
+        intraday_catalyst = f"📊 নরমাল ইন্ট্রাডে রেঞ্জ (CLV: {clv_pct:.0f}% | Vol {rvol_num}x)"
 
-    if has_bull_reversal_candle and was_falling_recently and r_1d >= -0.5:
-        action_sig = "🔄 পুলব্যাক রিভার্সাল (Doji/Hammer Turn)"
-    elif above_50dma and r_sel > 2.0 and rvol_num >= 1.25:
+    if above_50dma and r_sel > 2.0 and rvol_num >= 1.25:
         action_sig = "🔥 ভলিউম ব্রেকআউট (Vol Breakout)"
-    elif dd_52w < -22 or rsi_14 < 36:
-        action_sig = "💎 ডিপ ভ্যালু জোন (Deep Value)"
+    elif dd_52w < -12 and r_1d > 0.5:
+        action_sig = "🔄 নিচ থেকে ঘুরছে (Turnaround)"
+    elif dd_52w < -25 or rsi_14 < 35:
+        action_sig = "💎 ওভারসোল্ড / ভ্যালু (Deep Value)"
     elif above_50dma:
         action_sig = "🟢 পজিটিভ ট্রেন্ড (Positive)"
     else:
-        action_sig = "⚠️ দুর্বল / কারেকশন (Weak/Pullback)"
+        action_sig = "⚠️ দুর্বল / ডাউন (Weak Trend)"
 
     return {
         "Ticker": t,
         "Stock": t.replace(".NS", ""),
         "Sector": s_name_label,
         "Signal (সিগন্যাল)": action_sig,
-        "Candle Pattern": candle_pattern,
         "Intraday Catalyst": intraday_catalyst,
         "CMP (₹)": curr_p,
-        "Prior 4D %": prior_4d_ret,
         "Day High": round(day_high, 2),
         "Day Low": round(day_low, 2),
         "Day Open": round(day_open, 2),
@@ -1158,13 +998,8 @@ def compute_stock_row(t, s_name_label):
         "Bear SL (₹)": bear_sl,
         "Bear T1 (₹)": bear_t1,
         "Bear T2 (₹)": bear_t2,
-        "Pullback_Bull_Score": round(pullback_bull_score, 2),
-        "Exhaustion_Bear_Score": round(exhaustion_bear_score, 2),
-        "Was_Falling": was_falling_recently,
-        "Has_Bull_Candle": has_bull_reversal_candle,
-        "Was_Rising": was_rising_recently,
-        "Has_Bear_Candle": has_bear_reversal_candle,
-        "Not_Overbought": not_overbought,
+        "Turnaround_Bull_Score": turnaround_bull_score,
+        "Turnaround_Bear_Score": turnaround_bear_score,
         "RSI (14)": rsi_14,
         "Volume Action": rvol_label,
         "RVOL_Num": rvol_num,
@@ -1271,9 +1106,9 @@ if not instant_stock_search.startswith("শেয়ার"):
         sh_c1, sh_c2 = st.columns([4.5, 1.5])
         with sh_c1:
             st.markdown(
-                f"### ⚡ কুইক স্টক প্রোফাইল: **{stk_nm_clean}** ({st_obj['Sector']}) — `{st_obj['Candle Pattern']}`"
+                f"### ⚡ কুইক স্টক প্রোফাইল: **{stk_nm_clean}** ({st_obj['Sector']}) — `{st_obj['Signal (সিগন্যাল)']}`"
             )
-            st.caption(f"🎯 ইন্ট্রাডে প্রাইস অ্যাকশন: **{st_obj['Intraday Catalyst']}**")
+            st.caption(f"🎯 ইন্ট্রাডে ক্যাটালিস্ট: **{st_obj['Intraday Catalyst']}**")
         with sh_c2:
             st.markdown(
                 f'<a class="action-btn" href="https://in.tradingview.com/chart/?symbol=NSE:{stk_nm_clean}" target="_blank">📈 TradingView</a> '
@@ -1283,7 +1118,7 @@ if not instant_stock_search.startswith("শেয়ার"):
             )
         qm1, qm2, qm3, qm4, qm5, qm6 = st.columns(6)
         qm1.metric("বর্তমান দাম (CMP)", f"₹{st_obj['CMP (₹)']}")
-        qm2.metric("আজকের মুভ (1D)", f"{st_obj['1D %']:+.2f}%", f"আগের ৪ দিন: {st_obj['Prior 4D %']:+.1f}%")
+        qm2.metric("1D / ইন্ট্রাডে মুভ", f"{st_obj['1D %']:+.2f}%", f"Day Pos: {st_obj['Day Range Pos %']:.0f}%")
         qm3.metric("Buy Above (বুলিশ)", f"₹{st_obj['Buy Above (₹)']}", f"T1: ₹{st_obj['Bull T1 (₹)']}")
         qm4.metric("Sell Below (বেয়ারিশ)", f"₹{st_obj['Sell Below (₹)']}", f"T1: ₹{st_obj['Bear T1 (₹)']}")
         qm5.metric("RSI (14)", f"{st_obj['RSI (14)']}")
@@ -1291,44 +1126,42 @@ if not instant_stock_search.startswith("শেয়ার"):
         st.markdown("</div>", unsafe_allow_html=True)
 
 # ==============================================================================
-# ১০. ডোজি/হ্যামার ও পুলব্যাক রিভার্সাল ভিত্তিক ইন্ট্রাডে ওয়াচলিস্ট বার (8 Bullish vs 8 Bearish)
+# ১০. নতুন ইন্ট্রাডে ফোকাস বার (যাতে অলরেডি ৪-৫ দিন বেড়ে যাওয়া স্টক বাদ দিয়ে নিচ থেকে ঘুরে দাঁড়ানো স্টক আসে)
 # ==============================================================================
-# বুলিশ ইন্ট্রাডে লজিক: যারা আগে পড়েছিল বা পুলব্যাকে ছিল + আজ Doji/Hammer/Engulfing বা নিচ থেকে রিজেকশন দিয়েছে + ওভারবট নয়
-bull_reversal_candidates = all_st_df_global[
-    all_st_df_global["Not_Overbought"] & (all_st_df_global["Was_Falling"] | all_st_df_global["Has_Bull_Candle"])
-].sort_values(by="Pullback_Bull_Score", ascending=False)
+# বুলিশ টার্নঅ্যারাউন্ড ফিল্টার (যে স্টকগুলো গত ৩-৪ দিন অতিরিক্ত বা ধারাবাহিক বাড়েনি, কিন্তু আজ ভলিউম নিয়ে নিচ থেকে ঘুরছে)
+bull_turnaround_pool = all_st_df_global[
+    (all_st_df_global["1D %"] > 0.2) & (all_st_df_global["1W %"] < 6.0) & (all_st_df_global["Day Range Pos %"] >= 65)
+].sort_values(by="Turnaround_Bull_Score", ascending=False)
+if len(bull_turnaround_pool) < 6:
+    bull_turnaround_pool = all_st_df_global.sort_values(by="Turnaround_Bull_Score", ascending=False)
+top_6_bull_intraday = bull_turnaround_pool.head(6).reset_index(drop=True)
 
-if len(bull_reversal_candidates) < 10:
-    bull_reversal_candidates = all_st_df_global.sort_values(by="Pullback_Bull_Score", ascending=False)
-top_bull_intraday = bull_reversal_candidates.head(10).reset_index(drop=True)
-
-# বেয়ারিশ ইন্ট্রাডে লজিক: যারা আগে বেড়েছিল কিন্তু আজ উপরে Doji/Shooting Star/Wick Rejection দিয়েছে (প্রফিট বুকিং চান্স) অথবা ব্রেকডাউন হচ্ছে
-bear_reversal_candidates = all_st_df_global[
-    all_st_df_global["Was_Rising"] | all_st_df_global["Has_Bear_Candle"] | (all_st_df_global["1D %"] < -0.5)
-].sort_values(by="Exhaustion_Bear_Score", ascending=False)
-
-if len(bear_reversal_candidates) < 10:
-    bear_reversal_candidates = all_st_df_global.sort_values(by="Exhaustion_Bear_Score", ascending=False)
-top_bear_intraday = bear_reversal_candidates.head(10).reset_index(drop=True)
+# বেয়ারিশ টার্নঅ্যারাউন্ড ফিল্টার
+bear_turnaround_pool = all_st_df_global[
+    (all_st_df_global["1D %"] < -0.2) & (all_st_df_global["1W %"] > -6.0) & (all_st_df_global["Day Range Pos %"] <= 35)
+].sort_values(by="Turnaround_Bear_Score", ascending=False)
+if len(bear_turnaround_pool) < 6:
+    bear_turnaround_pool = all_st_df_global.sort_values(by="Turnaround_Bear_Score", ascending=False)
+top_6_bear_intraday = bear_turnaround_pool.head(6).reset_index(drop=True)
 
 ib_col1, ib_col2 = st.columns(2)
 with ib_col1:
     bull_pills_html = ""
-    for _, brow in top_bull_intraday.head(8).iterrows():
+    for _, brow in top_6_bull_intraday.iterrows():
         b_stk = brow["Stock"]
-        b_pat = brow["Candle Pattern"].split("(")[0].strip()
+        b_ret = brow["1D %"]
         b_rvol = brow["RVOL_Num"]
         b_lvl = brow["Buy Above (₹)"]
         bull_pills_html += (
             f'<a class="focus-pill-bull" href="https://in.tradingview.com/chart/?symbol=NSE:{b_stk}" target="_blank" '
-            f'title="আগের ৪ দিন: {brow[\'Prior 4D %\']:+.1f}% | আজ: {b_pat} | Buy Above: ₹{b_lvl}">'
-            f'🟢 {b_stk} ({b_pat} | {b_rvol}x Vol)</a>'
+            f'title="Buy Above: ₹{b_lvl} | Vol: {b_rvol}x | ক্লিক করে চার্ট খুলুন">'
+            f'🟢 {b_stk} ({b_ret:+.1f}% | {b_rvol}x Vol)</a>'
         )
     st.markdown(
         f"""
         <div class="intraday-bull-box">
             <div style="font-size:13.5px; font-weight:800; color:#00e676; margin-bottom:4px;">
-                🎯 আগামীকালের বুলিশ ইন্ট্রাডে ওয়াচলিস্ট (কয়েক দিন পতনের পর Doji / Hammer / পুলব্যাক রিভার্সাল স্টক)
+                🔄 ইন্ট্রাডে বুলিশ রিভার্সাল ফোকাস (Bottom Turnaround — অতিরিক্ত না বেড়ে নিচ থেকে ঘুরে দাঁড়ানো স্টক)
             </div>
             <div>{bull_pills_html}</div>
         </div>
@@ -1338,21 +1171,21 @@ with ib_col1:
 
 with ib_col2:
     bear_pills_html = ""
-    for _, srow in top_bear_intraday.head(8).iterrows():
+    for _, srow in top_6_bear_intraday.iterrows():
         s_stk = srow["Stock"]
-        s_pat = srow["Candle Pattern"].split("(")[0].strip()
+        s_ret = srow["1D %"]
         s_rvol = srow["RVOL_Num"]
         s_lvl = srow["Sell Below (₹)"]
         bear_pills_html += (
             f'<a class="focus-pill-bear" href="https://in.tradingview.com/chart/?symbol=NSE:{s_stk}" target="_blank" '
-            f'title="আগের ৪ দিন: {srow[\'Prior 4D %\']:+.1f}% | আজ: {s_pat} | Sell Below: ₹{s_lvl}">'
-            f'🔴 {s_stk} ({s_pat} | {s_rvol}x Vol)</a>'
+            f'title="Sell Below: ₹{s_lvl} | Vol: {s_rvol}x | ক্লিক করে চার্ট খুলুন">'
+            f'🔴 {s_stk} ({s_ret:+.1f}% | {s_rvol}x Vol)</a>'
         )
     st.markdown(
         f"""
         <div class="intraday-bear-box">
             <div style="font-size:13.5px; font-weight:800; color:#ff5252; margin-bottom:4px;">
-                📉 আগামীকালের বেয়ারিশ ইন্ট্রাডে ওয়াচলিস্ট (র্যালির পর উপরে Doji / Shooting Star / প্রফিট-বুকিং স্টক)
+                📉 ইন্ট্রাডে বেয়ারিশ রিভার্সাল ফোকাস (Top Breakdown — ওপর থেকে নিচে নামার প্রস্তুতি নেওয়া স্টক)
             </div>
             <div>{bear_pills_html}</div>
         </div>
@@ -1361,7 +1194,7 @@ with ib_col2:
     )
 
 # ==============================================================================
-# ১১. ১০০% ক্লিকেবল স্ক্রলিং সেক্টর বার
+# ১১. ১০০% ক্লিকেবল স্ক্রলিং সেক্টর বার (ব্যাকস্ল্যাশ মুক্ত ও সম্পূর্ণ নিরাপদ)
 # ==============================================================================
 pos_secs = sorted([s for s in sector_master if s[ret_key] >= 0], key=lambda x: x[ret_key], reverse=True)
 neg_secs = sorted([s for s in sector_master if s[ret_key] < 0], key=lambda x: x[ret_key], reverse=False)
@@ -1400,6 +1233,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# টিকার বারে ক্লিক করলে তার ডিটেইলস প্যানেল
 clicked_sec_raw = None
 try:
     q_val = st.query_params.get("focus_sec", None)
@@ -1477,8 +1311,8 @@ if clicked_sec_raw:
             st.plotly_chart(fig_tk_lines, use_container_width=True, theme=None, key="ticker_clicked_chart")
 
         tk_disp_cols = [
-            "Stock", "Candle Pattern", "Signal (সিগন্যাল)", "CMP (₹)", "RSI (14)", "Volume Action",
-            "1D %", "1W %", "1M %", "1Y %", "From 52W High %"
+            "Stock", "Signal (সিগন্যাল)", "CMP (₹)", "RSI (14)", "Volume Action",
+            "Meter Score", "1D %", "1W %", "1M %", "3M %", "1Y %", "From 52W High %", "50 DMA Trend"
         ]
         st.dataframe(
             style_colored_table(c_st_df[tk_disp_cols], ret_key),
@@ -1586,8 +1420,8 @@ if active_p is not None:
             st.rerun()
 
     disp_cols_kpi = [
-        "Stock", "Sector", "Candle Pattern", "Signal (সিগন্যাল)", "CMP (₹)", "RSI (14)", "Volume Action",
-        "1D %", "1W %", "1M %", "1Y %", "From 52W High %"
+        "Stock", "Sector", "Signal (সিগন্যাল)", "CMP (₹)", "RSI (14)", "Volume Action",
+        "1D %", "1W %", "1M %", "3M %", "1Y %", "From 52W High %"
     ]
 
     if active_p == "nifty":
@@ -1654,7 +1488,7 @@ if active_p is not None:
             )
             st.plotly_chart(fig_k, use_container_width=True, theme=None, key=f"kpi_chart_{active_p}_{tf_option}")
         with lc2:
-            cols_sec_show = ["Stock", "Candle Pattern", "Signal (সিগন্যাল)", "CMP (₹)", "RSI (14)", "Volume Action", "1D %", "1W %", "1M %", "From 52W High %"]
+            cols_sec_show = ["Stock", "Signal (সিগন্যাল)", "CMP (₹)", "RSI (14)", "Volume Action", "1D %", "1W %", "1M %", "1Y %", "From 52W High %"]
             st.dataframe(style_colored_table(t_df[cols_sec_show], ret_key), use_container_width=True, height=310, hide_index=True)
             btn_links = ""
             for _, r in t_df.iterrows():
@@ -1709,10 +1543,10 @@ elif "Meter: Low to High" in sort_option:
 # ==============================================================================
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "🧭 ১. সেক্টর চার্ট, মিটার ও শেয়ার তালিকা",
-    "⚡ ২. ইন্ট্রাডে ডোজি/হ্যামার রিভার্সাল ও রিস্ক ক্যালকুলেটর",
-    "🔥 ৩. লং ও সুইং স্ক্যানার (Volume, RSI & Value)",
+    "⚡ ২. ইন্ট্রাডে ও সুইং রাডার (Next-Day Bullish/Bearish)",
+    "🔥 ৩. লং ও শর্ট-টার্ম স্ক্যানার (Volume, RSI & Value)",
     "📊 ৪. সব সেক্টরের তুলনামূলক টেবিল",
-    "🕯️ ৫. ক্যান্ডেলস্টিক চার্ট, ভলিউম ও DMA অ্যানালাইজার",
+    "📈 ৫. শেয়ারের নিজস্ব চার্ট ও মুভিং অ্যাভারেজ",
 ])
 
 # ==============================================================================
@@ -1830,7 +1664,7 @@ with tab1:
 
             is_expanded_default = len(filtered_sectors) == 1
             with st.expander(
-                f"🔍 {s_name} ওপেন করুন — সব শেয়ারের ক্যান্ডেল প্যাটার্ন, RSI, ভলিউম ও চার্ট ({len(st_df)}টি শেয়ার)",
+                f"🔍 {s_name} ওপেন করুন — সব শেয়ারের সিগন্যাল, RSI, ভলিউম ও চার্ট ({len(st_df)}টি শেয়ার)",
                 expanded=is_expanded_default,
             ):
                 ex_c1, ex_c2 = st.columns([1, 2])
@@ -1871,8 +1705,8 @@ with tab1:
                     st.plotly_chart(fig_st, use_container_width=True, theme=None, key=f"st_cmp_{unique_key_suffix}")
 
                 disp_cols = [
-                    "Stock", "Candle Pattern", "Signal (সিগন্যাল)", "CMP (₹)", "RSI (14)", "Volume Action",
-                    "1D %", "1W %", "1M %", "1Y %", "From 52W High %"
+                    "Stock", "Signal (সিগন্যাল)", "CMP (₹)", "RSI (14)", "Volume Action",
+                    "Meter Score", "1D %", "1W %", "1M %", "3M %", "1Y %", "From 52W High %"
                 ]
                 st.dataframe(
                     style_colored_table(st_df[disp_cols], ret_key),
@@ -1894,42 +1728,29 @@ with tab1:
             st.markdown("<br>", unsafe_allow_html=True)
 
 # ==============================================================================
-# TAB 2: ইন্ট্রাডে ডোজি/হ্যামার পুলব্যাক রিভার্সাল রাডার + অটোমেটিক রিস্ক ও কোয়ান্টিটি ক্যালকুলেটর
+# TAB 2: ইন্ট্রাডে ও সুইং রাডার (Next-Day Bullish/Bearish Action Plan + News)
 # ==============================================================================
 with tab2:
-    st.subheader("⚡ ইন্ট্রাডে প্রাইস-অ্যাকশন রিভার্সাল ওয়াচলিস্ট (Doji / Hammer / Multi-Day Pullback)")
-
-    # প্রো রিস্ক ও পজিশন সাইজ ক্যালকুলেটর
-    rc1, rc2 = st.columns([1.3, 2.7])
-    with rc1:
-        risk_per_trade = st.number_input(
-            "💰 প্রতি ট্রেডে আপনার সর্বোচ্চ রিস্ক (₹ Risk Per Trade):",
-            min_value=100,
-            max_value=100000,
-            value=1000,
-            step=250,
-            key="num_risk_calc",
-        )
-    with rc2:
-        st.info(
-            f"🧮 **অটো পজিশন সাইজিং চালু আছে:** আপনার প্রতি ট্রেডে **₹{risk_per_trade}** রিস্ক অনুযায়ী নিচের প্রতিটি শেয়ারের `Entry` ও `Stop Loss` হিসাব করে **ঠিক কয়টি শেয়ার (`Qty`) কিনতে বা শর্ট করতে হবে** তা স্বয়ংক্রিয়ভাবে বের করে দেওয়া হয়েছে!"
-        )
+    st.subheader("⚡ আগামীকালের ইন্ট্রাডে ও সুইং ট্রেডিং ফোকাস রাডার (Volume + Price Action + News)")
+    st.markdown(
+        "**কীভাবে ব্যবহার করবেন:**\n"
+        "- 🟢 **মার্কেট যদি বুলিশ (উপরে) থাকে:** বামপাশের **বুলিশ ফোকাস তালিকা** থেকে যে শেয়ারগুলো আজকের দিনের হাই (`Buy Above`)-এর ওপরে ট্রেড করবে, সেগুলোতে Buy/Long ইন্ট্রাডে বা সুইং ট্রেড নেওয়া যাবে।\n"
+        "- 🔴 **মার্কেট যদি বেয়ারিশ (নিচে) থাকে:** ডানপাশের **বেয়ারিশ ফোকাস তালিকা** থেকে যে শেয়ারগুলো আজকের দিনের লো (`Sell Below`)-এর নিচে নামবে, সেগুলোতে Short/Sell ইন্ট্রাডে ট্রেড নেওয়া যাবে।"
+    )
 
     in_c1, in_c2 = st.columns(2)
 
     with in_c1:
-        st.markdown("#### 🎯 ১. বুলিশ ইন্ট্রাডে রিভার্সাল ওয়াচলিস্ট (Top 10 Pullback & Doji/Hammer Turnarounds)")
-        st.caption("লজিক: গত কয়েক দিন পতনের পর আজ সাপোর্টে Doji / Hammer / Bullish উইক তৈরি করেছে (অতিরিক্ত বেড়ে যাওয়া স্টক বাদ দেওয়া হয়েছে):")
-        top_10_bull = top_bull_intraday.copy()
-        top_10_bull["Qty (শেয়ার সংখ্যা)"] = np.maximum(
-            1, np.floor(risk_per_trade / np.maximum(top_10_bull["Buy Above (₹)"] - top_10_bull["Bull SL (₹)"], 0.5))
-        )
+        st.markdown("#### 🚀 ১. বুলিশ ইন্ট্রাডে ও সুইং ফোকাস (Top 10 Bullish Setups)")
+        st.caption("নিচ থেকে ঘুরে দাঁড়ানো (Turnaround Reversal) + হেভি ভলিউম স্টক:")
+        top_10_bull = top_6_bull_intraday.head(10).reset_index(drop=True).copy()
         top_10_bull_disp = top_10_bull[[
-            "Stock", "Candle Pattern", "CMP (₹)", "Prior 4D %", "1D %", "Volume Action",
-            "Buy Above (₹)", "Bull SL (₹)", "Bull T1 (₹)", "Qty (শেয়ার সংখ্যা)", "Intraday Catalyst"
+            "Stock", "Sector", "CMP (₹)", "1D %", "Volume Action", "Day Range Pos %",
+            "Buy Above (₹)", "Bull SL (₹)", "Bull T1 (₹)", "Bull T2 (₹)", "Intraday Catalyst"
         ]].rename(columns={
             "Bull SL (₹)": "Stop Loss (₹)",
             "Bull T1 (₹)": "Target 1 (₹)",
+            "Bull T2 (₹)": "Target 2 (₹)",
         })
         st.dataframe(
             style_colored_table(top_10_bull_disp, "1D %"),
@@ -1937,9 +1758,9 @@ with tab2:
             hide_index=True,
         )
 
-        st.markdown("##### 🔗 বুলিশ রিভার্সাল শেয়ারগুলোর চার্ট ও নিউজ:")
+        st.markdown("##### 🔗 বুলিশ ফোকাস শেয়ারগুলোর লাইভ চার্ট ও ব্রেকিং নিউজ চেক করুন:")
         bull_links_str = ""
-        for _, r in top_10_bull.head(8).iterrows():
+        for _, r in top_10_bull.head(6).iterrows():
             st_c = r["Stock"]
             bull_links_str += (
                 f'<a class="action-btn" href="https://in.tradingview.com/chart/?symbol=NSE:{st_c}" target="_blank">📈 {st_c} Chart</a>'
@@ -1948,18 +1769,16 @@ with tab2:
         st.markdown(bull_links_str, unsafe_allow_html=True)
 
     with in_c2:
-        st.markdown("#### 📉 ২. বেয়ারিশ ইন্ট্রাডে প্রফিট-বুকিং ওয়াচলিস্ট (Top 10 Rally Exhaustion & Breakdown)")
-        st.caption("লজিক: কয়েক দিন বাড়ার পর উপরে গিয়ে Doji / Shooting Star বানিয়ে দুর্বল হয়েছে অথবা ভলিউমে ব্রেকডাউন হচ্ছে:")
-        top_10_bear = top_bear_intraday.copy()
-        top_10_bear["Qty (শেয়ার সংখ্যা)"] = np.maximum(
-            1, np.floor(risk_per_trade / np.maximum(top_10_bear["Bear SL (₹)"] - top_10_bear["Sell Below (₹)"], 0.5))
-        )
+        st.markdown("#### 📉 ২. বেয়ারিশ ইন্ট্রাডে ফোকাস (Top 10 Bearish Breakdown Setups)")
+        st.caption("ওপর থেকে নিচে নামার প্রস্তুতি নেওয়া (Top Reversal) দুর্বল শেয়ার:")
+        top_10_bear = top_6_bear_intraday.head(10).reset_index(drop=True).copy()
         top_10_bear_disp = top_10_bear[[
-            "Stock", "Candle Pattern", "CMP (₹)", "Prior 4D %", "1D %", "Volume Action",
-            "Sell Below (₹)", "Bear SL (₹)", "Bear T1 (₹)", "Qty (শেয়ার সংখ্যা)", "Intraday Catalyst"
+            "Stock", "Sector", "CMP (₹)", "1D %", "Volume Action", "Day Range Pos %",
+            "Sell Below (₹)", "Bear SL (₹)", "Bear T1 (₹)", "Bear T2 (₹)", "Intraday Catalyst"
         ]].rename(columns={
             "Bear SL (₹)": "Stop Loss (₹)",
             "Bear T1 (₹)": "Target 1 (₹)",
+            "Bear T2 (₹)": "Target 2 (₹)",
         })
         st.dataframe(
             style_colored_table(top_10_bear_disp, "1D %"),
@@ -1967,9 +1786,9 @@ with tab2:
             hide_index=True,
         )
 
-        st.markdown("##### 🔗 বেয়ারিশ ফোকাস শেয়ারগুলোর চার্ট ও নিউজ:")
+        st.markdown("##### 🔗 বেয়ারিশ ফোকাস শেয়ারগুলোর লাইভ চার্ট ও ব্রেকিং নিউজ চেক করুন:")
         bear_links_str = ""
-        for _, r in top_10_bear.head(8).iterrows():
+        for _, r in top_10_bear.head(6).iterrows():
             st_c = r["Stock"]
             bear_links_str += (
                 f'<a class="action-btn" href="https://in.tradingview.com/chart/?symbol=NSE:{st_c}" target="_blank">📉 {st_c} Chart</a>'
@@ -1978,31 +1797,34 @@ with tab2:
         st.markdown(bear_links_str, unsafe_allow_html=True)
 
     st.markdown("---")
-    st.markdown("#### 🎯 ৩. আজকের স্পেশাল ক্যান্ডেলস্টিক স্ক্যানার (Doji, Hammer, Shooting Star & Inside Bar Finder)")
-    st.caption("পুরো মার্কেটের যে শেয়ারগুলোতে আজ পরিষ্কার রিভার্সাল বা কয়েলড ক্যান্ডেল (Doji / Hammer / Engulfing / Inside Bar) তৈরি হয়েছে:")
-    special_candles_df = (
-        all_st_df_global[all_st_df_global["Candle Pattern"] != "📊 Standard Candle"]
+    st.markdown("#### 🌊 ৩. সুইং ট্রেডিং স্পেশাল: ভলিউম ও প্রাইস শক স্ক্যানার (Unusual Volume + Big Move)")
+    st.caption("যে শেয়ারগুলোতে আজ সাধারণ সময়ের চেয়ে দেড় গুণ বা দ্বিগুণের বেশি ভলিউম হয়েছে:")
+    swing_shock_df = (
+        all_st_df_global[all_st_df_global["RVOL_Num"] >= 1.3]
         .sort_values(by="RVOL_Num", ascending=False)
-        .head(20)
+        .head(15)
         .reset_index(drop=True)
     )
-    candle_cols = [
-        "Stock", "Sector", "Candle Pattern", "CMP (₹)", "Prior 4D %", "1D %",
-        "Volume Action", "RSI (14)", "Buy Above (₹)", "Sell Below (₹)", "Intraday Catalyst"
+    if swing_shock_df.empty:
+        swing_shock_df = all_st_df_global.sort_values(by="RVOL_Num", ascending=False).head(12).reset_index(drop=True)
+
+    swing_cols = [
+        "Stock", "Sector", "Signal (সিগন্যাল)", "CMP (₹)", "1D %", "1W %",
+        "Volume Action", "Day Range Pos %", "RSI (14)", "Intraday Catalyst"
     ]
     st.dataframe(
-        style_colored_table(special_candles_df[candle_cols], "1D %"),
+        style_colored_table(swing_shock_df[swing_cols], "1D %"),
         use_container_width=True,
         hide_index=True,
     )
 
 # ==============================================================================
-# TAB 3: লং ও সুইং স্ক্যানার
+# TAB 3: লং ও শর্ট-টার্ম স্ক্যানার
 # ==============================================================================
 with tab3:
     st.subheader("🔥 লং-টার্ম ও পজিশনাল শেয়ার স্ক্যানার (Breakout, Turnaround & Deep Value)")
     cols_scanner = []
-    for c_item in ["Stock", "Sector", "Candle Pattern", "Signal (সিগন্যাল)", "CMP (₹)", "RSI (14)", "Volume Action", ret_key, "From 52W High %"]:
+    for c_item in ["Stock", "Sector", "Signal (সিগন্যাল)", "CMP (₹)", "RSI (14)", "Volume Action", ret_key, "1W %", "From 52W High %"]:
         if c_item not in cols_scanner:
             cols_scanner.append(c_item)
 
@@ -2046,7 +1868,7 @@ with tab3:
 
     csv_bytes = all_st_df_global.to_csv(index=False).encode("utf-8")
     st.download_button(
-        label="📥 সব শেয়ারের সম্পূর্ণ ডেটা (Candlestick Pattern, Intraday Levels, RSI ও Volume সহ) Excel/CSV ডাউনলোড করুন",
+        label="📥 সব শেয়ারের সম্পূর্ণ ডেটা (Intraday Levels, RSI ও Volume সহ) Excel/CSV ডাউনলোড করুন",
         data=csv_bytes,
         file_name="AlphaPulse_Full_Screener.csv",
         mime="text/csv",
@@ -2102,128 +1924,81 @@ with tab4:
     )
 
 # ==============================================================================
-# TAB 5: লাইভ ক্যান্ডেলস্টিক চার্ট (Candlestick + Volume + 20/50/200 DMA) এবং স্টকের অ্যানালগ মিটার
+# TAB 5: যেকোনো শেয়ারের নিজস্ব চার্ট, RSI, ভলিউম এবং স্টকের অ্যানালগ মিটার
 # ==============================================================================
 with tab5:
-    st.subheader("🕯️ সিঙ্গেল স্টক ক্যান্ডেলস্টিক চার্ট (Candlestick + Volume), ইন্ট্রাডে লেভেল ও DMA")
+    st.subheader("📈 সিঙ্গেল স্টক চার্ট, RSI, ভলিউম এবং মুভিং অ্যাভারেজ (DMA)")
 
-    sc1, sc2, sc3, sc4 = st.columns([1.2, 1.2, 0.9, 1.1])
+    sc1, sc2, sc3 = st.columns(3)
     with sc1:
         chosen_sec = st.selectbox("১. সেক্টর বেছে নিন:", list(sectors.keys()), key="t4_sec")
     with sc2:
         sec_tickers = [t.replace(".NS", "") for t in sectors[chosen_sec] if t in full_df.columns]
         chosen_stock = st.selectbox("২. শেয়ার বেছে নিন:", sec_tickers, key="t4_stk")
     with sc3:
-        chart_tf = st.selectbox("৩. সময়কাল:", ["1M", "3M", "6M", "1Y", "3Y"], index=1, key="t4_tf")
-    with sc4:
-        chart_style = st.selectbox("৪. চার্টের ধরন:", ["🕯️ Candlestick + Volume", "📈 Clean Line + DMA"], index=0, key="t4_style")
+        chart_tf = st.selectbox("৩. চার্টের সময়কাল:", ["3M", "6M", "1Y", "3Y", "5Y"], index=2, key="t4_tf")
 
     if chosen_stock:
         t_sym = chosen_stock + ".NS"
         s_info = all_stocks_master.get(t_sym, {})
 
         m1, m2, m3, m4, m5, m6 = st.columns(6)
-        m1.metric("বর্তমান দাম (CMP)", f"₹{s_info.get('CMP (₹)', 0)}", f"{s_info.get('1D %', 0):+.2f}%")
-        m2.metric("ক্যান্ডেল প্যাটার্ন", s_info.get("Candle Pattern", "").split("(")[0].strip())
-        m3.metric("Buy Above (বুলিশ)", f"₹{s_info.get('Buy Above (₹)', 0)}", f"SL: ₹{s_info.get('Bull SL (₹)', 0)}")
-        m4.metric("Sell Below (বেয়ারিশ)", f"₹{s_info.get('Sell Below (₹)', 0)}", f"SL: ₹{s_info.get('Bear SL (₹)', 0)}")
-        m5.metric("RSI (14)", f"{s_info.get('RSI (14)', 50)}")
-        m6.metric("Volume Action", s_info.get("Volume Action", ""))
+        m1.metric("বর্তমান দাম (CMP)", f"₹{s_info.get('CMP (₹)', 0)}")
+        m2.metric("RSI (14)", f"{s_info.get('RSI (14)', 50)}")
+        m3.metric("Volume Action", s_info.get("Volume Action", ""))
+        m4.metric("1M Return", f"{s_info.get('1M %', 0):+.2f}%")
+        m5.metric("52W High থেকে দূরত্ব", f"{s_info.get('From 52W High %', 0):+.2f}%")
+        m6.metric("সিগন্যাল", s_info.get("Signal (সিগন্যাল)", ""))
 
         st.markdown(
             f'<a class="action-btn" href="https://in.tradingview.com/chart/?symbol=NSE:{chosen_stock}" target="_blank">📈 TradingView-তে {chosen_stock}-এর পূর্ণাঙ্গ চার্ট খুলুন</a> '
-            f'<a class="action-btn" href="https://www.screener.in/company/{chosen_stock}/" target="_blank">📊 Screener.in-এ ফান্ডামেন্টাল দেখুন</a> '
+            f'<a class="action-btn" href="https://www.screener.in/company/{chosen_stock}/" target="_blank">📊 Screener.in-এ {chosen_stock}-এর ফান্ডামেন্টাল দেখুন</a> '
             f'<a class="action-btn" href="https://www.google.com/search?q={chosen_stock}+share+news+india&tbm=nws" target="_blank">📰 {chosen_stock}-এর ব্রেকিং নিউজ দেখুন</a>',
             unsafe_allow_html=True,
         )
 
-        s_close = full_df[t_sym].dropna()
-        s_open = full_open_df[t_sym].reindex(s_close.index).ffill() if t_sym in full_open_df.columns else s_close
-        s_high = full_high_df[t_sym].reindex(s_close.index).ffill() if t_sym in full_high_df.columns else s_close
-        s_low = full_low_df[t_sym].reindex(s_close.index).ffill() if t_sym in full_low_df.columns else s_close
-        s_vol = full_vol_df[t_sym].reindex(s_close.index).fillna(0) if t_sym in full_vol_df.columns else pd.Series(0, index=s_close.index)
-
-        sma20 = s_close.rolling(20).mean()
-        sma50 = s_close.rolling(50).mean()
-        sma200 = s_close.rolling(200).mean()
+        s_full = full_df[t_sym].dropna()
+        sma20 = s_full.rolling(20).mean()
+        sma50 = s_full.rolling(50).mean()
+        sma200 = s_full.rolling(200).mean()
 
         d_cnt = tf_days_map[chart_tf]
-        c_sub = s_close.tail(d_cnt)
-        o_sub = s_open.tail(d_cnt)
-        h_sub = s_high.tail(d_cnt)
-        l_sub = s_low.tail(d_cnt)
-        v_sub = s_vol.tail(d_cnt)
+        s_sub = s_full.tail(d_cnt)
 
         ind_c1, ind_c2 = st.columns([2.35, 1])
         with ind_c1:
-            if "Candlestick" in chart_style:
-                fig_ind = make_subplots(
-                    rows=2, cols=1, shared_xaxes=True,
-                    vertical_spacing=0.04, row_heights=[0.74, 0.26]
-                )
-                fig_ind.add_trace(
-                    go.Candlestick(
-                        x=c_sub.index, open=o_sub, high=h_sub, low=l_sub, close=c_sub,
-                        name=chosen_stock,
-                        increasing_line_color="#00e676", decreasing_line_color="#ff5252",
-                    ),
-                    row=1, col=1,
-                )
-                fig_ind.add_trace(
-                    go.Scatter(x=c_sub.index, y=sma20.tail(d_cnt), name="20 DMA", line=dict(color="#f59e0b", width=1.4, dash="dot")),
-                    row=1, col=1,
-                )
-                fig_ind.add_trace(
-                    go.Scatter(x=c_sub.index, y=sma50.tail(d_cnt), name="50 DMA", line=dict(color="#38bdf8", width=1.7)),
-                    row=1, col=1,
-                )
-                fig_ind.add_trace(
-                    go.Scatter(x=c_sub.index, y=sma200.tail(d_cnt), name="200 DMA", line=dict(color="#a855f7", width=1.9)),
-                    row=1, col=1,
-                )
-                vol_colors = ["#00e676" if c_val >= o_val else "#ff5252" for c_val, o_val in zip(c_sub, o_sub)]
-                fig_ind.add_trace(
-                    go.Bar(x=c_sub.index, y=v_sub, name="Volume", marker_color=vol_colors),
-                    row=2, col=1,
-                )
-                fig_ind.update_layout(
-                    title=f"{chosen_stock} ({chosen_sec}) — ক্যান্ডেলস্টিক, ভলিউম ও DMA চার্ট ({chart_tf})",
-                    paper_bgcolor=chart_bg,
-                    plot_bgcolor=chart_bg,
-                    font=dict(color=text_color),
-                    height=440,
-                    xaxis_rangeslider_visible=False,
-                    hovermode="x unified",
-                    margin=dict(t=45, b=15, l=15, r=15),
-                    legend=dict(orientation="h", y=1.08, x=0, font=dict(color=text_color)),
-                )
-                fig_ind.update_xaxes(gridcolor=grid_col)
-                fig_ind.update_yaxes(gridcolor=grid_col)
-            else:
-                fig_ind = go.Figure()
-                fig_ind.add_trace(go.Scatter(x=c_sub.index, y=c_sub, name=f"{chosen_stock} Price", line=dict(color=accent_col, width=2.8)))
-                fig_ind.add_trace(go.Scatter(x=c_sub.index, y=sma20.tail(d_cnt), name="20 DMA", line=dict(color="#f59e0b", width=1.5, dash="dot")))
-                fig_ind.add_trace(go.Scatter(x=c_sub.index, y=sma50.tail(d_cnt), name="50 DMA", line=dict(color="#00e676", width=1.8)))
-                fig_ind.add_trace(go.Scatter(x=c_sub.index, y=sma200.tail(d_cnt), name="200 DMA", line=dict(color="#ff5252", width=2.0)))
-                fig_ind.update_layout(
-                    title=f"{chosen_stock} ({chosen_sec}) — প্রাইস ও মুভিং অ্যাভারেজ চার্ট ({chart_tf})",
-                    paper_bgcolor=chart_bg,
-                    plot_bgcolor=chart_bg,
-                    font=dict(color=text_color),
-                    height=440,
-                    hovermode="x unified",
-                    margin=dict(t=45, b=20, l=15, r=15),
-                    xaxis=dict(gridcolor=grid_col),
-                    yaxis=dict(gridcolor=grid_col, title="Price (₹)"),
-                    legend=dict(orientation="h", y=1.08, x=0, font=dict(color=text_color)),
-                )
-            st.plotly_chart(fig_ind, use_container_width=True, theme=None, key=f"ind_stock_chart_{chosen_stock}_{chart_tf}_{chart_style}")
+            fig_ind = go.Figure()
+            fig_ind.add_trace(
+                go.Scatter(x=s_sub.index, y=s_sub, name=f"{chosen_stock} Price", line=dict(color=accent_col, width=2.8))
+            )
+            fig_ind.add_trace(
+                go.Scatter(x=s_sub.index, y=sma20.tail(d_cnt), name="20 DMA", line=dict(color="#f59e0b", width=1.5, dash="dot"))
+            )
+            fig_ind.add_trace(
+                go.Scatter(x=s_sub.index, y=sma50.tail(d_cnt), name="50 DMA", line=dict(color="#00e676", width=1.8))
+            )
+            fig_ind.add_trace(
+                go.Scatter(x=s_sub.index, y=sma200.tail(d_cnt), name="200 DMA", line=dict(color="#ff5252", width=2.0))
+            )
+            fig_ind.update_layout(
+                title=f"{chosen_stock} ({chosen_sec}) - প্রাইস ও মুভিং অ্যাভারেজ চার্ট ({chart_tf})",
+                paper_bgcolor=chart_bg,
+                plot_bgcolor=chart_bg,
+                font=dict(color=text_color),
+                height=400,
+                hovermode="x unified",
+                margin=dict(t=45, b=20, l=15, r=15),
+                xaxis=dict(gridcolor=grid_col),
+                yaxis=dict(gridcolor=grid_col, title="Price (₹)"),
+                legend=dict(orientation="h", y=1.08, x=0, font=dict(color=text_color)),
+            )
+            st.plotly_chart(fig_ind, use_container_width=True, theme=None, key=f"ind_stock_chart_{chosen_stock}_{chart_tf}")
 
         with ind_c2:
             fig_st_gauge = make_analog_gauge(
                 s_info.get("Meter Score", 50.0),
                 s_info.get("Prev Meter", 50.0),
                 f"{chosen_stock} মোমেন্টাম মিটার",
-                height_px=380,
+                height_px=360,
             )
             st.plotly_chart(fig_st_gauge, use_container_width=True, theme=None, key=f"ind_stock_gauge_{chosen_stock}_{chart_tf}")
