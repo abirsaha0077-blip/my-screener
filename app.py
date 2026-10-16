@@ -6,7 +6,7 @@ import streamlit.components.v1 as components
 import yfinance as yf
 
 # ==============================================================================
-# ১. পেজ সেটআপ (বাই-ডিফল্ট ডার্ক থিম)
+# ১. পেজ সেটআপ
 # ==============================================================================
 st.set_page_config(
     page_title="AlphaPulse Pro | Institutional Sector & Stock Terminal",
@@ -117,7 +117,6 @@ sectors = {
     ],
 }
 
-# নিফটি ৫০-এর মূল স্টকগুলোর সুনির্দিষ্ট তালিকা (নিফটি মুভার্সের জন্য)
 nifty50_symbols = [
     "RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "INFY.NS", "ICICIBANK.NS", "HINDUNILVR.NS",
     "ITC.NS", "SBIN.NS", "BHARTIARTL.NS", "KOTAKBANK.NS", "LTIM.NS", "AXISBANK.NS",
@@ -130,7 +129,7 @@ benchmark = "^NSEI"
 all_tickers = sorted(list(set([benchmark] + [t for s in sectors.values() for t in s])))
 
 # ==============================================================================
-# ৩. সাইডবার মেনু (বাই-ডিফল্ট ডার্ক থিম ও ক্লিয়ার টগল বাটন)
+# ৩. সাইডবার মেনু ও জাভাস্ক্রিপ্ট অটো-ক্লোজ (ত্রুটিমুক্ত স্ট্রিং)
 # ==============================================================================
 with st.sidebar:
     st.markdown("### 🎛️ থিম ও ডিসপ্লে সেটিংস")
@@ -154,49 +153,48 @@ with st.sidebar:
         "- **🔴 0–35:** Deep Value / Red Zone"
     )
 
-components.html(
-    f"""
-    <script>
-    (function() {{
-        const doc = window.parent.document;
-        let closeTimer = null;
+js_code = """
+<script>
+(function() {
+    const doc = window.parent.document;
+    let closeTimer = null;
 
-        function collapseSidebarNow() {{
-            if (doc.querySelector('div[data-baseweb="popover"]')) return;
-            const sidebar = doc.querySelector('section[data-testid="stSidebar"]');
-            if (sidebar && sidebar.getAttribute('aria-expanded') === 'true') {{
-                const closeBtn =
-                    doc.querySelector('[data-testid="stSidebarCollapseButton"] button') ||
-                    doc.querySelector('[data-testid="stSidebarHeader"] button') ||
-                    sidebar.querySelector('button[kind="headerNoPadding"]') ||
-                    sidebar.querySelector('button[kind="header"]') ||
-                    sidebar.querySelector('button');
-                if (closeBtn) closeBtn.click();
-            }}
+    function collapseSidebarNow() {
+        if (doc.querySelector('div[data-baseweb="popover"]')) return;
+        const sidebar = doc.querySelector('section[data-testid="stSidebar"]');
+        if (sidebar && sidebar.getAttribute('aria-expanded') === 'true') {
+            const closeBtn =
+                doc.querySelector('[data-testid="stSidebarCollapseButton"] button') ||
+                doc.querySelector('[data-testid="stSidebarHeader"] button') ||
+                sidebar.querySelector('button[kind="headerNoPadding"]') ||
+                sidebar.querySelector('button[kind="header"]') ||
+                sidebar.querySelector('button');
+            if (closeBtn) closeBtn.click();
         }
+    }
 
-        function attachAutoClose() {{
-            const sidebar = doc.querySelector('section[data-testid="stSidebar"]');
-            if (sidebar && !sidebar.dataset.boundAutoClose) {{
-                sidebar.dataset.boundAutoClose = "true";
-                sidebar.addEventListener('mouseleave', () => {{
-                    clearTimeout(closeTimer);
-                    closeTimer = setTimeout(collapseSidebarNow, {auto_close_sec * 1000});
-                }});
-                sidebar.addEventListener('mouseenter', () => {{
-                    clearTimeout(closeTimer);
-                }});
-            }}
+    function attachAutoClose() {
+        const sidebar = doc.querySelector('section[data-testid="stSidebar"]');
+        if (sidebar && !sidebar.dataset.boundAutoClose) {
+            sidebar.dataset.boundAutoClose = "true";
+            sidebar.addEventListener('mouseleave', () => {
+                clearTimeout(closeTimer);
+                closeTimer = setTimeout(collapseSidebarNow, TIMEOUT_VAL);
+            });
+            sidebar.addEventListener('mouseenter', () => {
+                clearTimeout(closeTimer);
+            });
         }
-        setInterval(attachAutoClose, 700);
-    }})();
-    </script>
-    """,
-    height=1,
-)
+    }
+    setInterval(attachAutoClose, 700);
+})();
+</script>
+""".replace("TIMEOUT_VAL", str(auto_close_sec * 1000))
+
+components.html(js_code, height=1)
 
 # ==============================================================================
-# ৪. থিম কালার ও সিএসএস স্টাইল (টগল বাটন স্পষ্ট করার জন্য হাই-কনট্রাস্ট)
+# ৪. থিম কালার ও সিএসএস স্টাইল
 # ==============================================================================
 if "Pure White" in theme_choice:
     bg_color, card_bg, input_bg, text_color, sub_text, border_col, chart_bg, grid_col, nifty_col_line, accent_col, shadow_css = (
@@ -211,39 +209,31 @@ else:
         "#090d16", "#111827", "#1e293b", "#f8fafc", "#cbd5e1", "#334155", "#111827", "rgba(255, 255, 255, 0.08)", "#facc15", "#38bdf8", "0 8px 24px rgba(0, 0, 0, 0.55)"
     )
 
-st.markdown(
-    f"""
-    <style>
-    .stApp {{ background-color: {bg_color} !important; color: {text_color} !important; }}
-    h1, h2, h3, h4, h5, h6, p, span, label, div[data-testid="stMarkdownContainer"] {{ color: {text_color} !important; }}
-    section[data-testid="stSidebar"] {{ background-color: {card_bg} !important; border-right: 1px solid {border_col} !important; }}
-    /* সাইডবার টগল বাটনটি স্পষ্ট এবং দৃশ্যমান রাখার জন্য স্টাইল */
-    button[kind="header"], [data-testid="collapsedControl"] {{
-        background-color: {accent_col} !important;
-        color: #ffffff !important;
-        border-radius: 8px !important;
-    }}
-    div[data-baseweb="select"] > div {{ background-color: {input_bg} !important; color: {text_color} !important; border: 1px solid {border_col} !important; border-radius: 10px !important; font-weight: 600 !important; }}
-    div.stButton > button {{ width: 100%; background-color: {input_bg} !important; color: {accent_col} !important; border: 1px solid {border_col} !important; border-radius: 10px !important; font-weight: 700 !important; font-size: 13px !important; padding: 6px 10px !important; }}
-    div.stButton > button:hover {{ border-color: {accent_col} !important; background-color: rgba(59, 130, 246, 0.12) !important; }}
-    .pro-card {{ background-color: {card_bg}; border: 1px solid {border_col}; border-radius: 14px; padding: 16px 18px; margin-bottom: 10px; box-shadow: {shadow_css}; }}
-    .kpi-card {{ background-color: {card_bg}; border: 1px solid {border_col}; border-top: 4px solid {accent_col}; border-radius: 14px; padding: 14px 16px; box-shadow: {shadow_css}; margin-bottom: 6px; min-height: 112px; }}
-    .kpi-title {{ font-size: 13px; font-weight: 700; color: {sub_text} !important; margin-bottom: 4px; }}
-    .kpi-main {{ font-size: 21px; font-weight: 800; color: {text_color} !important; line-height: 1.25; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
-    .kpi-sub-pos {{ display: inline-block; font-size: 12px; font-weight: 700; color: #10b981 !important; background: rgba(16, 185, 129, 0.14); padding: 2px 8px; border-radius: 99px; }}
-    .kpi-sub-neg {{ display: inline-block; font-size: 12px; font-weight: 700; color: #ef4444 !important; background: rgba(239, 68, 68, 0.14); padding: 2px 8px; border-radius: 99px; }}
-    .badge-green {{ background: rgba(16, 185, 129, 0.16); color: #10b981 !important; border: 1px solid rgba(16, 185, 129, 0.45); padding: 4px 12px; border-radius: 999px; font-weight: 800; font-size: 14px; }}
-    .badge-red {{ background: rgba(239, 68, 68, 0.16); color: #ef4444 !important; border: 1px solid rgba(239, 68, 68, 0.45); padding: 4px 12px; border-radius: 999px; font-weight: 800; font-size: 14px; }}
-    .stage-banner {{ display: inline-block; padding: 5px 12px; border-radius: 8px; font-size: 12.5px; font-weight: 700; margin: 6px 0; background: rgba(59, 130, 246, 0.12); border-left: 4px solid {accent_col}; }}
-    .action-btn {{ display: inline-block; padding: 4px 10px; margin: 3px 4px 3px 0; border-radius: 6px; font-size: 12px; font-weight: 700; text-decoration: none !important; border: 1px solid {border_col}; background: {input_bg}; color: {text_color} !important; }}
-    .ticker-wrap {{ width: 100%; overflow: hidden; background: {card_bg}; border: 1px solid {border_col}; border-radius: 10px; padding: 9px 14px; margin: 8px 0 14px 0; white-space: nowrap; box-shadow: {shadow_css}; }}
-    .ticker-move {{ display: inline-block; animation: ticker 155s linear infinite; }}
-    .ticker-wrap:hover .ticker-move {{ animation-play-state: paused; }}
-    @keyframes ticker {{ 0% {{ transform: translateX(0%); }} 100% {{ transform: translateX(-50%); }} }}
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+st.markdown(f"""
+<style>
+.stApp {{ background-color: {bg_color} !important; color: {text_color} !important; }}
+h1, h2, h3, h4, h5, h6, p, span, label, div[data-testid="stMarkdownContainer"] {{ color: {text_color} !important; }}
+section[data-testid="stSidebar"] {{ background-color: {card_bg} !important; border-right: 1px solid {border_col} !important; }}
+button[kind="header"], [data-testid="collapsedControl"] {{ background-color: {accent_col} !important; color: #ffffff !important; border-radius: 8px !important; }}
+div[data-baseweb="select"] > div {{ background-color: {input_bg} !important; color: {text_color} !important; border: 1px solid {border_col} !important; border-radius: 10px !important; font-weight: 600 !important; }}
+div.stButton > button {{ width: 100%; background-color: {input_bg} !important; color: {accent_col} !important; border: 1px solid {border_col} !important; border-radius: 10px !important; font-weight: 700 !important; font-size: 13px !important; padding: 6px 10px !important; }}
+div.stButton > button:hover {{ border-color: {accent_col} !important; background-color: rgba(59, 130, 246, 0.12) !important; }}
+.pro-card {{ background-color: {card_bg}; border: 1px solid {border_col}; border-radius: 14px; padding: 16px 18px; margin-bottom: 10px; box-shadow: {shadow_css}; }}
+.kpi-card {{ background-color: {card_bg}; border: 1px solid {border_col}; border-top: 4px solid {accent_col}; border-radius: 14px; padding: 14px 16px; box-shadow: {shadow_css}; margin-bottom: 6px; min-height: 112px; }}
+.kpi-title {{ font-size: 13px; font-weight: 700; color: {sub_text} !important; margin-bottom: 4px; }}
+.kpi-main {{ font-size: 21px; font-weight: 800; color: {text_color} !important; line-height: 1.25; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
+.kpi-sub-pos {{ display: inline-block; font-size: 12px; font-weight: 700; color: #10b981 !important; background: rgba(16, 185, 129, 0.14); padding: 2px 8px; border-radius: 99px; }}
+.kpi-sub-neg {{ display: inline-block; font-size: 12px; font-weight: 700; color: #ef4444 !important; background: rgba(239, 68, 68, 0.14); padding: 2px 8px; border-radius: 99px; }}
+.badge-green {{ background: rgba(16, 185, 129, 0.16); color: #10b981 !important; border: 1px solid rgba(16, 185, 129, 0.45); padding: 4px 12px; border-radius: 999px; font-weight: 800; font-size: 14px; }}
+.badge-red {{ background: rgba(239, 68, 68, 0.16); color: #ef4444 !important; border: 1px solid rgba(239, 68, 68, 0.45); padding: 4px 12px; border-radius: 999px; font-weight: 800; font-size: 14px; }}
+.stage-banner {{ display: inline-block; padding: 5px 12px; border-radius: 8px; font-size: 12.5px; font-weight: 700; margin: 6px 0; background: rgba(59, 130, 246, 0.12); border-left: 4px solid {accent_col}; }}
+.action-btn {{ display: inline-block; padding: 4px 10px; margin: 3px 4px 3px 0; border-radius: 6px; font-size: 12px; font-weight: 700; text-decoration: none !important; border: 1px solid {border_col}; background: {input_bg}; color: {text_color} !important; }}
+.ticker-wrap {{ width: 100%; overflow: hidden; background: {card_bg}; border: 1px solid {border_col}; border-radius: 10px; padding: 9px 14px; margin: 8px 0 14px 0; white-space: nowrap; box-shadow: {shadow_css}; }}
+.ticker-move {{ display: inline-block; animation: ticker 155s linear infinite; }}
+.ticker-wrap:hover .ticker-move {{ animation-play-state: paused; }}
+@keyframes ticker {{ 0% {{ transform: translateX(0%); }} 100% {{ transform: translateX(-50%); }} }}
+</style>
+""", unsafe_allow_html=True)
 
 st.markdown("## 🧭 AlphaPulse Pro — Institutional Sector & Stock Terminal")
 
@@ -395,7 +385,7 @@ for s_name, tickers in sectors.items():
     })
 
 # ==============================================================================
-# ৬. কন্ট্রোল প্যানেল (সঠিক ফিল্টার লজিকসহ সচল)
+# ৬. কন্ট্রোল প্যানেল
 # ==============================================================================
 c1, c2, c3, c4 = st.columns([1, 1.4, 1.4, 1.4])
 with c1:
@@ -432,7 +422,7 @@ for s in sorted(sector_master, key=lambda x: x[ret_key], reverse=True):
 st.markdown(f'<div class="ticker-wrap" title="মাউস রাখলে স্ক্রলিং থামবে"><div class="ticker-move">{"".join(ticker_items * 2)}</div></div>', unsafe_allow_html=True)
 
 # ==============================================================================
-# ৮. KPI কার্ড প্যানেল (সঠিক নিফটি ৫০ ফিল্টারিং সহ)
+# ৮. KPI কার্ড প্যানেল
 # ==============================================================================
 all_st_df_global = pd.DataFrame(list(all_stocks_master.values()))
 adv_count = int((all_st_df_global[ret_key] >= 0).sum())
@@ -543,7 +533,7 @@ if active_p is not None:
 st.markdown("<br>", unsafe_allow_html=True)
 
 # ==============================================================================
-# ৯. মেইন ট্যাবসমূহ (ফিল্টার ও সেক্টর জাম্প নিখুঁতভাবে সচল)
+# ৯. মেইন ট্যাবসমূহ
 # ==============================================================================
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "🧭 ১. সেক্টর চার্ট, মিটার ও সব শেয়ার",
@@ -557,15 +547,12 @@ with tab1:
     days_sel = tf_days_map[tf_option]
     nifty_curr_ret = nifty_multi_ret[tf_option]
 
-    # ফিল্টার লজিক ঠিক করা হয়েছে
-    filtered_sectors = []
-    for s in sector_master:
-        match_stage = stage_filter.startswith("সব") or (stage_filter.lower() in s["Meter_Status"].lower())
-        match_jump = quick_sec_jump.startswith("সবগুলো") or (s["Sector"] == quick_sec_jump)
-        if match_stage and match_jump:
-            filtered_sectors.append(s)
+    filtered_sectors = [
+        s for s in sector_master
+        if (stage_filter.startswith("সব") or stage_filter.lower() in s["Meter_Status"].lower())
+        and (quick_sec_jump.startswith("সবগুলো") or s["Sector"] == quick_sec_jump)
+    ]
 
-    # সর্টিং লজিক ঠিক করা হয়েছে
     if "Top Performers" in sort_option:
         filtered_sectors = sorted(filtered_sectors, key=lambda x: x[ret_key], reverse=True)
     elif "Beaten Down" in sort_option:
