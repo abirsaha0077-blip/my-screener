@@ -121,7 +121,7 @@ benchmark = "^NSEI"
 all_tickers = sorted(list(set([benchmark] + [t for s in sectors.values() for t in s])))
 
 # ==============================================================================
-# ৩. সাইডবার মেনু (অটো-ক্লোজ সময়সহ)
+# ৩. সাইডবার মেনু ও অটো-ক্লোজ লজিক
 # ==============================================================================
 with st.sidebar:
     st.markdown("### 🎛️ থিম ও ডিসপ্লে সেটিংস")
@@ -187,7 +187,7 @@ components.html(
 )
 
 # ==============================================================================
-# ৪. থিম কালার ও সিএসএস
+# ৪. থিম কালার ও সিএসএস স্টাইল
 # ==============================================================================
 if "Pure White" in theme_choice:
     bg_color, card_bg, input_bg, text_color, sub_text, border_col, chart_bg, grid_col, nifty_col_line, accent_col, shadow_css = (
@@ -233,7 +233,7 @@ st.markdown(
 st.markdown("## 🧭 AlphaPulse Pro — Institutional Sector & Stock Terminal")
 
 # ==============================================================================
-# ৫. ডেটা লোডিং ও সেফ স্টাইলিং ইঞ্জিন (Fixing Pandas Styler Error)
+# ৫. ডেটা লোডিং ও স্টাইলিং ইঞ্জিন
 # ==============================================================================
 @st.cache_data(ttl=3600)
 def load_full_history():
@@ -379,7 +379,7 @@ for s_name, tickers in sectors.items():
     })
 
 # ==============================================================================
-# ৬. অন-পেজ কন্ট্রোল প্যানেল (সরাসরি সচল ফিল্টার)
+# ৬. কন্ট্রোল প্যানেল
 # ==============================================================================
 c1, c2, c3, c4 = st.columns([1, 1.4, 1.4, 1.4])
 with c1:
@@ -387,12 +387,7 @@ with c1:
 with c2:
     sort_option = st.selectbox(
         "🔃 সাজানোর ক্রম (Sort By):",
-        [
-            "Top Performers First (সবচেয়ে বেশি বাড়া সেক্টর আগে)",
-            "Beaten Down First (সবচেয়ে বেশি ডাউন সেক্টর আগে)",
-            "Meter Score High to Low (স্ট্রং গ্রিন মিটার আগে)",
-            "Red ➔ Green Turnaround First (রেড থেকে গ্রিন হওয়া আগে)",
-        ],
+        ["Top Performers First (সবচেয়ে বেশি বাড়া সেক্টর আগে)", "Beaten Down First (সবচেয়ে বেশি ডাউন সেক্টর আগে)", "Meter Score High to Low (স্ট্রং গ্রিন মিটার আগে)", "Red ➔ Green Turnaround First (রেড থেকে গ্রিন হওয়া আগে)"],
         key="sel_sort"
     )
 with c3:
@@ -409,7 +404,7 @@ with c4:
     )
 
 # ==============================================================================
-# ৭. ধীরগতির স্ক্রলিং টিকার বার (মাউস রাখলে থামবে)
+# ৭. টিকার বার
 # ==============================================================================
 ret_key = f"{tf_option} %"
 ticker_items = []
@@ -421,7 +416,7 @@ for s in sorted(sector_master, key=lambda x: x[ret_key], reverse=True):
 st.markdown(f'<div class="ticker-wrap" title="মাউস রাখলে স্ক্রলিং থামবে"><div class="ticker-move">{"".join(ticker_items * 2)}</div></div>', unsafe_allow_html=True)
 
 # ==============================================================================
-# ৮. ক্লিকেবল ৪টি মেইন KPI কার্ড প্যানেল
+# ৮. KPI কার্ড প্যানেল
 # ==============================================================================
 all_st_df_global = pd.DataFrame(list(all_stocks_master.values()))
 adv_count = int((all_st_df_global[ret_key] >= 0).sum())
@@ -475,7 +470,6 @@ with k4:
     </div>""", unsafe_allow_html=True)
     if st.button(f"🔍 {worst_sec_now['Sector']}-এর শেয়ার দেখুন ▾", key="btn_kpi_laggard"): toggle_kpi("laggard")
 
-# ক্লিকেবল প্যানেল কন্টেন্ট
 active_p = st.session_state["active_kpi_panel"]
 if active_p is not None:
     st.markdown('<div class="pro-card">', unsafe_allow_html=True)
@@ -532,7 +526,7 @@ if active_p is not None:
 st.markdown("<br>", unsafe_allow_html=True)
 
 # ==============================================================================
-# ৯. মেইন ৫টি প্রো ট্যাব
+# ৯. মেইন ট্যাবসমূহ
 # ==============================================================================
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "🧭 ১. সেক্টর চার্ট, মিটার ও সব শেয়ার",
