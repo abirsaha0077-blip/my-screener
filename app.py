@@ -61,22 +61,59 @@ SECTOR_STOCKS = {
 ALL_TICKERS = sorted(list({t for lst in SECTOR_STOCKS.values() for t in lst}))
 TICKER_TO_SECTOR = {t: sec for sec, lst in SECTOR_STOCKS.items() for t in lst}
 
+DEFAULT_SECTOR = "সবগুলো সেক্টর (Show All 32)"
+DEFAULT_STOCK = "শেয়ার টাইপ করুন..."
+
 # ==============================================================================
-# ৩. সেশন স্টেট ও ক্লিকেবল লিঙ্ক (Query Params) হ্যান্ডলিং
+# ৩. সেশন স্টেট ও ব্যাক/ফরওয়ার্ড/হোম নেভিগেশন হিস্ট্রি ইঞ্জিন
 # ==============================================================================
 if "selected_sector" not in st.session_state:
-    st.session_state.selected_sector = "সবগুলো সেক্টর (Show All 32)"
+    st.session_state.selected_sector = DEFAULT_SECTOR
 if "selected_stock" not in st.session_state:
-    st.session_state.selected_stock = "শেয়ার টাইপ করুন..."
+    st.session_state.selected_stock = DEFAULT_STOCK
 if "kpi_panel" not in st.session_state:
     st.session_state.kpi_panel = None
+if "nav_history" not in st.session_state:
+    st.session_state.nav_history = [{"sec": DEFAULT_SECTOR, "stk": DEFAULT_STOCK, "kpi": None}]
+if "nav_idx" not in st.session_state:
+    st.session_state.nav_idx = 0
+
+def push_nav_state(sec, stk, kpi):
+    snap = {"sec": sec, "stk": stk, "kpi": kpi}
+    hist = st.session_state.nav_history[: st.session_state.nav_idx + 1]
+    if not hist or hist[-1] != snap:
+        hist.append(snap)
+        st.session_state.nav_history = hist
+        st.session_state.nav_idx = len(hist) - 1
 
 qp = st.query_params
+if "nav_action" in qp:
+    act = qp["nav_action"]
+    if act == "home":
+        st.session_state.selected_sector = DEFAULT_SECTOR
+        st.session_state.selected_stock = DEFAULT_STOCK
+        st.session_state.kpi_panel = None
+        push_nav_state(DEFAULT_SECTOR, DEFAULT_STOCK, None)
+    elif act == "back" and st.session_state.nav_idx > 0:
+        st.session_state.nav_idx -= 1
+        snap = st.session_state.nav_history[st.session_state.nav_idx]
+        st.session_state.selected_sector = snap["sec"]
+        st.session_state.selected_stock = snap["stk"]
+        st.session_state.kpi_panel = snap["kpi"]
+    elif act == "forward" and st.session_state.nav_idx < len(st.session_state.nav_history) - 1:
+        st.session_state.nav_idx += 1
+        snap = st.session_state.nav_history[st.session_state.nav_idx]
+        st.session_state.selected_sector = snap["sec"]
+        st.session_state.selected_stock = snap["stk"]
+        st.session_state.kpi_panel = snap["kpi"]
+    st.query_params.clear()
+
 if "focus_stock" in qp:
     clicked_sym = urllib.parse.unquote(qp["focus_stock"]).strip()
     full_t = clicked_sym if clicked_sym.endswith(".NS") else f"{clicked_sym}.NS"
     if full_t in ALL_TICKERS:
         st.session_state.selected_stock = full_t
+        push_nav_state(st.session_state.selected_sector, full_t, st.session_state.kpi_panel)
     st.query_params.clear()
 
 if "focus_sec" in qp:
@@ -84,150 +121,332 @@ if "focus_sec" in qp:
     if clicked_sec in SECTOR_STOCKS:
         st.session_state.selected_sector = clicked_sec
         st.session_state.kpi_panel = "custom_sector"
+        push_nav_state(clicked_sec, st.session_state.selected_stock, "custom_sector")
     st.query_params.clear()
 
 # ==============================================================================
-# ৪. টপ হেডার, থিম সিলেক্টর ও অ্যানালগ মিটার টগল
+# ৪. টপ হেডার বার (ক্লিকেবল লোগো = মেইন পেজ রিসেট + নেভিগেশন + থিম + মিটার)
 # ==============================================================================
 st.markdown('<div id="top-anchor"></div>', unsafe_allow_html=True)
 
-top_c1, top_c2, top_c3 = st.columns([6.3, 2.3, 1.4])
+top_c1, top_c2, top_c3, top_c4 = st.columns([5.3, 1.5, 2.0, 1.2])
 with top_c1:
     st.markdown(
-        '<div style="display:flex;align-items:center;gap:10px;">'
-        '<span style="font-size:2rem;">🧭</span>'
-        '<span style="font-size:1.75rem;font-weight:800;letter-spacing:-0.3px;">'
-        'AlphaPulse Pro — Intraday, Swing & Sector Terminal'
-        '</span></div>',
+        '<a href="?nav_action=home" target="_self" class="brand-logo-link" title="ক্লিক করলে সব ফিল্টার রিসেট হয়ে একদম মেইন পেজে চলে আসবে">'
+        '<span class="logo-badge">🧭</span>'
+        '<span class="brand-title">AlphaPulse Pro — Intraday, Swing & Sector Terminal</span>'
+        '</a>',
         unsafe_allow_html=True
     )
 with top_c2:
+    can_back = st.session_state.nav_idx > 0
+    can_fwd = st.session_state.nav_idx < len(st.session_state.nav_history) - 1
+    b_cls = "top-nav-btn" if can_back else "top-nav-btn disabled-nav"
+    f_cls = "top-nav-btn" if can_fwd else "top-nav-btn disabled-nav"
+    st.markdown(
+        f'<div style="display:flex;gap:6px;padding-top:4px;">'
+        f'<a href="?nav_action=back" target="_self" class="{b_cls}" title="আগের ভিউতে ফিরে যান (Back)">⬅️ ব্যাক</a>'
+        f'<a href="?nav_action=home" target="_self" class="top-nav-btn" title="মেইন পেজে যান (Home)">🏠 হোম</a>'
+        f'<a href="?nav_action=forward" target="_self" class="{f_cls}" title="পরের ভিউতে যান (Forward)">➡️</a>'
+        f'</div>',
+        unsafe_allow_html=True
+    )
+with top_c3:
     theme_mode = st.selectbox(
-        "Theme",
+        "থিম",
         ["🌙 Pro Dark (ডার্ক থিম)", "🌌 Cyber Neon (নিয়ন থিম)", "☀️ Clean Light (লাইট থিম)"],
         index=0,
         label_visibility="collapsed"
     )
-with top_c3:
+with top_c4:
     show_analog_meter = st.toggle("🎛️ অ্যানালগ মিটার", value=True)
 
 # ==============================================================================
-# ৫. কাস্টম CSS (Zero-Indentation Safe)
+# ৫. সম্পূর্ণ ফিক্সড ও হাই-কনট্রাস্ট CSS (সব কালো/অস্পষ্ট লেখা ও সাদা বাটন ফিক্সড)
 # ==============================================================================
 if "Clean Light" in theme_mode:
-    BG_MAIN, BG_CARD, TEXT_MAIN, TEXT_SUB, BORDER_C = "#f8fafc", "#ffffff", "#0f172a", "#475569", "#cbd5e1"
+    BG_MAIN, BG_CARD, TEXT_MAIN, TEXT_SUB, BORDER_C = "#f1f5f9", "#ffffff", "#0f172a", "#334155", "#cbd5e1"
+    BTN_BG, BTN_TEXT, BTN_BORDER = "#e2e8f0", "#0f172a", "#94a3b8"
+    INPUT_BG, INPUT_TEXT = "#ffffff", "#0f172a"
 elif "Cyber Neon" in theme_mode:
-    BG_MAIN, BG_CARD, TEXT_MAIN, TEXT_SUB, BORDER_C = "#050b14", "#0b1528", "#ecfdf5", "#94a3b8", "#0ea5e966"
+    BG_MAIN, BG_CARD, TEXT_MAIN, TEXT_SUB, BORDER_C = "#040911", "#0a1424", "#f8fafc", "#cbd5e1", "#0ea5e966"
+    BTN_BG, BTN_TEXT, BTN_BORDER = "linear-gradient(135deg, #0f172a, #1e293b)", "#38bdf8", "#0ea5e988"
+    INPUT_BG, INPUT_TEXT = "#0f1c30", "#f8fafc"
 else:
-    BG_MAIN, BG_CARD, TEXT_MAIN, TEXT_SUB, BORDER_C = "#070b14", "#0e1525", "#f8fafc", "#94a3b8", "#1e293b"
+    BG_MAIN, BG_CARD, TEXT_MAIN, TEXT_SUB, BORDER_C = "#070b14", "#0f172a", "#f8fafc", "#cbd5e1", "#1e293b"
+    BTN_BG, BTN_TEXT, BTN_BORDER = "linear-gradient(135deg, #111c33, #1e293b)", "#38bdf8", "#38bdf866"
+    INPUT_BG, INPUT_TEXT = "#111c30", "#f8fafc"
 
 css_block = """
 <style>
+/* ১. উপরের সাদা ডিফল্ট হেডার বার হাইড ও পর্যাপ্ত জায়গা রাখা (যাতে টাইটেল কেটে না যায়) */
+header[data-testid="stHeader"] {
+    background: transparent !important;
+    height: 0px !important;
+    min-height: 0px !important;
+    pointer-events: none !important;
+}
+div[data-testid="stToolbar"], div[data-testid="stDecoration"] {
+    display: none !important;
+}
 html, body, [data-testid="stAppViewContainer"], .main {
     background-color: __BG_MAIN__ !important;
     color: __TEXT_MAIN__ !important;
     scroll-behavior: smooth !important;
 }
 .block-container {
-    padding-top: 1.2rem !important;
-    padding-bottom: 4.5rem !important;
+    padding-top: 1.6rem !important;
+    padding-bottom: 5rem !important;
     max-width: 97% !important;
 }
+
+/* ২. ক্লিকেবল ব্র্যান্ড লোগো ও টপ নেভিগেশন বাটন */
+a.brand-logo-link {
+    text-decoration: none !important;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 2px 6px;
+    border-radius: 10px;
+    transition: all 0.2s ease;
+}
+a.brand-logo-link:hover {
+    background: rgba(56, 189, 248, 0.12);
+    transform: translateY(-1px);
+}
+.logo-badge {
+    font-size: 1.85rem;
+    background: linear-gradient(135deg, #0ea5e9, #2563eb);
+    padding: 3px 8px;
+    border-radius: 10px;
+    box-shadow: 0 3px 10px rgba(14, 165, 233, 0.4);
+}
+.brand-title {
+    font-size: 1.52rem;
+    font-weight: 800;
+    color: __TEXT_MAIN__ !important;
+    letter-spacing: -0.3px;
+}
+a.top-nav-btn {
+    text-decoration: none !important;
+    background: __BTN_BG__;
+    color: __TEXT_MAIN__ !important;
+    border: 1px solid __BTN_BORDER__;
+    padding: 5px 10px;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    transition: all 0.2s ease;
+}
+a.top-nav-btn:hover {
+    background: #0284c7 !important;
+    color: #ffffff !important;
+}
+a.disabled-nav {
+    opacity: 0.42;
+    pointer-events: none;
+}
+
+/* ৩. সব ফিল্টার লেবেল, রেডিও বাটন, ট্যাব ও এক্সপান্ডার লেখার উজ্জ্বল রঙ (কালো লেখা ফিক্স) */
+[data-testid="stWidgetLabel"] p,
+[data-testid="stWidgetLabel"] label,
+.stSelectbox label,
+.stNumberInput label,
+.stRadio label,
+[data-testid="stRadio"] label p,
+[data-testid="stRadio"] label span,
+[data-testid="stRadio"] div[role="radiogroup"] label {
+    color: __TEXT_MAIN__ !important;
+    font-weight: 700 !important;
+    font-size: 0.85rem !important;
+    opacity: 1 !important;
+}
+
+/* ৪. রেডিও বাটনের বক্স স্টাইল */
+[data-testid="stRadio"] div[role="radiogroup"] {
+    background: __BG_CARD__;
+    border: 1px solid __BORDER_C__;
+    padding: 4px 12px;
+    border-radius: 999px;
+    gap: 12px !important;
+}
+
+/* ৫. সব Streamlit বাটন (প্যানেল বন্ধ করুন, নিফটি মুভার্স, ব্রেডথ বাটন) ফিক্স */
+div.stButton > button,
+button[data-testid="stBaseButton-secondary"],
+div.stDownloadButton > button {
+    background: __BTN_BG__ !important;
+    color: __TEXT_MAIN__ !important;
+    border: 1.5px solid __BTN_BORDER__ !important;
+    border-radius: 10px !important;
+    font-weight: 800 !important;
+    font-size: 0.84rem !important;
+    padding: 0.45rem 0.9rem !important;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25) !important;
+    transition: all 0.2s ease !important;
+}
+div.stButton > button p,
+button[data-testid="stBaseButton-secondary"] p,
+div.stDownloadButton > button p {
+    color: __TEXT_MAIN__ !important;
+    font-weight: 800 !important;
+}
+div.stButton > button:hover,
+button[data-testid="stBaseButton-secondary"]:hover,
+div.stDownloadButton > button:hover {
+    background: linear-gradient(135deg, #0284c7, #2563eb) !important;
+    color: #ffffff !important;
+    border-color: #38bdf8 !important;
+    transform: translateY(-2px) !important;
+}
+div.stButton > button:hover p,
+button[data-testid="stBaseButton-secondary"]:hover p {
+    color: #ffffff !important;
+}
+
+/* ৬. ট্যাব ও এক্সপান্ডার হেডিং উজ্জ্বল ও স্পষ্ট করা */
+button[data-baseweb="tab"] {
+    background: __BG_CARD__ !important;
+    border: 1px solid __BORDER_C__ !important;
+    border-radius: 10px 10px 0 0 !important;
+    margin-right: 6px !important;
+    padding: 8px 16px !important;
+}
+button[data-baseweb="tab"] p,
+button[data-baseweb="tab"] span {
+    color: __TEXT_SUB__ !important;
+    font-weight: 700 !important;
+    font-size: 0.9rem !important;
+}
+button[data-baseweb="tab"][aria-selected="true"] {
+    background: linear-gradient(135deg, rgba(2,132,199,0.25), rgba(37,99,235,0.2)) !important;
+    border-bottom: 3px solid #38bdf8 !important;
+}
+button[data-baseweb="tab"][aria-selected="true"] p {
+    color: #38bdf8 !important;
+    font-weight: 800 !important;
+}
+[data-testid="stExpander"] details {
+    background: __BG_CARD__ !important;
+    border: 1px solid __BORDER_C__ !important;
+    border-radius: 10px !important;
+}
+[data-testid="stExpander"] summary,
+[data-testid="stExpander"] summary p,
+[data-testid="stExpander"] summary span {
+    color: __TEXT_MAIN__ !important;
+    font-weight: 700 !important;
+    font-size: 0.88rem !important;
+}
+code {
+    background: rgba(56, 189, 248, 0.16) !important;
+    color: #38bdf8 !important;
+    padding: 2px 8px !important;
+    border-radius: 6px !important;
+    font-weight: 700 !important;
+}
+
+/* ৭. পালস বার */
 .pulse-bar {
     background: __BG_CARD__;
     border: 1px solid __BORDER_C__;
-    border-radius: 12px;
-    padding: 10px 18px;
-    margin: 8px 0 14px 0;
+    border-radius: 10px;
+    padding: 8px 16px;
+    margin: 6px 0 10px 0;
     display: flex;
     flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
 }
 .pulse-item {
-    font-size: 0.88rem;
+    font-size: 0.85rem;
     font-weight: 700;
+    color: __TEXT_MAIN__;
 }
+
+/* ৮. কমপ্যাক্ট ও স্লিম ইন্ট্রাডে বুলিশ ও বেয়ারিশ ফোকাস বক্স (অতিরিক্ত জায়গা নেবে না) */
 .intraday-box-bull {
-    background: linear-gradient(145deg, rgba(6,78,59,0.22), rgba(14,21,37,0.95));
-    border: 1.5px solid #10b981;
-    border-radius: 14px;
-    padding: 14px 16px;
-    box-shadow: 0 0 16px rgba(16,185,129,0.12);
-    min-height: 118px;
+    background: linear-gradient(145deg, rgba(6,78,59,0.20), __BG_CARD__);
+    border: 1px solid #10b98188;
+    border-left: 4px solid #10b981;
+    border-radius: 10px;
+    padding: 8px 12px;
+    margin-bottom: 4px;
 }
 .intraday-box-bear {
-    background: linear-gradient(145deg, rgba(127,29,29,0.22), rgba(14,21,37,0.95));
-    border: 1.5px solid #ef4444;
-    border-radius: 14px;
-    padding: 14px 16px;
-    box-shadow: 0 0 16px rgba(239,68,68,0.12);
-    min-height: 118px;
+    background: linear-gradient(145deg, rgba(127,29,29,0.20), __BG_CARD__);
+    border: 1px solid #ef444488;
+    border-left: 4px solid #ef4444;
+    border-radius: 10px;
+    padding: 8px 12px;
+    margin-bottom: 4px;
 }
 .box-title-bull {
-    color: #10b981;
-    font-size: 0.93rem;
+    color: #34d399;
+    font-size: 0.82rem;
     font-weight: 800;
-    margin-bottom: 10px;
+    margin-bottom: 6px;
 }
 .box-title-bear {
-    color: #ef4444;
-    font-size: 0.93rem;
+    color: #f87171;
+    font-size: 0.82rem;
     font-weight: 800;
-    margin-bottom: 10px;
+    margin-bottom: 6px;
 }
 .pill-container {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 6px;
 }
 a.bull-pill {
     text-decoration: none !important;
     background: rgba(16,185,129,0.14);
-    border: 1px solid #10b981;
+    border: 1px solid #10b98199;
     color: #ecfdf5 !important;
-    padding: 6px 12px;
+    padding: 3px 9px;
     border-radius: 999px;
-    font-size: 0.79rem;
+    font-size: 0.74rem;
     font-weight: 700;
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    transition: all 0.2s ease;
+    gap: 4px;
+    transition: all 0.15s ease;
 }
 a.bull-pill:hover {
     background: #10b981;
     color: #03150e !important;
-    transform: translateY(-2px);
+    transform: translateY(-1px);
 }
 a.bear-pill {
     text-decoration: none !important;
     background: rgba(239,68,68,0.14);
-    border: 1px solid #ef4444;
+    border: 1px solid #ef444499;
     color: #fef2f2 !important;
-    padding: 6px 12px;
+    padding: 3px 9px;
     border-radius: 999px;
-    font-size: 0.79rem;
+    font-size: 0.74rem;
     font-weight: 700;
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    transition: all 0.2s ease;
+    gap: 4px;
+    transition: all 0.15s ease;
 }
 a.bear-pill:hover {
     background: #ef4444;
     color: #ffffff !important;
-    transform: translateY(-2px);
+    transform: translateY(-1px);
 }
+
+/* ৯. ক্লিকেবল সেক্টর মার্কি বার */
 .marquee-wrap {
     background: __BG_CARD__;
     border: 1px solid __BORDER_C__;
-    border-radius: 12px;
-    padding: 10px 12px;
+    border-radius: 10px;
+    padding: 8px 10px;
     overflow: hidden;
     white-space: nowrap;
-    margin: 6px 0 16px 0;
+    margin: 4px 0 12px 0;
 }
 .marquee-track {
     display: inline-block;
@@ -248,10 +467,10 @@ a.sec-pill-up {
     background: rgba(16,185,129,0.14);
     border: 1px solid #10b981;
     color: #34d399 !important;
-    padding: 6px 14px;
-    margin-right: 10px;
+    padding: 4px 12px;
+    margin-right: 8px;
     border-radius: 999px;
-    font-size: 0.81rem;
+    font-size: 0.78rem;
     font-weight: 700;
 }
 a.sec-pill-down {
@@ -262,18 +481,20 @@ a.sec-pill-down {
     background: rgba(239,68,68,0.14);
     border: 1px solid #ef4444;
     color: #f87171 !important;
-    padding: 6px 14px;
-    margin-right: 10px;
+    padding: 4px 12px;
+    margin-right: 8px;
     border-radius: 999px;
-    font-size: 0.81rem;
+    font-size: 0.78rem;
     font-weight: 700;
 }
+
+/* ১০. ৪টি সামারি KPI কার্ড */
 .kpi-card {
     background: __BG_CARD__;
-    border: 1.5px solid #0284c788;
-    border-radius: 14px;
-    padding: 14px 16px;
-    min-height: 125px;
+    border: 1.5px solid #0284c777;
+    border-radius: 12px;
+    padding: 12px 14px;
+    min-height: 112px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -281,21 +502,22 @@ a.sec-pill-down {
 }
 .kpi-title {
     color: __TEXT_SUB__;
-    font-size: 0.82rem;
+    font-size: 0.8rem;
     font-weight: 700;
 }
 .kpi-val {
-    font-size: 1.35rem;
+    font-size: 1.25rem;
     font-weight: 800;
-    margin: 5px 0;
+    color: __TEXT_MAIN__;
+    margin: 4px 0;
 }
 .kpi-sub-up {
     background: rgba(16,185,129,0.15);
     color: #34d399;
     border: 1px solid #10b98155;
-    padding: 3px 9px;
-    border-radius: 8px;
-    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 0.73rem;
     font-weight: 700;
     width: fit-content;
 }
@@ -303,34 +525,60 @@ a.sec-pill-down {
     background: rgba(239,68,68,0.15);
     color: #f87171;
     border: 1px solid #ef444455;
-    padding: 3px 9px;
-    border-radius: 8px;
-    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 0.73rem;
     font-weight: 700;
     width: fit-content;
 }
-a.floating-top-btn {
+
+/* ১১. ফ্লোটিং কুইক নেভিগেশন ডক (Back, মেইন পেজ লোগো, Forward, ওপরে যান) */
+.floating-nav-dock {
     position: fixed;
-    bottom: 62px;
-    right: 22px;
+    bottom: 58px;
+    right: 18px;
     z-index: 999999;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(15, 23, 42, 0.92);
+    border: 1.5px solid #38bdf888;
+    padding: 6px 10px;
+    border-radius: 999px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+}
+a.dock-btn {
+    text-decoration: none !important;
+    color: #f8fafc !important;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    padding: 5px 10px;
+    border-radius: 999px;
+    font-size: 0.76rem;
+    font-weight: 800;
+    transition: all 0.18s ease;
+}
+a.dock-btn:hover {
+    background: #0284c7;
+    color: #ffffff !important;
+    transform: translateY(-2px);
+}
+a.dock-btn-top {
+    text-decoration: none !important;
     background: linear-gradient(135deg, #0ea5e9, #2563eb);
     color: #ffffff !important;
-    text-decoration: none !important;
-    padding: 9px 18px;
+    padding: 5px 12px;
     border-radius: 999px;
-    font-size: 0.86rem;
+    font-size: 0.78rem;
     font-weight: 800;
-    box-shadow: 0 6px 20px rgba(2,132,199,0.55);
-    border: 1px solid rgba(255,255,255,0.28);
-    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(2, 132, 199, 0.5);
 }
-a.floating-top-btn:hover {
-    transform: translateY(-3px) scale(1.04);
-    box-shadow: 0 8px 25px rgba(2,132,199,0.8);
+a.dock-btn-top:hover {
+    transform: translateY(-2px) scale(1.03);
 }
 </style>
-""".replace("__BG_MAIN__", BG_MAIN).replace("__BG_CARD__", BG_CARD).replace("__TEXT_MAIN__", TEXT_MAIN).replace("__TEXT_SUB__", TEXT_SUB).replace("__BORDER_C__", BORDER_C)
+""".replace("__BG_MAIN__", BG_MAIN).replace("__BG_CARD__", BG_CARD).replace("__TEXT_MAIN__", TEXT_MAIN).replace("__TEXT_SUB__", TEXT_SUB).replace("__BORDER_C__", BORDER_C).replace("__BTN_BG__", BTN_BG).replace("__BTN_TEXT__", BTN_TEXT).replace("__BTN_BORDER__", BTN_BORDER)
 
 st.markdown(css_block, unsafe_allow_html=True)
 
@@ -433,7 +681,6 @@ def load_full_market_data():
 
             rsi_val = round(calc_rsi(closes, 14), 1)
 
-            # টানা কত দিন শেয়ারটি উপরে বা নিচে গেছে (Consecutive Up / Down Days)
             c_arr = closes.values
             consec_up, consec_down = 0, 0
             for i in range(len(c_arr) - 1, 0, -1):
@@ -450,42 +697,39 @@ def load_full_market_data():
                 else:
                     break
 
-            # ক্যান্ডেলস্টিক ডজি / হ্যামার / শুটিং স্টার / কনসোলিডেশন বিশ্লেষণ
             rng = max(h_now - l_now, 1e-6)
             body = abs(c_now - o_now)
             body_pct = body / rng
             lower_wick = (min(o_now, c_now) - l_now) / rng
             upper_wick = (h_now - max(o_now, c_now)) / rng
 
-            # গত ৩ দিনের কনসোলিডেশন রেঞ্জ (Tight Consolidation)
             rng_3d_pct = ((float(highs.iloc[-3:].max()) - float(lows.iloc[-3:].min())) / max(c_now, 1.0)) * 100.0 if len(df) >= 4 else 10.0
 
             bull_candle = None
             bear_candle = None
 
-            if body_pct <= 0.25 and lower_wick >= 0.45:
+            if body_pct <= 0.28 and lower_wick >= 0.42:
                 bull_candle = "Dragonfly Doji"
-            elif body_pct <= 0.30:
-                bull_candle = "Bullish Doji"
-            elif lower_wick >= 0.50 and body_pct <= 0.42:
+            elif lower_wick >= 0.48 and body_pct <= 0.42:
                 bull_candle = "Hammer"
+            elif body_pct <= 0.28 and c_now >= o_now:
+                bull_candle = "Bullish Doji"
             elif rng_3d_pct <= 4.2 and c_now >= o_now:
                 bull_candle = "Tight Base"
-            elif lower_wick >= 0.35 and c_now >= o_now:
-                bull_candle = "Bottom Wick"
+            elif lower_wick >= 0.35 and r_1d >= 0:
+                bull_candle = "Bottom Turn"
 
-            if body_pct <= 0.25 and upper_wick >= 0.45:
+            if body_pct <= 0.28 and upper_wick >= 0.42:
                 bear_candle = "Gravestone Doji"
-            elif body_pct <= 0.30:
-                bear_candle = "Top Stall Doji"
-            elif upper_wick >= 0.50 and body_pct <= 0.42:
+            elif upper_wick >= 0.48 and body_pct <= 0.42:
                 bear_candle = "Shooting Star"
-            elif rng_3d_pct <= 4.2 and c_now <= o_now:
+            elif body_pct <= 0.28 and c_now < o_now:
+                bear_candle = "Bearish Doji"
+            elif rng_3d_pct <= 4.2 and c_now < o_now:
                 bear_candle = "Supply Stall"
-            elif upper_wick >= 0.35 and c_now <= o_now:
-                bear_candle = "Upper Rejection"
+            elif upper_wick >= 0.35 and r_1d < 0:
+                bear_candle = "Top Reject"
 
-            # ATR (14) হিসাব
             if len(df) >= 15:
                 tr = pd.concat([
                     highs - lows,
@@ -532,7 +776,6 @@ def load_full_market_data():
     if stocks_df.empty:
         return pd.DataFrame(), pd.DataFrame()
 
-    # সেক্টর লেভেল ক্যালকুলেশন
     sec_rows = []
     for sec_name, grp in stocks_df.groupby("Sector"):
         s_1d = float(grp["1D"].mean())
@@ -545,9 +788,7 @@ def load_full_market_data():
         s_rsi = float(grp["RSI"].mean())
         s_b50 = float((grp["Above_50DMA"].sum() / len(grp)) * 100.0)
 
-        # ডাউন সেক্টর যা নিচ থেকে আপের দিকে মুভ করছে (Bullish Sector Turnaround)
         sec_bull_turn = (s_1w <= 1.5 or s_1m <= 1.5) and (s_1d >= -0.15 or s_1d > (s_1w / 5.0))
-        # আপ সেক্টর যা ওপর থেকে নিচের দিকে নামছে (Bearish Sector Rollover)
         sec_bear_roll = (s_1w >= -0.5 or s_1m >= 0.5) and (s_1d <= 0.25 or s_1d < (s_1w / 5.0))
 
         meter = int(np.clip(50 + (s_1w * 3.5) + (s_1d * 6.0) + ((s_rsi - 50) * 0.6), 5, 98))
@@ -604,28 +845,15 @@ def style_colored_table(df: pd.DataFrame, pct_cols: list):
 
 
 # ==============================================================================
-# ৭. ইন্ট্রাডে বুলিশ ও বেয়ারিশ রিভার্সাল ফোকাস (তোমার নির্দেশ অনুযায়ী ডজি + ভলিউম + সেক্টর টার্নঅ্যারাউন্ড)
+# ৭. ইন্ট্রাডে বুলিশ ও বেয়ারিশ ফোকাস (কখনোই একই শেয়ার দুই বক্সে আসবে না)
 # ==============================================================================
 def filter_intraday_focus_stocks(stocks_df: pd.DataFrame):
-    """
-    ১. বুলিশ সাইড:
-       - টানা ৩-৪ দিন উপরে যাওয়া শেয়ার সম্পূর্ণ বাদ (Consec_Up <= 2)
-       - অতিরিক্ত বেড়ে যাওয়া শেয়ার বাদ (-1.5% <= 1D <= +4.0%)
-       - নিচে ডজি / হ্যামার / টাইট কনসোলিডেশন তৈরি করেছে (Bull_Candle.notna())
-       - ভলিউম তৈরি হচ্ছে (Vol_Ratio >= 1.15x, কম ভলিউমের শেয়ার বাদ)
-       - ডাউন সেক্টর যা নিচ থেকে আপের দিকে ঘুরছে (Sec_Bull_Turn বা 1W ডাউন থেকে 1D পজিটিভ)
-    ২. বেয়ারিশ সাইড:
-       - টানা ৩-৪ দিন নিচে পড়া শেয়ার সম্পূর্ণ বাদ (Consec_Down <= 2)
-       - অতিরিক্ত পড়ে যাওয়া শেয়ার বাদ (-4.0% <= 1D <= +1.5%)
-       - ওপরে ডজি / শুটিং স্টার / সাপ্লাই রিজেকশন তৈরি করেছে (Bear_Candle.notna())
-       - ভলিউম তৈরি হচ্ছে (Vol_Ratio >= 1.15x) এবং সেক্টর ওপর থেকে নিচে ঘুরছে
-    """
     df = stocks_df.copy()
 
-    # বুলিশ ফিল্টার
+    # বুলিশ ফিল্টার: টানা ৩-৪ দিন বাড়া বাদ + পজিটিভ/ডজি কনসোলিডেশন + ভলিউম
     bull_mask = (
         (df["Consec_Up"] <= 2) &
-        (df["1D"] >= -1.5) & (df["1D"] <= 4.0) &
+        (df["1D"] >= -0.2) & (df["1D"] <= 3.8) &
         (df["1W"] <= 4.2) &
         (df["Vol_Ratio"] >= 1.12) &
         (df["Bull_Candle"].notna())
@@ -635,7 +863,7 @@ def filter_intraday_focus_stocks(stocks_df: pd.DataFrame):
     if len(bull_candidates) < 6:
         extra_bull = df[
             (df["Consec_Up"] <= 2) &
-            (df["1D"] >= -1.8) & (df["1D"] <= 4.2) &
+            (df["1D"] >= 0.0) & (df["1D"] <= 4.0) &
             (df["Vol_Ratio"] >= 1.05)
         ].copy()
         extra_bull["Bull_Candle"] = extra_bull["Bull_Candle"].fillna("Doji Base")
@@ -649,11 +877,13 @@ def filter_intraday_focus_stocks(stocks_df: pd.DataFrame):
         + (bull_candidates["Lower_Wick"] * 15.0)
     )
     bull_top6 = bull_candidates.sort_values("Focus_Score", ascending=False).head(6)
+    bull_tickers_used = set(bull_top6["Ticker"].tolist())
 
-    # বেয়ারিশ ফিল্টার (ঠিক বিপরীত লজিক)
+    # বেয়ারিশ ফিল্টার: বুলিশে থাকা শেয়ার বাদ + ওপরে শুটিং স্টার/ডজি রিজেকশন + ভলিউম
     bear_mask = (
+        (~df["Ticker"].isin(bull_tickers_used)) &
         (df["Consec_Down"] <= 2) &
-        (df["1D"] <= 1.5) & (df["1D"] >= -4.0) &
+        (df["1D"] <= 0.2) & (df["1D"] >= -3.8) &
         (df["1W"] >= -4.2) &
         (df["Vol_Ratio"] >= 1.12) &
         (df["Bear_Candle"].notna())
@@ -662,11 +892,12 @@ def filter_intraday_focus_stocks(stocks_df: pd.DataFrame):
 
     if len(bear_candidates) < 6:
         extra_bear = df[
+            (~df["Ticker"].isin(bull_tickers_used)) &
             (df["Consec_Down"] <= 2) &
-            (df["1D"] <= 1.8) & (df["1D"] >= -4.2) &
-            (df["Vol_Ratio"] >= 1.05)
+            (df["1D"] < 0.0) & (df["1D"] >= -4.0) &
+            (df["Vol_Ratio"] >= 1.02)
         ].copy()
-        extra_bear["Bear_Candle"] = extra_bear["Bear_Candle"].fillna("Top Doji")
+        extra_bear["Bear_Candle"] = extra_bear["Bear_Candle"].fillna("Top Stall")
         bear_candidates = pd.concat([bear_candidates, extra_bear]).drop_duplicates(subset=["Ticker"])
 
     bear_candidates["Focus_Score"] = (
@@ -681,7 +912,7 @@ def filter_intraday_focus_stocks(stocks_df: pd.DataFrame):
     return bull_top6, bear_top6
 
 
-with st.spinner("⚡ ৩২টি সেক্টর ও ১৮০+ শেয়ারের লাইভ ডজি ক্যান্ডেল, ভলিউম ও সেক্টর রোটেশন লোড হচ্ছে..."):
+with st.spinner("⚡ ৩২টি সেক্টর ও ১৮০+ শেয়ারের লাইভ ডেটা লোড হচ্ছে..."):
     pulse = load_pulse_indices()
     stocks_df, sectors_df = load_full_market_data()
 
@@ -690,7 +921,7 @@ if stocks_df.empty or sectors_df.empty:
     st.stop()
 
 # ==============================================================================
-# ৮. মার্কেট পালস রিবন (স্ক্রিনশটের হুবহু ডিজাইন)
+# ৮. মার্কেট পালস রিবন
 # ==============================================================================
 n_d = pulse["NIFTY"]
 b_d = pulse["BANKNIFTY"]
@@ -704,13 +935,13 @@ pulse_html = (
     f'<div class="pulse-item">🇮🇳 Nifty 50: <span style="color:{"#34d399" if n_d["1D"]>=0 else "#f87171"};">{n_d["price"]:,.1f} ({n_d["1D"]:+.2f}%)</span></div>'
     f'<div class="pulse-item">🏛️ Bank Nifty: <span style="color:{"#34d399" if b_d["1D"]>=0 else "#f87171"};">{b_d["price"]:,.1f} ({b_d["1D"]:+.2f}%)</span></div>'
     f'<div class="pulse-item">⚡ India VIX: <span style="color:{"#34d399" if v_d["1D"]<=0 else "#fbbf24"};">{v_d["price"]:.2f} ({v_d["1D"]:+.2f}%)</span> — {vix_badge}</div>'
-    f'<div class="pulse-item">💵 USD/INR: <span style="color:#94a3b8;">₹{u_d["price"]:.2f} ({u_d["1D"]:+.2f}%)</span></div>'
+    f'<div class="pulse-item">💵 USD/INR: <span style="color:#38bdf8;">₹{u_d["price"]:.2f} ({u_d["1D"]:+.2f}%)</span></div>'
     f'</div>'
 )
 st.markdown(pulse_html, unsafe_allow_html=True)
 
 # ==============================================================================
-# ৯. ৫-কলাম কন্ট্রোল ও ফিল্টার বার (স্ক্রিনশটের হুবহু লেআউট)
+# ৯. ৫-কলাম কন্ট্রোল ও ফিল্টার বার (সব লেবেল উজ্জ্বল ও স্পষ্ট)
 # ==============================================================================
 fc1, fc2, fc3, fc4, fc5 = st.columns([1.15, 2.2, 2.2, 2.2, 2.25])
 
@@ -744,49 +975,52 @@ with fc3:
     )
 
 with fc4:
-    sec_list = ["সবগুলো সেক্টর (Show All 32)"] + sorted(list(SECTOR_STOCKS.keys()))
+    sec_list = [DEFAULT_SECTOR] + sorted(list(SECTOR_STOCKS.keys()))
     sec_default_idx = sec_list.index(st.session_state.selected_sector) if st.session_state.selected_sector in sec_list else 0
     picked_sec = st.selectbox("🔍 ৪. নির্দিষ্ট সেক্টর খুঁজুন:", sec_list, index=sec_default_idx)
-    st.session_state.selected_sector = picked_sec
+    if picked_sec != st.session_state.selected_sector:
+        st.session_state.selected_sector = picked_sec
+        push_nav_state(picked_sec, st.session_state.selected_stock, st.session_state.kpi_panel)
+        st.rerun()
 
 with fc5:
-    stock_search_list = ["শেয়ার টাইপ করুন..."] + [f"{r['Symbol']} ({r['Sector']})" for _, r in stocks_df.sort_values("Symbol").iterrows()]
+    stock_search_list = [DEFAULT_STOCK] + [f"{r['Symbol']} ({r['Sector']})" for _, r in stocks_df.sort_values("Symbol").iterrows()]
     st_default_idx = 0
-    if st.session_state.selected_stock != "শেয়ার টাইপ করুন...":
+    if st.session_state.selected_stock != DEFAULT_STOCK:
         target_sym = st.session_state.selected_stock.replace(".NS", "")
         for idx_s, item_s in enumerate(stock_search_list):
             if item_s.startswith(f"{target_sym} ("):
                 st_default_idx = idx_s
                 break
     picked_stock = st.selectbox("⚡ ৫. যেকোনো শেয়ার খুঁজুন (Stock Search):", stock_search_list, index=st_default_idx)
-    if picked_stock != "শেয়ার টাইপ করুন...":
-        st.session_state.selected_stock = picked_stock.split(" (")[0].strip() + ".NS"
-    else:
-        st.session_state.selected_stock = "শেয়ার টাইপ করুন..."
+    new_stk = picked_stock.split(" (")[0].strip() + ".NS" if picked_stock != DEFAULT_STOCK else DEFAULT_STOCK
+    if new_stk != st.session_state.selected_stock:
+        st.session_state.selected_stock = new_stk
+        push_nav_state(st.session_state.selected_sector, new_stk, st.session_state.kpi_panel)
+        st.rerun()
 
 # ==============================================================================
-# ১০. ইন্ট্রাডে বুলিশ ও বেয়ারিশ রিভার্সাল ফোকাস বক্স (স্ক্রিনশট + সংশোধিত লজিক)
+# ১০. স্লিম ও কমপ্যাক্ট ইন্ট্রাডে বুলিশ ও বেয়ারিশ ফোকাস বক্স
 # ==============================================================================
 bull_top6, bear_top6 = filter_intraday_focus_stocks(stocks_df)
 
-# বুলিশ ডে / বেয়ারিশ ডে ট্র্যাকিং মোড সুইচার
-m_bar1, m_bar2 = st.columns([6.8, 3.2])
+m_bar1, m_bar2 = st.columns([5.8, 4.2])
 with m_bar1:
     st.markdown(
-        '<div style="font-size:0.82rem;color:#94a3b8;margin-bottom:4px;">'
-        '🎯 <b>ইন্ট্রাডে ডজি ও সেক্টর টার্নঅ্যারাউন্ড ফিল্টার:</b> টানা ৩-৪ দিন বাড়া/পড়া শেয়ার বাদ দিয়ে ডজি/হ্যামার কনসোলিডেশন ও ভলিউম বিল্ডআপ স্টক (যেকোনো শেয়ারে ক্লিক করলে সাথে সাথে চার্ট ও ট্রেড প্ল্যান খুলবে):'
+        '<div style="font-size:0.80rem;color:#cbd5e1;padding-top:6px;">'
+        '🎯 <b>ইন্ট্রাডে ফোকাস (Doji & Sector Turnaround):</b> শেয়ারে ক্লিক করলেই ট্রেড প্ল্যান ও চার্ট খুলবে'
         '</div>',
         unsafe_allow_html=True
     )
 with m_bar2:
     market_day_mode = st.radio(
         "ট্র্যাকিং মোড:",
-        ["🌗 উভয় সাইড", "🟢 বুলিশ সাইড ফোকাস", "🔴 বেয়ারিশ সাইড ফোকাস"],
+        ["🌗 উভয় সাইড", "🟢 বুলিশ ফোকাস", "🔴 বেয়ারিশ ফোকাস"],
         horizontal=True,
         label_visibility="collapsed"
     )
 
-def make_pills_html(df_focus: pd.DataFrame, is_bullish: bool) -> str:
+def make_compact_pills_html(df_focus: pd.DataFrame, is_bullish: bool) -> str:
     items = []
     cls = "bull-pill" if is_bullish else "bear-pill"
     dot = "🟢" if is_bullish else "🔴"
@@ -798,31 +1032,31 @@ def make_pills_html(df_focus: pd.DataFrame, is_bullish: bool) -> str:
         tip = f"Sector: {r['Sector']} | Pattern: {c_tag} | RSI: {r['RSI']} | 1W: {r['1W']:+.1f}%"
         items.append(
             f'<a class="{cls}" href="?focus_stock={q_t}" target="_self" title="{tip}">'
-            f'{dot} {r["Symbol"]} ({r["1D"]:+.1f}% | {r["Vol_Ratio"]:.2f}x Vol | {c_tag})'
+            f'{dot} {r["Symbol"]} ({r["1D"]:+.1f}% | {r["Vol_Ratio"]:.1f}x | {c_tag})'
             f'</a>'
         )
     return "".join(items)
 
-bull_html_pills = make_pills_html(bull_top6, True)
-bear_html_pills = make_pills_html(bear_top6, False)
+bull_html_pills = make_compact_pills_html(bull_top6, True)
+bear_html_pills = make_compact_pills_html(bear_top6, False)
 
 bull_box_markup = (
     '<div class="intraday-box-bull">'
-    '<div class="box-title-bull">🔄 ইন্ট্রাডে বুলিশ রিভার্সাল ফোকাস (Bottom Turnaround – অতিরিক্ত না বেড়ে নিচ থেকে ডজি/ভলিউমসহ ঘুরে দাঁড়ানো স্টক)</div>'
+    '<div class="box-title-bull">🔄 বুলিশ রিভার্সাল ফোকাস (নিচ থেকে ডজি/ভলিউমসহ ঘুরে দাঁড়ানো স্টক)</div>'
     f'<div class="pill-container">{bull_html_pills}</div>'
     '</div>'
 )
 
 bear_box_markup = (
     '<div class="intraday-box-bear">'
-    '<div class="box-title-bear">📉 ইন্ট্রাডে বেয়ারিশ রিভার্সাল ফোকাস (Top Breakdown – ওপর থেকে ডজি/শুটিং স্টারসহ নিচে নামার প্রস্তুতি নেওয়া স্টক)</div>'
+    '<div class="box-title-bear">📉 বেয়ারিশ ব্রেকডাউন ফোকাস (ওপর থেকে ডজি/শুটিং স্টারসহ নিচে নামা স্টক)</div>'
     f'<div class="pill-container">{bear_html_pills}</div>'
     '</div>'
 )
 
-if market_day_mode == "🟢 বুলিশ সাইড ফোকাস":
+if market_day_mode == "🟢 বুলিশ ফোকাস":
     st.markdown(bull_box_markup, unsafe_allow_html=True)
-elif market_day_mode == "🔴 বেয়ারিশ সাইড ফোকাস":
+elif market_day_mode == "🔴 বেয়ারিশ ফোকাস":
     st.markdown(bear_box_markup, unsafe_allow_html=True)
 else:
     ib1, ib2 = st.columns(2)
@@ -832,7 +1066,7 @@ else:
         st.markdown(bear_box_markup, unsafe_allow_html=True)
 
 # ==============================================================================
-# ১১. স্টক প্রোফাইল ও ইন্ট্রাডে ট্রেড সেটআপ প্যানেল (শেয়ারে ক্লিক করলে ওপেন হবে)
+# ১১. স্টক প্রোফাইল ও ইন্ট্রাডে ট্রেড সেটআপ প্যানেল
 # ==============================================================================
 @st.cache_data(ttl=300, show_spinner=False)
 def load_single_stock_ohlc(ticker: str):
@@ -844,7 +1078,7 @@ def load_single_stock_ohlc(ticker: str):
     except Exception:
         return pd.DataFrame()
 
-if st.session_state.selected_stock != "শেয়ার টাইপ করুন..." and st.session_state.selected_stock in stocks_df["Ticker"].values:
+if st.session_state.selected_stock != DEFAULT_STOCK and st.session_state.selected_stock in stocks_df["Ticker"].values:
     s_info = stocks_df[stocks_df["Ticker"] == st.session_state.selected_stock].iloc[0]
     sym_clean = s_info["Symbol"]
     p_now = s_info["Price"]
@@ -861,15 +1095,16 @@ if st.session_state.selected_stock != "শেয়ার টাইপ করুন
     sh_t2 = round(sh_entry - 2.5 * atr_v, 2)
 
     st.markdown("---")
-    sp_col1, sp_col2 = st.columns([8.2, 1.8])
+    sp_col1, sp_col2 = st.columns([8.0, 2.0])
     with sp_col1:
         st.markdown(
-            f"### 🎯 শেয়ার ক্যান্ডেল ও ইন্ট্রাডে ট্রেড সেটআপ: **{sym_clean}** — `{s_info['Sector']}` "
-            f"(দাম: ₹{p_now:,.2f} | 1D: {s_info['1D']:+.2f}% | ভলিউম: {s_info['Vol_Ratio']}x)"
+            f"#### 🎯 শেয়ার ক্যান্ডেল ও ইন্ট্রাডে ট্রেড সেটআপ: **{sym_clean}** (`{s_info['Sector']}`) — "
+            f"দাম: ₹{p_now:,.2f} ({s_info['1D']:+.2f}% | Vol: {s_info['Vol_Ratio']}x)"
         )
     with sp_col2:
-        if st.button("✖ প্যানেল বন্ধ করুন", use_container_width=True):
-            st.session_state.selected_stock = "শেয়ার টাইপ করুন..."
+        if st.button("✖ প্যানেল বন্ধ করুন", key="close_stk_panel", use_container_width=True):
+            st.session_state.selected_stock = DEFAULT_STOCK
+            push_nav_state(st.session_state.selected_sector, DEFAULT_STOCK, st.session_state.kpi_panel)
             st.rerun()
 
     lv1, lv2, lv3 = st.columns(3)
@@ -909,7 +1144,7 @@ if st.session_state.selected_stock != "শেয়ার টাইপ করুন
         v_cols = ["#10b981" if c >= o else "#ef4444" for c, o in zip(sub_df["Close"], sub_df["Open"])]
         fig_st.add_trace(go.Bar(x=sub_df.index, y=sub_df["Volume"], name="Volume", marker_color=v_cols), row=2, col=1)
         fig_st.update_layout(
-            height=400,
+            height=380,
             template="plotly_dark" if "Clean Light" not in theme_mode else "plotly_white",
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
@@ -928,11 +1163,11 @@ if st.session_state.selected_stock != "শেয়ার টাইপ করুন
     st.markdown("---")
 
 # ==============================================================================
-# ১২. ক্লিকেবল সেক্টর বার (স্ক্রিনশটের হুবহু ডিজাইন + URL-Encoded Safe)
+# ১২. ক্লিকেবল সেক্টর বার
 # ==============================================================================
 st.markdown(
-    '<div style="font-size:0.85rem;color:#cbd5e1;margin-top:8px;">'
-    '📍 <b>ক্লিকেবল সেক্টর বার:</b> নিচের চলমান বারের ওপর মাউস রাখলে সেটি থেমে যাবে এবং <b>যেকোনো সেক্টরের ওপর ক্লিক করলেই</b> সাথে সাথে সেই সেক্টরের সব শেয়ার ও চার্ট খুলে যাবে:'
+    '<div style="font-size:0.80rem;color:#cbd5e1;margin-top:4px;">'
+    '📍 <b>ক্লিকেবল সেক্টর বার:</b> যেকোনো সেক্টরের ওপর ক্লিক করলেই সাথে সাথে সেই সেক্টরের সব শেয়ার খুলে যাবে:'
     '</div>',
     unsafe_allow_html=True
 )
@@ -952,7 +1187,7 @@ marquee_html = f'<div class="marquee-wrap"><div class="marquee-track">{"".join(b
 st.markdown(marquee_html, unsafe_allow_html=True)
 
 # ==============================================================================
-# ১৩. ৪টি সামারি KPI কার্ড এবং নিচের ৪টি অ্যাকশন বাটন (স্ক্রিনশটের হুবহু)
+# ১৩. ৪টি সামারি KPI কার্ড এবং নিচের ৪টি স্পষ্ট দৃশ্যমান বাটন
 # ==============================================================================
 adv_count = int((stocks_df[tf_choice] > 0).sum())
 dec_count = int((stocks_df[tf_choice] < 0).sum())
@@ -973,8 +1208,11 @@ with kc1:
         f'</div>'
     )
     st.markdown(c1_html, unsafe_allow_html=True)
-    if st.button("📊 নিফটি ৫০ মুভার্স লিস্ট দেখুন •", key="kpi_btn_1", use_container_width=True):
-        st.session_state.kpi_panel = "nifty_movers" if st.session_state.kpi_panel != "nifty_movers" else None
+    if st.button("📊 নিফটি ৫০ মুভার্স লিস্ট দেখুন", key="kpi_btn_1", use_container_width=True):
+        new_k = "nifty_movers" if st.session_state.kpi_panel != "nifty_movers" else None
+        st.session_state.kpi_panel = new_k
+        push_nav_state(st.session_state.selected_sector, st.session_state.selected_stock, new_k)
+        st.rerun()
 
 with kc2:
     c2_html = (
@@ -985,8 +1223,11 @@ with kc2:
         f'</div>'
     )
     st.markdown(c2_html, unsafe_allow_html=True)
-    if st.button("📈 বাড়তে থাকা ও ডাউন শেয়ার দেখুন •", key="kpi_btn_2", use_container_width=True):
-        st.session_state.kpi_panel = "breadth_list" if st.session_state.kpi_panel != "breadth_list" else None
+    if st.button("📈 বাড়তে থাকা ও ডাউন শেয়ার দেখুন", key="kpi_btn_2", use_container_width=True):
+        new_k = "breadth_list" if st.session_state.kpi_panel != "breadth_list" else None
+        st.session_state.kpi_panel = new_k
+        push_nav_state(st.session_state.selected_sector, st.session_state.selected_stock, new_k)
+        st.rerun()
 
 with kc3:
     c3_html = (
@@ -997,9 +1238,11 @@ with kc3:
         f'</div>'
     )
     st.markdown(c3_html, unsafe_allow_html=True)
-    if st.button(f"🔍 {leader_sec['Sector']}-এর শেয়ার দেখুন •", key="kpi_btn_3", use_container_width=True):
+    if st.button(f"🔍 {leader_sec['Sector']}-এর শেয়ার দেখুন", key="kpi_btn_3", use_container_width=True):
         st.session_state.selected_sector = leader_sec["Sector"]
         st.session_state.kpi_panel = "leader_sec"
+        push_nav_state(leader_sec["Sector"], st.session_state.selected_stock, "leader_sec")
+        st.rerun()
 
 with kc4:
     c4_html = (
@@ -1010,17 +1253,19 @@ with kc4:
         f'</div>'
     )
     st.markdown(c4_html, unsafe_allow_html=True)
-    if st.button(f"🔍 {laggard_sec['Sector']}-এর শেয়ার দেখুন •", key="kpi_btn_4", use_container_width=True):
+    if st.button(f"🔍 {laggard_sec['Sector']}-এর শেয়ার দেখুন", key="kpi_btn_4", use_container_width=True):
         st.session_state.selected_sector = laggard_sec["Sector"]
         st.session_state.kpi_panel = "laggard_sec"
+        push_nav_state(laggard_sec["Sector"], st.session_state.selected_stock, "laggard_sec")
+        st.rerun()
 
-# KPI কার্ডের বাটনে ক্লিক করলে ওপেন হওয়া বিস্তারিত প্যানেল
 if st.session_state.kpi_panel is not None:
     st.markdown("---")
-    kp_h1, kp_h2 = st.columns([8.5, 1.5])
+    kp_h1, kp_h2 = st.columns([8.2, 1.8])
     with kp_h2:
-        if st.button("✖ লিস্ট বন্ধ করুন", use_container_width=True):
+        if st.button("✖ লিস্ট বন্ধ করুন", key="close_kpi_btn", use_container_width=True):
             st.session_state.kpi_panel = None
+            push_nav_state(st.session_state.selected_sector, st.session_state.selected_stock, None)
             st.rerun()
 
     if st.session_state.kpi_panel == "nifty_movers":
@@ -1065,7 +1310,7 @@ if st.session_state.kpi_panel is not None:
     st.markdown("---")
 
 # ==============================================================================
-# ১৪. ৪টি প্রধান ট্যাব (সেক্টর চার্ট ও অ্যানালগ মিটার, ইন্ট্রাডে রিস্ক ক্যালকুলেটর, সুইং স্ক্যানার, তুলনামূলক টেবিল)
+# ১৪. ৪টি প্রধান ট্যাব (স্পষ্ট ও উজ্জ্বল হেডিং)
 # ==============================================================================
 tab1, tab2, tab3, tab4 = st.tabs([
     "📈 ১. সেক্টর চার্ট, মিটার ও শেয়ার তালিকা",
@@ -1074,20 +1319,18 @@ tab1, tab2, tab3, tab4 = st.tabs([
     "📋 ৪. সব সেক্টরের তুলনামূলক টেবিল"
 ])
 
-# ------------------------------------------------------------------------------
-# ট্যাব ১: সেক্টর চার্ট, Plotly অ্যানালগ স্পিডোমিটার ও ড্রিল-ডাউন এক্সপান্ডার
-# ------------------------------------------------------------------------------
 with tab1:
     filtered_secs = sectors_df.copy()
 
     if zone_choice != "🌐 সব সেক্টর (All 32 Sectors)":
         filtered_secs = filtered_secs[filtered_secs["Zone"] == zone_choice]
 
-    if st.session_state.selected_sector != "সবগুলো সেক্টর (Show All 32)":
+    if st.session_state.selected_sector != DEFAULT_SECTOR:
         filtered_secs = filtered_secs[filtered_secs["Sector"] == st.session_state.selected_sector]
-        if st.button("🔄 সবগুলো ৩২টি সেক্টর আবার একসাথে দেখুন"):
-            st.session_state.selected_sector = "সবগুলো সেক্টর (Show All 32)"
+        if st.button("🔄 সবগুলো ৩২টি সেক্টর আবার একসাথে দেখুন (Reset to All Sectors)"):
+            st.session_state.selected_sector = DEFAULT_SECTOR
             st.session_state.kpi_panel = None
+            push_nav_state(DEFAULT_SECTOR, st.session_state.selected_stock, None)
             st.rerun()
 
     if "Top Gainers" in sort_choice:
@@ -1107,25 +1350,26 @@ with tab1:
             mode="gauge+number",
             value=score,
             number={"suffix": f" ({ret_val:+.1f}%)", "font": {"size": 15, "color": TEXT_MAIN}},
-            title={"text": title_txt, "font": {"size": 13, "color": TEXT_MAIN}},
+            title={"text": title_txt, "font": {"size": 14, "color": TEXT_MAIN}},
             gauge={
-                "axis": {"range": [0, 100], "tickwidth": 1, "tickcolor": "#475569"},
-                "bar": {"color": bar_col, "thickness": 0.32},
+                "axis": {"range": [0, 100], "tickwidth": 1, "tickcolor": "#64748b", "tickfont": {"color": TEXT_SUB}},
+                "bar": {"color": bar_col, "thickness": 0.34},
                 "bgcolor": "rgba(0,0,0,0)",
                 "borderwidth": 1,
                 "bordercolor": "#334155",
                 "steps": [
-                    {"range": [0, 38], "color": "rgba(239, 68, 68, 0.18)"},
-                    {"range": [38, 60], "color": "rgba(251, 191, 36, 0.18)"},
-                    {"range": [60, 100], "color": "rgba(16, 185, 129, 0.18)"}
+                    {"range": [0, 38], "color": "rgba(239, 68, 68, 0.20)"},
+                    {"range": [38, 60], "color": "rgba(251, 191, 36, 0.20)"},
+                    {"range": [60, 100], "color": "rgba(16, 185, 129, 0.20)"}
                 ],
             }
         ))
         fig_g.update_layout(
-            height=175,
+            height=170,
             margin=dict(l=16, r=16, t=36, b=10),
             paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)"
+            plot_bgcolor="rgba(0,0,0,0)",
+            font=dict(color=TEXT_MAIN)
         )
         return fig_g
 
@@ -1147,12 +1391,12 @@ with tab1:
                 )
             else:
                 st.markdown(
-                    f'<div class="kpi-card" style="min-height:80px;">'
+                    f'<div class="kpi-card" style="min-height:76px;">'
                     f'<div style="display:flex;justify-content:space-between;align-items:center;">'
-                    f'<b>🧭 {s_name}</b>'
+                    f'<b style="color:{TEXT_MAIN};">🧭 {s_name}</b>'
                     f'<span style="color:{"#34d399" if s_ret>=0 else "#f87171"};font-weight:800;">{s_ret:+.2f}% (Meter: {s_meter})</span>'
                     f'</div>'
-                    f'<div style="font-size:0.78rem;color:#94a3b8;">{s_row["Zone"]} | Avg Vol: {s_row["Avg_Vol"]}x | RSI: {s_row["RSI"]}</div>'
+                    f'<div style="font-size:0.78rem;color:{TEXT_SUB};">{s_row["Zone"]} | Avg Vol: {s_row["Avg_Vol"]}x | RSI: {s_row["RSI"]}</div>'
                     f'</div>',
                     unsafe_allow_html=True
                 )
@@ -1175,19 +1419,15 @@ with tab1:
                     )
                 st.markdown(f'<div class="pill-container">{"".join(q_pills)}</div>', unsafe_allow_html=True)
 
-# ------------------------------------------------------------------------------
-# ট্যাব ২: ইন্ট্রাডে ডোজি/হ্যামার রিভার্সাল ও রিস্ক ক্যালকুলেটর
-# ------------------------------------------------------------------------------
 with tab2:
     st.markdown("#### 🎯 ইন্ট্রাডে ডজি / হ্যামার কনসোলিডেশন ও সেক্টর টার্নঅ্যারাউন্ড স্ক্যানার")
 
-    # সম্পূর্ণ ফিল্টারড বুলিশ ও বেয়ারিশ টেবিল (Entry, SL, Target সহ)
     t2_c1, t2_c2 = st.columns(2)
     with t2_c1:
         st.markdown("##### 🟢 বুলিশ ইন্ট্রাডে রিভার্সাল (ডাউন সেক্টর আপ মুভ + ডজি/হ্যামার + ভলিউম)")
         b_scan = stocks_df[
             (stocks_df["Consec_Up"] <= 2) &
-            (stocks_df["1D"] >= -1.8) & (stocks_df["1D"] <= 4.2) &
+            (stocks_df["1D"] >= -0.5) & (stocks_df["1D"] <= 4.0) &
             (stocks_df["Vol_Ratio"] >= 1.05)
         ].copy()
         b_scan["Bull_Candle"] = b_scan["Bull_Candle"].fillna("Base Consolidation")
@@ -1208,7 +1448,7 @@ with tab2:
         st.markdown("##### 🔴 বেয়ারিশ ইন্ট্রাডে ব্রেকডাউন (টপ সেক্টর রোলওভার + ডজি/শুটিং স্টার + ভলিউম)")
         br_scan = stocks_df[
             (stocks_df["Consec_Down"] <= 2) &
-            (stocks_df["1D"] <= 1.8) & (stocks_df["1D"] >= -4.2) &
+            (stocks_df["1D"] <= 0.5) & (stocks_df["1D"] >= -4.0) &
             (stocks_df["Vol_Ratio"] >= 1.05)
         ].copy()
         br_scan["Bear_Candle"] = br_scan["Bear_Candle"].fillna("Top Stall Doji")
@@ -1248,9 +1488,6 @@ with tab2:
         f"🎯 **১:২ রিস্ক-রিওয়ার্ড টার্গেট:** `₹{target_1_2:,.2f}`"
     )
 
-# ------------------------------------------------------------------------------
-# ট্যাব ৩: লং ও সুইং স্ক্যানার (Breakout & Value)
-# ------------------------------------------------------------------------------
 with tab3:
     sw1, sw2 = st.columns(2)
     with sw1:
@@ -1297,9 +1534,6 @@ with tab3:
         use_container_width=True
     )
 
-# ------------------------------------------------------------------------------
-# ট্যাব ৪: সব সেক্টরের তুলনামূলক টেবিল ও বার চার্ট
-# ------------------------------------------------------------------------------
 with tab4:
     st.markdown(f"#### 📊 ৩২টি সেক্টরের তুলনামূলক পারফরম্যান্স চার্ট ({tf_choice})")
     chart_secs = sectors_df.sort_values(tf_choice, ascending=True)
@@ -1311,7 +1545,8 @@ with tab4:
         orientation="h",
         marker_color=bar_colors,
         text=[f"{v:+.2f}%" for v in chart_secs[tf_choice]],
-        textposition="outside"
+        textposition="outside",
+        textfont=dict(color=TEXT_MAIN)
     ))
     fig_bar.update_layout(
         height=720,
@@ -1319,7 +1554,8 @@ with tab4:
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         margin=dict(l=10, r=40, t=15, b=10),
-        xaxis_title=f"রিটার্ন ({tf_choice} %)"
+        xaxis_title=f"রিটার্ন ({tf_choice} %)",
+        font=dict(color=TEXT_MAIN)
     )
     st.plotly_chart(fig_bar, use_container_width=True)
 
@@ -1336,9 +1572,17 @@ with tab4:
     )
 
 # ==============================================================================
-# ১৫. ফ্লোটিং ‘🚀 ওপরে যান (Top)’ বাটন (HTML Anchor + JS Smooth Scroller)
+# ১৫. ফ্লোটিং স্মার্ট নেভিগেশন ডক (⬅️ ব্যাক | 🧭 মেইন পেজ | ➡️ ফরওয়ার্ড | 🚀 ওপরে যান)
 # ==============================================================================
-st.markdown('<a href="#top-anchor" class="floating-top-btn" id="alphapulse-top-btn">🚀 ওপরে যান (Top)</a>', unsafe_allow_html=True)
+dock_html = (
+    '<div class="floating-nav-dock">'
+    '<a href="?nav_action=back" target="_self" class="dock-btn" title="আগের পেজে বা শেয়ারে ফিরে যান">⬅️ ব্যাক</a>'
+    '<a href="?nav_action=home" target="_self" class="dock-btn" title="লোগোতে ক্লিক করে একদম মেইন পেজে ফিরে যান">🧭 মেইন পেজ</a>'
+    '<a href="?nav_action=forward" target="_self" class="dock-btn" title="পরের ভিউতে যান">➡️</a>'
+    '<a href="#top-anchor" class="dock-btn-top" id="alphapulse-top-btn" title="স্ক্রল করে একদম ওপরে যান">🚀 ওপরে যান</a>'
+    '</div>'
+)
+st.markdown(dock_html, unsafe_allow_html=True)
 
 components.html(
     """
