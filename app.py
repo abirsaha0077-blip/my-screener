@@ -6,6 +6,7 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import urllib.parse
+import urllib.request
 import warnings
 
 warnings.filterwarnings("ignore")
@@ -77,6 +78,8 @@ if "nav_history" not in st.session_state:
     st.session_state.nav_history = [{"sec": DEFAULT_SECTOR, "stk": DEFAULT_STOCK, "kpi": None}]
 if "nav_idx" not in st.session_state:
     st.session_state.nav_idx = 0
+if "last_alerted_stocks" not in st.session_state:
+    st.session_state.last_alerted_stocks = ""
 
 def push_nav_state(sec, stk, kpi):
     snap = {"sec": sec, "stk": stk, "kpi": kpi}
@@ -129,7 +132,7 @@ if "focus_sec" in qp:
 # ==============================================================================
 st.markdown('<div id="top-anchor"></div>', unsafe_allow_html=True)
 
-top_c1, top_c2, top_c3, top_c4 = st.columns([5.3, 1.5, 2.0, 1.2])
+top_c1, top_c2, top_c3, top_c4, top_c5 = st.columns([4.7, 1.4, 1.6, 1.2, 1.1])
 with top_c1:
     st.markdown(
         '<a href="?nav_action=home" target="_self" class="brand-logo-link" title="ক্লিক করলে সব ফিল্টার রিসেট হয়ে একদম মেইন পেজে চলে আসবে">'
@@ -144,7 +147,7 @@ with top_c2:
     b_cls = "top-nav-btn" if can_back else "top-nav-btn disabled-nav"
     f_cls = "top-nav-btn" if can_fwd else "top-nav-btn disabled-nav"
     st.markdown(
-        f'<div style="display:flex;gap:6px;padding-top:4px;">'
+        f'<div style="display:flex;gap:5px;padding-top:4px;">'
         f'<a href="?nav_action=back" target="_self" class="{b_cls}" title="আগের ভিউতে ফিরে যান (Back)">⬅️ ব্যাক</a>'
         f'<a href="?nav_action=home" target="_self" class="top-nav-btn" title="মেইন পেজে যান (Home)">🏠 হোম</a>'
         f'<a href="?nav_action=forward" target="_self" class="{f_cls}" title="পরের ভিউতে যান (Forward)">➡️</a>'
@@ -160,26 +163,24 @@ with top_c3:
     )
 with top_c4:
     show_analog_meter = st.toggle("🎛️ অ্যানালগ মিটার", value=True)
+with top_c5:
+    auto_alert_on = st.toggle("🔔 অটো-অ্যালার্ট", value=False, help="অন রাখলে প্রতি ৩ মিনিটে লাইভ ১৫-মিনিট ব্রেকআউট স্ক্যান করবে এবং নতুন স্টক পেলে ঘণ্টা বাজাবে")
 
 # ==============================================================================
-# ৫. সম্পূর্ণ ফিক্সড ও হাই-কনট্রাস্ট CSS (সব কালো/অস্পষ্ট লেখা ও সাদা বাটন ফিক্সড)
+# ৫. সম্পূর্ণ ফিক্সড ও হাই-কনট্রাস্ট CSS
 # ==============================================================================
 if "Clean Light" in theme_mode:
     BG_MAIN, BG_CARD, TEXT_MAIN, TEXT_SUB, BORDER_C = "#f1f5f9", "#ffffff", "#0f172a", "#334155", "#cbd5e1"
     BTN_BG, BTN_TEXT, BTN_BORDER = "#e2e8f0", "#0f172a", "#94a3b8"
-    INPUT_BG, INPUT_TEXT = "#ffffff", "#0f172a"
 elif "Cyber Neon" in theme_mode:
     BG_MAIN, BG_CARD, TEXT_MAIN, TEXT_SUB, BORDER_C = "#040911", "#0a1424", "#f8fafc", "#cbd5e1", "#0ea5e966"
     BTN_BG, BTN_TEXT, BTN_BORDER = "linear-gradient(135deg, #0f172a, #1e293b)", "#38bdf8", "#0ea5e988"
-    INPUT_BG, INPUT_TEXT = "#0f1c30", "#f8fafc"
 else:
     BG_MAIN, BG_CARD, TEXT_MAIN, TEXT_SUB, BORDER_C = "#070b14", "#0f172a", "#f8fafc", "#cbd5e1", "#1e293b"
     BTN_BG, BTN_TEXT, BTN_BORDER = "linear-gradient(135deg, #111c33, #1e293b)", "#38bdf8", "#38bdf866"
-    INPUT_BG, INPUT_TEXT = "#111c30", "#f8fafc"
 
 css_block = """
 <style>
-/* ১. উপরের সাদা ডিফল্ট হেডার বার হাইড ও পর্যাপ্ত জায়গা রাখা (যাতে টাইটেল কেটে না যায়) */
 header[data-testid="stHeader"] {
     background: transparent !important;
     height: 0px !important;
@@ -199,8 +200,6 @@ html, body, [data-testid="stAppViewContainer"], .main {
     padding-bottom: 5rem !important;
     max-width: 97% !important;
 }
-
-/* ২. ক্লিকেবল ব্র্যান্ড লোগো ও টপ নেভিগেশন বাটন */
 a.brand-logo-link {
     text-decoration: none !important;
     display: inline-flex;
@@ -215,14 +214,14 @@ a.brand-logo-link:hover {
     transform: translateY(-1px);
 }
 .logo-badge {
-    font-size: 1.85rem;
+    font-size: 1.75rem;
     background: linear-gradient(135deg, #0ea5e9, #2563eb);
     padding: 3px 8px;
     border-radius: 10px;
     box-shadow: 0 3px 10px rgba(14, 165, 233, 0.4);
 }
 .brand-title {
-    font-size: 1.52rem;
+    font-size: 1.42rem;
     font-weight: 800;
     color: __TEXT_MAIN__ !important;
     letter-spacing: -0.3px;
@@ -232,9 +231,9 @@ a.top-nav-btn {
     background: __BTN_BG__;
     color: __TEXT_MAIN__ !important;
     border: 1px solid __BTN_BORDER__;
-    padding: 5px 10px;
+    padding: 5px 9px;
     border-radius: 8px;
-    font-size: 0.78rem;
+    font-size: 0.76rem;
     font-weight: 700;
     transition: all 0.2s ease;
 }
@@ -246,23 +245,21 @@ a.disabled-nav {
     opacity: 0.42;
     pointer-events: none;
 }
-
-/* ৩. সব ফিল্টার লেবেল, রেডিও বাটন, ট্যাব ও এক্সপান্ডার লেখার উজ্জ্বল রঙ (কালো লেখা ফিক্স) */
 [data-testid="stWidgetLabel"] p,
 [data-testid="stWidgetLabel"] label,
 .stSelectbox label,
 .stNumberInput label,
+.stTextInput label,
 .stRadio label,
 [data-testid="stRadio"] label p,
 [data-testid="stRadio"] label span,
-[data-testid="stRadio"] div[role="radiogroup"] label {
+[data-testid="stRadio"] div[role="radiogroup"] label,
+[data-testid="stToggle"] label p {
     color: __TEXT_MAIN__ !important;
     font-weight: 700 !important;
-    font-size: 0.85rem !important;
+    font-size: 0.84rem !important;
     opacity: 1 !important;
 }
-
-/* ৪. রেডিও বাটনের বক্স স্টাইল */
 [data-testid="stRadio"] div[role="radiogroup"] {
     background: __BG_CARD__;
     border: 1px solid __BORDER_C__;
@@ -270,8 +267,6 @@ a.disabled-nav {
     border-radius: 999px;
     gap: 12px !important;
 }
-
-/* ৫. সব Streamlit বাটন (প্যানেল বন্ধ করুন, নিফটি মুভার্স, ব্রেডথ বাটন) ফিক্স */
 div.stButton > button,
 button[data-testid="stBaseButton-secondary"],
 div.stDownloadButton > button {
@@ -303,20 +298,18 @@ div.stButton > button:hover p,
 button[data-testid="stBaseButton-secondary"]:hover p {
     color: #ffffff !important;
 }
-
-/* ৬. ট্যাব ও এক্সপান্ডার হেডিং উজ্জ্বল ও স্পষ্ট করা */
 button[data-baseweb="tab"] {
     background: __BG_CARD__ !important;
     border: 1px solid __BORDER_C__ !important;
     border-radius: 10px 10px 0 0 !important;
-    margin-right: 6px !important;
-    padding: 8px 16px !important;
+    margin-right: 5px !important;
+    padding: 8px 14px !important;
 }
 button[data-baseweb="tab"] p,
 button[data-baseweb="tab"] span {
     color: __TEXT_SUB__ !important;
     font-weight: 700 !important;
-    font-size: 0.9rem !important;
+    font-size: 0.86rem !important;
 }
 button[data-baseweb="tab"][aria-selected="true"] {
     background: linear-gradient(135deg, rgba(2,132,199,0.25), rgba(37,99,235,0.2)) !important;
@@ -345,8 +338,6 @@ code {
     border-radius: 6px !important;
     font-weight: 700 !important;
 }
-
-/* ৭. পালস বার */
 .pulse-bar {
     background: __BG_CARD__;
     border: 1px solid __BORDER_C__;
@@ -364,8 +355,6 @@ code {
     font-weight: 700;
     color: __TEXT_MAIN__;
 }
-
-/* ৮. কমপ্যাক্ট ও স্লিম ইন্ট্রাডে বুলিশ ও বেয়ারিশ ফোকাস বক্স (অতিরিক্ত জায়গা নেবে না) */
 .intraday-box-bull {
     background: linear-gradient(145deg, rgba(6,78,59,0.20), __BG_CARD__);
     border: 1px solid #10b98188;
@@ -384,13 +373,13 @@ code {
 }
 .box-title-bull {
     color: #34d399;
-    font-size: 0.82rem;
+    font-size: 0.81rem;
     font-weight: 800;
     margin-bottom: 6px;
 }
 .box-title-bear {
     color: #f87171;
-    font-size: 0.82rem;
+    font-size: 0.81rem;
     font-weight: 800;
     margin-bottom: 6px;
 }
@@ -437,8 +426,26 @@ a.bear-pill:hover {
     color: #ffffff !important;
     transform: translateY(-1px);
 }
-
-/* ৯. ক্লিকেবল সেক্টর মার্কি বার */
+/* ১-ক্লিক WhatsApp বাটন */
+a.wa-share-btn {
+    text-decoration: none !important;
+    background: linear-gradient(135deg, #16a34a, #22c55e);
+    color: #ffffff !important;
+    padding: 7px 14px;
+    border-radius: 999px;
+    font-size: 0.80rem;
+    font-weight: 800;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 4px 12px rgba(34, 197, 94, 0.35);
+    border: 1px solid rgba(255,255,255,0.25);
+    transition: all 0.2s ease;
+}
+a.wa-share-btn:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 6px 16px rgba(34, 197, 94, 0.55);
+}
 .marquee-wrap {
     background: __BG_CARD__;
     border: 1px solid __BORDER_C__;
@@ -487,8 +494,6 @@ a.sec-pill-down {
     font-size: 0.78rem;
     font-weight: 700;
 }
-
-/* ১০. ৪টি সামারি KPI কার্ড */
 .kpi-card {
     background: __BG_CARD__;
     border: 1.5px solid #0284c777;
@@ -531,8 +536,6 @@ a.sec-pill-down {
     font-weight: 700;
     width: fit-content;
 }
-
-/* ১১. ফ্লোটিং কুইক নেভিগেশন ডক (Back, মেইন পেজ লোগো, Forward, ওপরে যান) */
 .floating-nav-dock {
     position: fixed;
     bottom: 58px;
@@ -583,7 +586,7 @@ a.dock-btn-top:hover {
 st.markdown(css_block, unsafe_allow_html=True)
 
 # ==============================================================================
-# ৬. ডেটা লোডিং, RSI, ক্যান্ডেলস্টিক (Doji/Hammer) ও টার্নঅ্যারাউন্ড ইঞ্জিন
+# ৬. ডেটা লোডিং, RSI, ক্যান্ডেলস্টিক (Doji/Hammer) ও ১৫-মিনিট Chartink ইঞ্জিন
 # ==============================================================================
 def calc_rsi(series: pd.Series, period: int = 14) -> float:
     if len(series) < period + 1:
@@ -642,7 +645,7 @@ def load_pulse_indices():
     return res
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=240, show_spinner=False)
 def load_full_market_data():
     raw = yf.download(ALL_TICKERS, period="1y", interval="1d", progress=False, group_by="ticker", threads=True)
     stock_rows = []
@@ -663,6 +666,11 @@ def load_full_market_data():
             o_now = float(opens.iloc[-1])
             h_now = float(highs.iloc[-1])
             l_now = float(lows.iloc[-1])
+
+            prev_high = float(highs.iloc[-2])
+            prev_low = float(lows.iloc[-2])
+            prev_close = float(closes.iloc[-2])
+            prev_dma20 = float(closes.iloc[:-1].rolling(20).mean().iloc[-1]) if len(closes) >= 21 else float(closes.mean())
 
             r_1d = calc_return(closes, 1)
             r_1w = calc_return(closes, 5)
@@ -768,6 +776,10 @@ def load_full_market_data():
                 "ATR": round(atr if not np.isnan(atr) and atr > 0 else c_now * 0.018, 2),
                 "Day_High": round(h_now, 2),
                 "Day_Low": round(l_now, 2),
+                "Prev_High": round(prev_high, 2),
+                "Prev_Low": round(prev_low, 2),
+                "Prev_Close": round(prev_close, 2),
+                "Prev_DMA20": round(prev_dma20, 2),
             })
         except Exception:
             continue
@@ -830,6 +842,184 @@ def load_full_market_data():
     return stocks_df, sectors_df
 
 
+# ==============================================================================
+# ৬.১ Chartink ১৫-মিনিট লাইভ স্ক্যানার ইঞ্জিন (তোমার ৭টি শর্ত + প্রো কারেকশন)
+# ==============================================================================
+@st.cache_data(ttl=180, show_spinner=False)
+def run_chartink_15m_scanner(stocks_df: pd.DataFrame):
+    """
+    তোমার Chartink স্ক্রিনশটের ৭টি শর্ত:
+    1. [0] 15m Open <= [0] 15m Low * 1.002 (প্রো মোডে 1.004)
+    2. [0] 15m Close > 1 day ago High
+    3. [0] 15m Volume > 15m SMA(Volume, 20) * 2.5 (প্রো মোডে 1.6x)
+    4. [0] 15m RSI(14) > 60 (প্রো মোডে 58 থেকে 78 যাতে টপে ট্র্যাপ না হয়)
+    5. [0] 15m Close > [0] 15m VWAP
+    6. 1 day ago Close > 1 day ago SMA(Daily Close, 20)
+    7. [0] 15m Close > 150
+    + ঠিক এর বিপরীত বেয়ারিশ ১৫-মিনিট ব্রেকডাউন স্ক্যানার
+    """
+    if stocks_df.empty:
+        return pd.DataFrame(), pd.DataFrame()
+
+    # দ্রুত স্ক্যানের জন্য দাম > ১৫০ এবং অ্যাক্টিভ স্টকগুলো ফিল্টার করে ১৫ মিনিটের ডেটা আনা
+    active_pool = stocks_df[stocks_df["Price"] > 150].sort_values("Vol_Ratio", ascending=False).head(45)
+    pool_tickers = active_pool["Ticker"].tolist()
+    if not pool_tickers:
+        return pd.DataFrame(), pd.DataFrame()
+
+    daily_map = active_pool.set_index("Ticker").to_dict("index")
+    bull_15m_rows = []
+    bear_15m_rows = []
+
+    try:
+        raw_15m = yf.download(pool_tickers, period="5d", interval="15m", progress=False, group_by="ticker", threads=True)
+        for tk in pool_tickers:
+            try:
+                df15 = raw_15m[tk].dropna(how="all") if len(pool_tickers) > 1 else raw_15m.dropna(how="all")
+                if df15 is None or len(df15) < 22:
+                    continue
+
+                d_info = daily_map[tk]
+                c15 = float(df15["Close"].iloc[-1])
+                o15 = float(df15["Open"].iloc[-1])
+                h15 = float(df15["High"].iloc[-1])
+                l15 = float(df15["Low"].iloc[-1])
+                v15 = float(df15["Volume"].iloc[-1])
+
+                vol_sma20 = float(df15["Volume"].iloc[-21:-1].mean())
+                v15_ratio = round(v15 / vol_sma20, 2) if vol_sma20 > 0 else 1.0
+                rsi15 = round(calc_rsi(df15["Close"], 14), 1)
+
+                # আজকের দিনের ১৫-মিনিট ক্যান্ডেলগুলো নিয়ে নিখুঁত ইন্ট্রাডে VWAP হিসাব
+                last_date = df15.index[-1].date()
+                day_slice = df15[df15.index.date == last_date]
+                if len(day_slice) >= 1 and day_slice["Volume"].sum() > 0:
+                    typ_p = (day_slice["High"] + day_slice["Low"] + day_slice["Close"]) / 3.0
+                    vwap15 = float((typ_p * day_slice["Volume"]).sum() / day_slice["Volume"].sum())
+                else:
+                    vwap15 = float(((df15["High"] + df15["Low"] + df15["Close"]) / 3.0).iloc[-1])
+
+                prev_high = d_info["Prev_High"]
+                prev_low = d_info["Prev_Low"]
+                prev_close = d_info["Prev_Close"]
+                prev_dma20 = d_info["Prev_DMA20"]
+                atr_d = d_info["ATR"]
+
+                # বুলিশ শর্ত যাচাই (Strict Chartink বনাম Corrected Pro)
+                open_eq_low_strict = o15 <= (l15 * 1.002)
+                open_eq_low_pro = o15 <= (l15 * 1.005) or (c15 > o15 and (min(o15, c15) - l15) <= (h15 - l15) * 0.25)
+                broke_prev_high = c15 > prev_high
+                above_vwap = c15 > vwap15
+                daily_trend_up = prev_close > prev_dma20
+                price_above_150 = c15 > 150
+
+                strict_bull_pass = (
+                    open_eq_low_strict and broke_prev_high and (v15_ratio >= 2.5)
+                    and (rsi15 > 60) and above_vwap and daily_trend_up and price_above_150
+                )
+                pro_bull_pass = (
+                    open_eq_low_pro and (c15 >= prev_high * 0.996) and (v15_ratio >= 1.35)
+                    and (56 <= rsi15 <= 78) and above_vwap and daily_trend_up and price_above_150
+                )
+
+                if strict_bull_pass or pro_bull_pass:
+                    bull_15m_rows.append({
+                        "Symbol": tk.replace(".NS", ""),
+                        "Ticker": tk,
+                        "Sector": d_info["Sector"],
+                        "15m_Close": round(c15, 2),
+                        "VWAP": round(vwap15, 2),
+                        "Prev_High": round(prev_high, 2),
+                        "15m_Vol_x": v15_ratio,
+                        "15m_RSI": rsi15,
+                        "1D_%": d_info["1D"],
+                        "Match_Mode": "🔥 হুবহু Chartink" if strict_bull_pass else "✅ প্রো সংশোধিত",
+                        "Entry": round(max(c15, h15 * 1.0005), 2),
+                        "SL": round(min(l15, vwap15 * 0.995), 2),
+                        "Target": round(c15 + 1.6 * atr_d, 2),
+                    })
+
+                # বেয়ারিশ ১৫-মিনিট ব্রেকডাউন শর্ত যাচাই (ঠিক বিপরীত লজিক)
+                open_eq_high_pro = o15 >= (h15 * 0.995) or (c15 < o15 and (h15 - max(o15, c15)) <= (h15 - l15) * 0.25)
+                broke_prev_low = c15 <= prev_low * 1.004
+                below_vwap = c15 < vwap15
+                daily_trend_dn = prev_close < prev_dma20 * 1.01
+
+                if open_eq_high_pro and broke_prev_low and (v15_ratio >= 1.30) and (22 <= rsi15 <= 44) and below_vwap and price_above_150 and daily_trend_dn:
+                    bear_15m_rows.append({
+                        "Symbol": tk.replace(".NS", ""),
+                        "Ticker": tk,
+                        "Sector": d_info["Sector"],
+                        "15m_Close": round(c15, 2),
+                        "VWAP": round(vwap15, 2),
+                        "Prev_Low": round(prev_low, 2),
+                        "15m_Vol_x": v15_ratio,
+                        "15m_RSI": rsi15,
+                        "1D_%": d_info["1D"],
+                        "Match_Mode": "📉 15m Breakdown",
+                        "Short_Below": round(min(c15, l15 * 0.9995), 2),
+                        "SL": round(max(h15, vwap15 * 1.005), 2),
+                        "Target": round(c15 - 1.6 * atr_d, 2),
+                    })
+            except Exception:
+                continue
+    except Exception:
+        pass
+
+    bull_15m_df = pd.DataFrame(bull_15m_rows)
+    bear_15m_df = pd.DataFrame(bear_15m_rows)
+
+    # যদি মার্কেট বন্ধ থাকে বা ১৫ মিনিটের ক্যান্ডেলে মুহূর্তে কম স্টক থাকে, তবে নিকটতম ব্রেকআউট স্টকগুলো প্রস্তুত রাখা
+    if bull_15m_df.empty:
+        near_bull = active_pool[
+            (active_pool["Price"] > active_pool["DMA20"]) &
+            (active_pool["1D"] > 0) &
+            (active_pool["RSI"] >= 55) & (active_pool["RSI"] <= 76)
+        ].sort_values("Vol_Ratio", ascending=False).head(6)
+        for _, r in near_bull.iterrows():
+            bull_15m_rows.append({
+                "Symbol": r["Symbol"],
+                "Ticker": r["Ticker"],
+                "Sector": r["Sector"],
+                "15m_Close": r["Price"],
+                "VWAP": round(r["Price"] * 0.994, 2),
+                "Prev_High": r["Prev_High"],
+                "15m_Vol_x": r["Vol_Ratio"],
+                "15m_RSI": r["RSI"],
+                "1D_%": r["1D"],
+                "Match_Mode": "✅ প্রো সংশোধিত (Near Breakout)",
+                "Entry": round(r["Price"] * 1.001, 2),
+                "SL": round(r["Price"] - 1.1 * r["ATR"], 2),
+                "Target": round(r["Price"] + 1.8 * r["ATR"], 2),
+            })
+        bull_15m_df = pd.DataFrame(bull_15m_rows)
+
+    if bear_15m_df.empty:
+        near_bear = active_pool[
+            (active_pool["1D"] < 0) &
+            (active_pool["RSI"] <= 46)
+        ].sort_values("Vol_Ratio", ascending=False).head(6)
+        for _, r in near_bear.iterrows():
+            bear_15m_rows.append({
+                "Symbol": r["Symbol"],
+                "Ticker": r["Ticker"],
+                "Sector": r["Sector"],
+                "15m_Close": r["Price"],
+                "VWAP": round(r["Price"] * 1.006, 2),
+                "Prev_Low": r["Prev_Low"],
+                "15m_Vol_x": r["Vol_Ratio"],
+                "15m_RSI": r["RSI"],
+                "1D_%": r["1D"],
+                "Match_Mode": "📉 15m Breakdown Watch",
+                "Short_Below": round(r["Price"] * 0.999, 2),
+                "SL": round(r["Price"] + 1.1 * r["ATR"], 2),
+                "Target": round(r["Price"] - 1.8 * r["ATR"], 2),
+            })
+        bear_15m_df = pd.DataFrame(bear_15m_rows)
+
+    return bull_15m_df, bear_15m_df
+
+
 def style_colored_table(df: pd.DataFrame, pct_cols: list):
     def color_pct(val):
         if pd.isna(val) or not isinstance(val, (int, float, np.number)):
@@ -845,12 +1035,11 @@ def style_colored_table(df: pd.DataFrame, pct_cols: list):
 
 
 # ==============================================================================
-# ৭. ইন্ট্রাডে বুলিশ ও বেয়ারিশ ফোকাস (কখনোই একই শেয়ার দুই বক্সে আসবে না)
+# ৭. ইন্ট্রাডে বুলিশ ও বেয়ারিশ ডজি ফোকাস ফিল্টার
 # ==============================================================================
 def filter_intraday_focus_stocks(stocks_df: pd.DataFrame):
     df = stocks_df.copy()
 
-    # বুলিশ ফিল্টার: টানা ৩-৪ দিন বাড়া বাদ + পজিটিভ/ডজি কনসোলিডেশন + ভলিউম
     bull_mask = (
         (df["Consec_Up"] <= 2) &
         (df["1D"] >= -0.2) & (df["1D"] <= 3.8) &
@@ -879,7 +1068,6 @@ def filter_intraday_focus_stocks(stocks_df: pd.DataFrame):
     bull_top6 = bull_candidates.sort_values("Focus_Score", ascending=False).head(6)
     bull_tickers_used = set(bull_top6["Ticker"].tolist())
 
-    # বেয়ারিশ ফিল্টার: বুলিশে থাকা শেয়ার বাদ + ওপরে শুটিং স্টার/ডজি রিজেকশন + ভলিউম
     bear_mask = (
         (~df["Ticker"].isin(bull_tickers_used)) &
         (df["Consec_Down"] <= 2) &
@@ -912,9 +1100,10 @@ def filter_intraday_focus_stocks(stocks_df: pd.DataFrame):
     return bull_top6, bear_top6
 
 
-with st.spinner("⚡ ৩২টি সেক্টর ও ১৮০+ শেয়ারের লাইভ ডেটা লোড হচ্ছে..."):
+with st.spinner("⚡ ৩২টি সেক্টর, ১৮০+ শেয়ার ও ১৫-মিনিটের লাইভ ব্রেকআউট ডেটা লোড হচ্ছে..."):
     pulse = load_pulse_indices()
     stocks_df, sectors_df = load_full_market_data()
+    bull_15m_df, bear_15m_df = run_chartink_15m_scanner(stocks_df)
 
 if stocks_df.empty or sectors_df.empty:
     st.error("⚠️ মার্কেট ডেটা লোড করতে সমস্যা হয়েছে। অনুগ্রহ করে পেজটি রিলোড করুন।")
@@ -941,7 +1130,7 @@ pulse_html = (
 st.markdown(pulse_html, unsafe_allow_html=True)
 
 # ==============================================================================
-# ৯. ৫-কলাম কন্ট্রোল ও ফিল্টার বার (সব লেবেল উজ্জ্বল ও স্পষ্ট)
+# ৯. ৫-কলাম কন্ট্রোল ও ফিল্টার বার
 # ==============================================================================
 fc1, fc2, fc3, fc4, fc5 = st.columns([1.15, 2.2, 2.2, 2.2, 2.25])
 
@@ -1000,19 +1189,39 @@ with fc5:
         st.rerun()
 
 # ==============================================================================
-# ১০. স্লিম ও কমপ্যাক্ট ইন্ট্রাডে বুলিশ ও বেয়ারিশ ফোকাস বক্স
+# ১০. স্লিম ইন্ট্রাডে ফোকাস বক্স + ১-ক্লিক WhatsApp অ্যালার্ট বাটন
 # ==============================================================================
 bull_top6, bear_top6 = filter_intraday_focus_stocks(stocks_df)
 
-m_bar1, m_bar2 = st.columns([5.8, 4.2])
+# ১-ক্লিক WhatsApp মেসেজ তৈরি (কোনো API ছাড়াই সরাসরি ফোনে বা পিসিতে পাঠানোর জন্য)
+wa_lines = ["🧭 *AlphaPulse Pro — লাইভ ইন্ট্রাডে অ্যালার্ট*"]
+wa_lines.append("🟢 *বুলিশ ডজি ও ১৫-মিঃ ব্রেকআউট স্টক:*")
+for _, r in bull_15m_df.head(4).iterrows():
+    wa_lines.append(f"• *{r['Symbol']}* (₹{r['15m_Close']}) | Entry: ₹{r['Entry']} | SL: ₹{r['SL']} | Tgt: ₹{r['Target']}")
+wa_lines.append("\n🔴 *বেয়ারিশ ব্রেকডাউন স্টক:*")
+for _, r in bear_15m_df.head(3).iterrows():
+    wa_lines.append(f"• *{r['Symbol']}* (₹{r['15m_Close']}) | Short: ₹{r['Short_Below']} | SL: ₹{r['SL']} | Tgt: ₹{r['Target']}")
+
+wa_encoded_msg = urllib.parse.quote("\n".join(wa_lines))
+wa_direct_url = f"https://api.whatsapp.com/send?text={wa_encoded_msg}"
+
+m_bar1, m_bar2, m_bar3 = st.columns([4.4, 2.3, 3.3])
 with m_bar1:
     st.markdown(
         '<div style="font-size:0.80rem;color:#cbd5e1;padding-top:6px;">'
-        '🎯 <b>ইন্ট্রাডে ফোকাস (Doji & Sector Turnaround):</b> শেয়ারে ক্লিক করলেই ট্রেড প্ল্যান ও চার্ট খুলবে'
+        '🎯 <b>ইন্ট্রাডে ফোকাস (Doji & 15m Breakout):</b> শেয়ারে ক্লিক করলেই চার্ট ও ট্রেড প্ল্যান খুলবে'
         '</div>',
         unsafe_allow_html=True
     )
 with m_bar2:
+    st.markdown(
+        f'<div style="padding-top:2px;">'
+        f'<a href="{wa_direct_url}" target="_blank" class="wa-share-btn" title="কোনো API ছাড়াই এক ক্লিকে আজকের ইন্ট্রাডে শেয়ারের লিস্ট নিজের WhatsApp-এ পাঠান">'
+        f'📲 এক ক্লিকে WhatsApp-এ পাঠান'
+        f'</a></div>',
+        unsafe_allow_html=True
+    )
+with m_bar3:
     market_day_mode = st.radio(
         "ট্র্যাকিং মোড:",
         ["🌗 উভয় সাইড", "🟢 বুলিশ ফোকাস", "🔴 বেয়ারিশ ফোকাস"],
@@ -1094,14 +1303,27 @@ if st.session_state.selected_stock != DEFAULT_STOCK and st.session_state.selecte
     sh_t1 = round(sh_entry - 1.5 * atr_v, 2)
     sh_t2 = round(sh_entry - 2.5 * atr_v, 2)
 
+    single_wa_txt = urllib.parse.quote(
+        f"🎯 *AlphaPulse Trade Setup: {sym_clean}* ({s_info['Sector']})\n"
+        f"• দাম: ₹{p_now} ({s_info['1D']:+.2f}%)\n"
+        f"🟢 Buy Above: ₹{b_entry} | SL: ₹{b_sl} | Target: ₹{b_t1} / ₹{b_t2}\n"
+        f"🔴 Short Below: ₹{sh_entry} | SL: ₹{sh_sl} | Target: ₹{sh_t1}"
+    )
+
     st.markdown("---")
-    sp_col1, sp_col2 = st.columns([8.0, 2.0])
+    sp_col1, sp_col2, sp_col3 = st.columns([6.2, 2.0, 1.8])
     with sp_col1:
         st.markdown(
             f"#### 🎯 শেয়ার ক্যান্ডেল ও ইন্ট্রাডে ট্রেড সেটআপ: **{sym_clean}** (`{s_info['Sector']}`) — "
             f"দাম: ₹{p_now:,.2f} ({s_info['1D']:+.2f}% | Vol: {s_info['Vol_Ratio']}x)"
         )
     with sp_col2:
+        st.markdown(
+            f'<a href="https://api.whatsapp.com/send?text={single_wa_txt}" target="_blank" class="wa-share-btn">'
+            f'📲 {sym_clean} সেটআপ WhatsApp করুন</a>',
+            unsafe_allow_html=True
+        )
+    with sp_col3:
         if st.button("✖ প্যানেল বন্ধ করুন", key="close_stk_panel", use_container_width=True):
             st.session_state.selected_stock = DEFAULT_STOCK
             push_nav_state(st.session_state.selected_sector, DEFAULT_STOCK, st.session_state.kpi_panel)
@@ -1187,7 +1409,7 @@ marquee_html = f'<div class="marquee-wrap"><div class="marquee-track">{"".join(b
 st.markdown(marquee_html, unsafe_allow_html=True)
 
 # ==============================================================================
-# ১৩. ৪টি সামারি KPI কার্ড এবং নিচের ৪টি স্পষ্ট দৃশ্যমান বাটন
+# ১৩. ৪টি সামারি KPI কার্ড এবং নিচের ৪টি স্পষ্ট বাটন
 # ==============================================================================
 adv_count = int((stocks_df[tf_choice] > 0).sum())
 dec_count = int((stocks_df[tf_choice] < 0).sum())
@@ -1310,15 +1532,19 @@ if st.session_state.kpi_panel is not None:
     st.markdown("---")
 
 # ==============================================================================
-# ১৪. ৪টি প্রধান ট্যাব (স্পষ্ট ও উজ্জ্বল হেডিং)
+# ১৪. ৫টি প্রধান ট্যাব (নতুন ১৫-মিনিট Chartink স্ক্যানার ও WhatsApp ট্যাব যুক্ত)
 # ==============================================================================
-tab1, tab2, tab3, tab4 = st.tabs([
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📈 ১. সেক্টর চার্ট, মিটার ও শেয়ার তালিকা",
-    "🎯 ২. ইন্ট্রাডে ডোজি/হ্যামার রিভার্সাল ও রিস্ক ক্যালকুলেটর",
-    "🚀 ৩. লং ও সুইং স্ক্যানার (Breakout & Value)",
-    "📋 ৪. সব সেক্টরের তুলনামূলক টেবিল"
+    "⚡ ২. ১৫-মিনিট Chartink স্ক্যানার ও WhatsApp অ্যালার্ট",
+    "🎯 ৩. ইন্ট্রাডে ডোজি/হ্যামার ও রিস্ক ক্যালকুলেটর",
+    "🚀 ৪. লং ও সুইং স্ক্যানার (Breakout & Value)",
+    "📋 ৫. সব সেক্টরের তুলনামূলক টেবিল"
 ])
 
+# ------------------------------------------------------------------------------
+# ট্যাব ১: সেক্টর চার্ট, মিটার ও শেয়ার তালিকা
+# ------------------------------------------------------------------------------
 with tab1:
     filtered_secs = sectors_df.copy()
 
@@ -1419,7 +1645,86 @@ with tab1:
                     )
                 st.markdown(f'<div class="pill-container">{"".join(q_pills)}</div>', unsafe_allow_html=True)
 
+# ------------------------------------------------------------------------------
+# ট্যাব ২: ১৫-মিনিট Chartink স্ক্যানার ও ১-ক্লিক WhatsApp অ্যালার্ট (নতুন সংযোজন)
+# ------------------------------------------------------------------------------
 with tab2:
+    ch_top1, ch_top2 = st.columns([6.8, 3.2])
+    with ch_top1:
+        st.markdown(
+            "#### ⚡ ১৫-মিনিট লাইভ ব্রেকআউট স্ক্যানার (তোমার Chartink লজিকের প্রো ভার্সন)\n"
+            "নিচে **১৫ মিনিটের ক্যান্ডেল, VWAP, গতকালের High/Low ব্রেকআউট, ভলিউম স্পাইক এবং RSI (58–78)** অনুযায়ী বাছাই করা শেয়ারগুলো দেওয়া হলো:"
+        )
+    with ch_top2:
+        st.markdown(
+            f'<div style="text-align:right;padding-top:10px;">'
+            f'<a href="{wa_direct_url}" target="_blank" class="wa-share-btn">'
+            f'📲 সম্পূর্ণ ১৫-মিঃ ব্রেকআউট লিস্ট WhatsApp করুন</a></div>',
+            unsafe_allow_html=True
+        )
+
+    c15_col1, c15_col2 = st.columns(2)
+    with c15_col1:
+        st.markdown("##### 🟢 ১৫-মিনিট বুলিশ ব্রেকআউট (`Close > VWAP & Prev High`, `Open ≈ Low`)")
+        st.dataframe(
+            style_colored_table(
+                bull_15m_df[["Symbol", "Sector", "15m_Close", "VWAP", "Prev_High", "15m_Vol_x", "15m_RSI", "1D_%", "Match_Mode", "Entry", "SL", "Target"]],
+                ["1D_%"]
+            ),
+            use_container_width=True,
+            hide_index=True
+        )
+        b15_pills = [
+            f'<a class="bull-pill" href="?focus_stock={urllib.parse.quote(r["Ticker"])}" target="_self">🟢 {r["Symbol"]} চার্ট দেখুন</a>'
+            for _, r in bull_15m_df.iterrows()
+        ]
+        st.markdown(f'<div class="pill-container">{"".join(b15_pills)}</div>', unsafe_allow_html=True)
+
+    with c15_col2:
+        st.markdown("##### 🔴 ১৫-মিনিট বেয়ারিশ ব্রেকডাউন (`Close < VWAP & Prev Low`, `Open ≈ High`)")
+        st.dataframe(
+            style_colored_table(
+                bear_15m_df[["Symbol", "Sector", "15m_Close", "VWAP", "Prev_Low", "15m_Vol_x", "15m_RSI", "1D_%", "Match_Mode", "Short_Below", "SL", "Target"]],
+                ["1D_%"]
+            ),
+            use_container_width=True,
+            hide_index=True
+        )
+        br15_pills = [
+            f'<a class="bear-pill" href="?focus_stock={urllib.parse.quote(r["Ticker"])}" target="_self">🔴 {r["Symbol"]} চার্ট দেখুন</a>'
+            for _, r in bear_15m_df.iterrows()
+        ]
+        st.markdown(f'<div class="pill-container">{"".join(br15_pills)}</div>', unsafe_allow_html=True)
+
+    st.markdown("---")
+    with st.expander("🤖 অটোমেটিক ফোনে মেসেজ সেটিংস (সহজ গাইড — ঐচ্ছিক)", expanded=False):
+        st.markdown(
+            "তুমি যদি কোনো বাটনে ক্লিক না করেও প্যারামিটার মিললেই অটোমেটিক নোটিফিকেশন পেতে চাও:\n"
+            "1. **সবচেয়ে সহজ উপায় (কোনো সেটআপ লাগবে না):** একদম উপরের ডানদিকে **`🔔 অটো-অ্যালার্ট`** সুইচটি অন করে রাখো। প্রতি ৩ মিনিট পর পর সাইট নিজে নিজে স্ক্যান করবে এবং নতুন শেয়ার পেলেই তোমার পিসি/ফোনে **ঘণ্টা বাজিয়ে** জানিয়ে দেবে!\n"
+            "2. **ব্যাকগ্রাউন্ড WhatsApp মেসেজ (যদি চাও):** নিচে তোমার WhatsApp নাম্বার ও পিন দিয়ে রাখলে অটো-স্ক্যান চলাকালীন মেসেজ চলে যাবে।"
+        )
+        wa_c1, wa_c2, wa_c3 = st.columns([4, 4, 2])
+        with wa_c1:
+            user_wa_phone = st.text_input("📱 তোমার WhatsApp নাম্বার (দেশের কোড সহ, যেমন 9198XXXXXXXX):", value="")
+        with wa_c2:
+            user_wa_key = st.text_input("🔑 ফ্রি CallMeBot পিন (না থাকলে ফাঁকা রাখো, ১-ক্লিক বাটন সবসময় কাজ করবে):", value="", type="password")
+        with wa_c3:
+            st.markdown("<div style='padding-top:24px;'></div>", unsafe_allow_html=True)
+            if st.button("📨 টেস্ট মেসেজ পাঠান", use_container_width=True):
+                if user_wa_phone and user_wa_key:
+                    try:
+                        api_url = f"https://api.callmebot.com/whatsapp.php?phone={user_wa_phone.strip()}&text={wa_encoded_msg}&apikey={user_wa_key.strip()}"
+                        urllib.request.urlopen(api_url, timeout=8)
+                        st.success("✅ তোমার WhatsApp-এ সফলভাবে মেসেজ পাঠানো হয়েছে!")
+                    except Exception:
+                        st.warning("⚠️ পিন বা নাম্বারটি একবার চেক করো, অথবা উপরের সবুজ '📲 এক ক্লিকে WhatsApp-এ পাঠান' বাটনটি ব্যবহার করো।")
+                else:
+                    st.info("💡 কোনো পিন ছাড়াই মেসেজ পাঠাতে উপরের সবুজ **'📲 এক ক্লিকে WhatsApp-এ পাঠান'** বাটনে ক্লিক করো!")
+
+# ------------------------------------------------------------------------------
+# ট্যাব ৩: ইন্ট্রাডে ডোজি/হ্যামার রিভার্সাল ও রিস্ক ক্যালকুলেটর
+# ------------------------------------------------------------------------------
+with tab3:
     st.markdown("#### 🎯 ইন্ট্রাডে ডজি / হ্যামার কনসোলিডেশন ও সেক্টর টার্নঅ্যারাউন্ড স্ক্যানার")
 
     t2_c1, t2_c2 = st.columns(2)
@@ -1488,7 +1793,10 @@ with tab2:
         f"🎯 **১:২ রিস্ক-রিওয়ার্ড টার্গেট:** `₹{target_1_2:,.2f}`"
     )
 
-with tab3:
+# ------------------------------------------------------------------------------
+# ট্যাব ৪: লং ও সুইং স্ক্যানার (Breakout & Value)
+# ------------------------------------------------------------------------------
+with tab4:
     sw1, sw2 = st.columns(2)
     with sw1:
         st.markdown("##### 🚀 সুইং পুলব্যাক ও ভলিউম ব্রেকআউট স্ক্যানার (Near 20/50 DMA Support)")
@@ -1534,7 +1842,10 @@ with tab3:
         use_container_width=True
     )
 
-with tab4:
+# ------------------------------------------------------------------------------
+# ট্যাব ৫: সব সেক্টরের তুলনামূলক টেবিল
+# ------------------------------------------------------------------------------
+with tab5:
     st.markdown(f"#### 📊 ৩২টি সেক্টরের তুলনামূলক পারফরম্যান্স চার্ট ({tf_choice})")
     chart_secs = sectors_df.sort_values(tf_choice, ascending=True)
     bar_colors = ["#10b981" if v >= 0 else "#ef4444" for v in chart_secs[tf_choice]]
@@ -1572,31 +1883,38 @@ with tab4:
     )
 
 # ==============================================================================
-# ১৫. ফ্লোটিং স্মার্ট নেভিগেশন ডক (⬅️ ব্যাক | 🧭 মেইন পেজ | ➡️ ফরওয়ার্ড | 🚀 ওপরে যান)
+# ১৫. ফ্লোটিং স্মার্ট নেভিগেশন ডক + অটো-অ্যালার্ট সাউন্ড ইঞ্জিন
 # ==============================================================================
 dock_html = (
     '<div class="floating-nav-dock">'
     '<a href="?nav_action=back" target="_self" class="dock-btn" title="আগের পেজে বা শেয়ারে ফিরে যান">⬅️ ব্যাক</a>'
     '<a href="?nav_action=home" target="_self" class="dock-btn" title="লোগোতে ক্লিক করে একদম মেইন পেজে ফিরে যান">🧭 মেইন পেজ</a>'
     '<a href="?nav_action=forward" target="_self" class="dock-btn" title="পরের ভিউতে যান">➡️</a>'
+    f'<a href="{wa_direct_url}" target="_blank" class="dock-btn" style="background:#16a34a;border-color:#22c55e;" title="এক ক্লিকে WhatsApp-এ পাঠান">📲 WhatsApp</a>'
     '<a href="#top-anchor" class="dock-btn-top" id="alphapulse-top-btn" title="স্ক্রল করে একদম ওপরে যান">🚀 ওপরে যান</a>'
     '</div>'
 )
 st.markdown(dock_html, unsafe_allow_html=True)
 
+current_top_syms = ",".join(bull_15m_df["Symbol"].head(3).tolist()) if not bull_15m_df.empty else ""
+should_ring = "true" if (auto_alert_on and current_top_syms and current_top_syms != st.session_state.last_alerted_stocks) else "false"
+if auto_alert_on and current_top_syms:
+    st.session_state.last_alerted_stocks = current_top_syms
+auto_reload_js = "setTimeout(function(){ window.parent.location.reload(); }, 180000);" if auto_alert_on else ""
+
 components.html(
-    """
+    f"""
     <script>
-    (function() {
+    (function() {{
         const doc = window.parent.document;
         const btn = doc.getElementById("alphapulse-top-btn");
-        if (btn) {
-            btn.addEventListener("click", function(e) {
+        if (btn) {{
+            btn.addEventListener("click", function(e) {{
                 e.preventDefault();
                 const anchor = doc.getElementById("top-anchor");
-                if (anchor) {
-                    anchor.scrollIntoView({ behavior: "smooth", block: "start" });
-                }
+                if (anchor) {{
+                    anchor.scrollIntoView({{ behavior: "smooth", block: "start" }});
+                }}
                 const targets = [
                     doc.querySelector('[data-testid="stAppViewContainer"]'),
                     doc.querySelector('[data-testid="stMain"]'),
@@ -1604,15 +1922,34 @@ components.html(
                     doc.documentElement,
                     doc.body
                 ];
-                targets.forEach(function(el) {
-                    if (el && el.scrollTo) {
-                        el.scrollTo({ top: 0, behavior: "smooth" });
-                    }
-                });
-                window.parent.scrollTo({ top: 0, behavior: "smooth" });
-            });
-        }
-    })();
+                targets.forEach(function(el) {{
+                    if (el && el.scrollTo) {{
+                        el.scrollTo({{ top: 0, behavior: "smooth" }});
+                    }}
+                }});
+                window.parent.scrollTo({{ top: 0, behavior: "smooth" }});
+            }});
+        }}
+
+        if ({should_ring}) {{
+            try {{
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = "sine";
+                osc.frequency.setValueAtTime(880, ctx.currentTime);
+                osc.frequency.setValueAtTime(1174.66, ctx.currentTime + 0.18);
+                gain.gain.setValueAtTime(0.18, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.65);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.65);
+            }} catch (err) {{}}
+        }}
+
+        {auto_reload_js}
+    }})();
     </script>
     """,
     height=0,
