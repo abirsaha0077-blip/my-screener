@@ -1,3 +1,4 @@
+from urllib.parse import quote, unquote
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
@@ -5,17 +6,17 @@ import streamlit as st
 import yfinance as yf
 
 # ==============================================================================
-# ১. পেজ সেটআপ (সাইডবার সম্পূর্ণ বন্ধ এবং ফুল-স্ক্রিন মোড)
+# ১. পেজ সেটআপ (ফুল-স্ক্রিন ফিনান্সিয়াল টার্মিনাল মোড)
 # ==============================================================================
 st.set_page_config(
-    page_title="AlphaPulse Pro | Sector & Stock Screener",
+    page_title="AlphaPulse Pro | Institutional Financial Terminal",
     page_icon="🧭",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
 
 # ==============================================================================
-# ২. ৩২টি মাইক্রো-সেক্টর এবং আসল NIFTY 50-এর ৫০টি শেয়ারের তালিকা
+# ২. ৩২টি মাইক্রো-সেক্টর, ম্যাক্রো ইনডেক্স এবং আসল NIFTY 50-এর তালিকা
 # ==============================================================================
 sectors = {
     "Defence & Aerospace": [
@@ -130,16 +131,17 @@ NIFTY_50_TICKERS = [
 ]
 
 benchmark = "^NSEI"
+macro_tickers = ["^NSEI", "^NSEBANK", "^INDIAVIX", "USDINR=X"]
 all_tickers = sorted(
-    list(set([benchmark] + NIFTY_50_TICKERS + [t for s in sectors.values() for t in s]))
+    list(set(macro_tickers + NIFTY_50_TICKERS + [t for s in sectors.values() for t in s]))
 )
 
 # ==============================================================================
-# ৩. টপ হেডার বার (কোনো সাইডবার ছাড়াই এক লাইনে টাইটেল, থিম ও মিটার সুইচ)
+# ৩. টপ হেডার বার (থিম সিলেক্টর ও মিটার সুইচ)
 # ==============================================================================
-top_h1, top_h2, top_h3 = st.columns([2.6, 1.1, 0.8])
+top_h1, top_h2, top_h3 = st.columns([2.7, 1.1, 0.8])
 with top_h1:
-    st.markdown("## 🧭 AlphaPulse Pro — Sector & Stock Screener")
+    st.markdown("## 🧭 AlphaPulse Pro — Institutional Sector & Stock Terminal")
 with top_h2:
     theme_choice = st.selectbox(
         "🎨 থিম (Theme):",
@@ -155,7 +157,7 @@ with top_h3:
     show_card_meter = st.toggle("🎛️ অ্যানালগ মিটার", value=True)
 
 # ==============================================================================
-# ৪. থিম কালার ও ক্লিন সিএসএস (সাইডবার ও উপরের সাদা বার ১০০% হাইড করা হয়েছে)
+# ৪. থিম কালার ও প্রফেশনাল সিএসএস (ডার্ক থিমে লাল হাইলাইট চিরতরে দূর করা হয়েছে)
 # ==============================================================================
 if "Pure White" in theme_choice:
     bg_color = "#f4f6f9"
@@ -186,7 +188,7 @@ else:
     card_bg = "#111827"
     input_bg = "#1e293b"
     text_color = "#f8fafc"
-    sub_text = "#cbd5e1"
+    sub_text = "#94a3b8"
     border_col = "#334155"
     chart_bg = "#111827"
     grid_col = "rgba(255, 255, 255, 0.08)"
@@ -196,7 +198,6 @@ else:
 
 css_template = """
 <style>
-/* উপরের অপ্রয়োজনীয় সাদা Streamlit Header Bar এবং বাঁদিকের Sidebar সম্পূর্ণ আউট করা হয়েছে */
 header[data-testid="stHeader"] {
     display: none !important;
 }
@@ -210,7 +211,7 @@ section[data-testid="stSidebar"],
     color: __TEXT_COLOR__ !important;
 }
 .block-container {
-    padding-top: 1.2rem !important;
+    padding-top: 1.0rem !important;
     padding-bottom: 2rem !important;
     padding-left: 1.8rem !important;
     padding-right: 1.8rem !important;
@@ -219,7 +220,7 @@ section[data-testid="stSidebar"],
 h1, h2, h3, h4, h5, h6, label {
     color: __TEXT_COLOR__ !important;
 }
-/* ড্রপডাউন এবং ইনপুট বক্স */
+/* ড্রপডাউন এবং ইনপুট বক্স (লাল বর্ডার বা হাইলাইট সম্পূর্ণ সরিয়ে সায়ান/ব্লু করা হয়েছে) */
 div[data-baseweb="select"] > div {
     background-color: __INPUT_BG__ !important;
     color: __TEXT_COLOR__ !important;
@@ -227,11 +228,13 @@ div[data-baseweb="select"] > div {
     border-radius: 10px !important;
     font-weight: 600 !important;
     cursor: pointer !important;
+    box-shadow: none !important;
     transition: all 0.2s ease !important;
 }
-div[data-baseweb="select"] > div:hover {
+div[data-baseweb="select"] > div:hover,
+div[data-baseweb="select"] > div:focus-within {
     border-color: __ACCENT_COL__ !important;
-    box-shadow: 0 0 10px rgba(56, 189, 248, 0.25) !important;
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.28) !important;
 }
 div[data-baseweb="select"] span {
     color: __TEXT_COLOR__ !important;
@@ -243,6 +246,41 @@ div[data-baseweb="popover"] ul {
 div[data-baseweb="popover"] li {
     color: __TEXT_COLOR__ !important;
     cursor: pointer !important;
+}
+/* ট্যাব বার থেকে Streamlit-এর ডিফল্ট লাল দাগ ও লাল টেক্সট সম্পূর্ণ সরিয়ে প্রিমিয়াম সায়ান/ব্লু করা হয়েছে */
+div[data-baseweb="tab-highlight"] {
+    background-color: __ACCENT_COL__ !important;
+    height: 3px !important;
+}
+div[data-baseweb="tab-border"] {
+    background-color: __BORDER_COL__ !important;
+}
+button[data-baseweb="tab"] {
+    background-color: __CARD_BG__ !important;
+    color: __TEXT_COLOR__ !important;
+    border: 1px solid __BORDER_COL__ !important;
+    border-radius: 10px 10px 0 0 !important;
+    padding: 10px 20px !important;
+    margin-right: 8px !important;
+    font-weight: 700 !important;
+    font-size: 14px !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+}
+button[data-baseweb="tab"] p,
+button[data-baseweb="tab"] span {
+    color: __TEXT_COLOR__ !important;
+    font-weight: 700 !important;
+}
+button[data-baseweb="tab"][aria-selected="true"] {
+    background-color: rgba(56, 189, 248, 0.14) !important;
+    border-color: __ACCENT_COL__ !important;
+    border-bottom: 3px solid __ACCENT_COL__ !important;
+    color: __ACCENT_COL__ !important;
+}
+button[data-baseweb="tab"][aria-selected="true"] p,
+button[data-baseweb="tab"][aria-selected="true"] span {
+    color: __ACCENT_COL__ !important;
 }
 /* বাটন স্টাইল */
 div.stButton > button {
@@ -259,24 +297,8 @@ div.stButton > button {
 }
 div.stButton > button:hover {
     border-color: __ACCENT_COL__ !important;
-    background-color: rgba(59, 130, 246, 0.16) !important;
+    background-color: rgba(56, 189, 248, 0.16) !important;
     transform: translateY(-1px);
-}
-/* ৪টি মেইন ট্যাব যাতে কখনোই কেটে না যায় */
-button[data-baseweb="tab"] {
-    background-color: __CARD_BG__ !important;
-    color: __TEXT_COLOR__ !important;
-    border: 1px solid __BORDER_COL__ !important;
-    border-radius: 10px 10px 0 0 !important;
-    padding: 10px 20px !important;
-    margin-right: 8px !important;
-    font-weight: 700 !important;
-    font-size: 14px !important;
-    cursor: pointer !important;
-}
-button[data-baseweb="tab"][aria-selected="true"] {
-    border-bottom: 3px solid __ACCENT_COL__ !important;
-    color: __ACCENT_COL__ !important;
 }
 /* এক্সপান্ডার */
 div[data-testid="stExpander"] details {
@@ -294,6 +316,26 @@ div[data-testid="stExpander"] summary p {
     font-weight: 700 !important;
     font-size: 14px !important;
 }
+div[data-testid="stExpander"] summary:hover span,
+div[data-testid="stExpander"] summary:hover p {
+    color: __ACCENT_COL__ !important;
+}
+/* মেট্রিক বক্স */
+div[data-testid="stMetric"] {
+    background-color: __CARD_BG__ !important;
+    border: 1px solid __BORDER_COL__ !important;
+    border-radius: 12px !important;
+    padding: 10px 14px !important;
+    box-shadow: __SHADOW_CSS__ !important;
+}
+div[data-testid="stMetricLabel"] p {
+    color: __SUB_TEXT__ !important;
+    font-weight: 600 !important;
+}
+div[data-testid="stMetricValue"] div {
+    color: __TEXT_COLOR__ !important;
+    font-weight: 800 !important;
+}
 /* প্রো কার্ড ও KPI কার্ড */
 .pro-card {
     background-color: __CARD_BG__;
@@ -306,6 +348,32 @@ div[data-testid="stExpander"] summary p {
 }
 .pro-card:hover {
     border-color: __ACCENT_COL__;
+}
+.focus-drawer {
+    background-color: __CARD_BG__;
+    border: 2px solid __ACCENT_COL__;
+    border-radius: 16px;
+    padding: 18px 22px;
+    margin: 10px 0 18px 0;
+    box-shadow: 0 10px 30px rgba(56, 189, 248, 0.18);
+}
+.macro-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    justify-content: space-between;
+    background-color: __CARD_BG__;
+    border: 1px solid __BORDER_COL__;
+    border-radius: 12px;
+    padding: 8px 16px;
+    margin-bottom: 12px;
+    box-shadow: __SHADOW_CSS__;
+}
+.macro-item {
+    font-size: 13px;
+    font-weight: 700;
+    color: __TEXT_COLOR__;
 }
 .kpi-card {
     background-color: __CARD_BG__;
@@ -373,7 +441,7 @@ div[data-testid="stExpander"] summary p {
     font-size: 12.5px;
     font-weight: 700;
     margin: 6px 0;
-    background: rgba(59, 130, 246, 0.12);
+    background: rgba(56, 189, 248, 0.12);
     color: __TEXT_COLOR__ !important;
     border-left: 4px solid __ACCENT_COL__;
 }
@@ -391,9 +459,9 @@ div[data-testid="stExpander"] summary p {
 }
 .action-btn:hover {
     border-color: __ACCENT_COL__;
-    background: rgba(59, 130, 246, 0.18);
+    background: rgba(56, 189, 248, 0.18);
 }
-/* স্ক্রলিং টিকার বার — আপসাইডে উজ্জ্বল সবুজ (Green) এবং ডাউনসাইডে উজ্জ্বল লাল (Red) */
+/* ক্লিকেবল স্ক্রলিং টিকার বার (মাউস রাখলে থামবে এবং যেকোনো সেক্টরে ক্লিক করলে তার ডিটেইলস খুলবে) */
 .ticker-wrap {
     width: 100%;
     overflow: hidden;
@@ -401,38 +469,54 @@ div[data-testid="stExpander"] summary p {
     border: 1px solid __BORDER_COL__;
     border-radius: 12px;
     padding: 10px 14px;
-    margin: 8px 0 14px 0;
+    margin: 6px 0 12px 0;
     white-space: nowrap;
     box-shadow: __SHADOW_CSS__;
 }
 .ticker-move {
     display: inline-block;
-    animation: ticker 190s linear infinite;
+    animation: ticker 185s linear infinite;
 }
 .ticker-wrap:hover .ticker-move {
     animation-play-state: paused;
 }
-.ticker-chip-up {
+a.ticker-chip-up {
     display: inline-block;
-    margin-right: 18px;
-    padding: 4px 12px;
+    margin-right: 16px;
+    padding: 5px 14px;
     border-radius: 999px;
     font-size: 13.5px;
     font-weight: 800;
     background: rgba(0, 230, 118, 0.14);
     border: 1px solid rgba(0, 230, 118, 0.45);
     color: #00e676 !important;
+    text-decoration: none !important;
+    cursor: pointer !important;
+    transition: all 0.18s ease;
 }
-.ticker-chip-down {
+a.ticker-chip-up:hover {
+    background: rgba(0, 230, 118, 0.28);
+    transform: scale(1.05);
+    box-shadow: 0 0 12px rgba(0, 230, 118, 0.4);
+}
+a.ticker-chip-down {
     display: inline-block;
-    margin-right: 18px;
-    padding: 4px 12px;
+    margin-right: 16px;
+    padding: 5px 14px;
     border-radius: 999px;
     font-size: 13.5px;
     font-weight: 800;
     background: rgba(255, 82, 82, 0.14);
     border: 1px solid rgba(255, 82, 82, 0.45);
     color: #ff5252 !important;
+    text-decoration: none !important;
+    cursor: pointer !important;
+    transition: all 0.18s ease;
+}
+a.ticker-chip-down:hover {
+    background: rgba(255, 82, 82, 0.28);
+    transform: scale(1.05);
+    box-shadow: 0 0 12px rgba(255, 82, 82, 0.4);
 }
 @keyframes ticker {
     0% { transform: translateX(0%); }
@@ -454,18 +538,21 @@ final_css = (
 st.markdown(final_css, unsafe_allow_html=True)
 
 # ==============================================================================
-# ৫. ডেটা ইঞ্জিন এবং কালার টেবিল ফাংশন
+# ৫. ডেটা ইঞ্জিন (ফ্রি-তেই প্রাইস + ভলিউম + RSI + ম্যাক্রো ইনডেক্স লোড করা হচ্ছে)
 # ==============================================================================
 @st.cache_data(ttl=3600)
-def load_full_history():
+def load_full_market_data():
     raw = yf.download(all_tickers, period="5y", interval="1d", auto_adjust=True, progress=False)
     if isinstance(raw.columns, pd.MultiIndex):
-        if "Close" in raw.columns.levels[0]:
-            return raw["Close"].ffill()
-    return raw.ffill()
+        close_df = raw["Close"].ffill() if "Close" in raw.columns.levels[0] else pd.DataFrame()
+        vol_df = raw["Volume"].fillna(0) if "Volume" in raw.columns.levels[0] else pd.DataFrame()
+    else:
+        close_df = raw.ffill()
+        vol_df = pd.DataFrame(index=close_df.index)
+    return close_df, vol_df
 
-with st.spinner("৫ বছরের সম্পূর্ণ মার্কেট ডেটা এবং ৩২টি সেক্টরের মিটার প্রস্তুত হচ্ছে..."):
-    full_df = load_full_history()
+with st.spinner("৫ বছরের সম্পূর্ণ মার্কেট ডেটা, ভলিউম স্পাইক, RSI এবং ৩২টি সেক্টরের মিটার প্রস্তুত হচ্ছে..."):
+    full_df, full_vol_df = load_full_market_data()
 
 tf_days_map = {
     "1D": 2, "1W": 6, "1M": 22, "3M": 64, "6M": 126, "1Y": 252, "3Y": 756, "5Y": len(full_df)
@@ -480,6 +567,39 @@ def calc_return(series, days):
         return 0.0
     return round(((sub.iloc[-1] / sub.iloc[0]) - 1) * 100, 2)
 
+def calc_rsi(series, period=14):
+    s = series.dropna()
+    if len(s) < period + 2:
+        return 50.0
+    delta = s.diff()
+    gain = delta.clip(lower=0).rolling(window=period).mean()
+    loss = (-delta.clip(upper=0)).rolling(window=period).mean()
+    last_g = float(gain.iloc[-1]) if not pd.isna(gain.iloc[-1]) else 0.0
+    last_l = float(loss.iloc[-1]) if not pd.isna(loss.iloc[-1]) else 0.0
+    if last_l == 0:
+        return 100.0 if last_g > 0 else 50.0
+    rs = last_g / last_l
+    return round(100.0 - (100.0 / (1.0 + rs)), 1)
+
+def calc_rvol(t_sym):
+    if full_vol_df is None or t_sym not in full_vol_df.columns:
+        return 1.0, "📊 1.0x (Normal)"
+    v = full_vol_df[t_sym].replace(0, np.nan).dropna()
+    if len(v) < 21:
+        return 1.0, "📊 1.0x (Normal)"
+    curr_v = float(v.iloc[-1])
+    avg_v = float(v.iloc[-21:-1].mean())
+    if avg_v <= 0:
+        return 1.0, "📊 1.0x (Normal)"
+    ratio = round(curr_v / avg_v, 2)
+    if ratio >= 2.0:
+        return ratio, f"🔥 {ratio}x (Huge Buying)"
+    elif ratio >= 1.35:
+        return ratio, f"⚡ {ratio}x (High Vol)"
+    elif ratio <= 0.55:
+        return ratio, f"💤 {ratio}x (Low Vol)"
+    return ratio, f"📊 {ratio}x (Normal)"
+
 def style_colored_table(df_in, primary_col):
     if df_in is None or df_in.empty:
         return df_in
@@ -491,6 +611,8 @@ def style_colored_table(df_in, primary_col):
     fmt = {}
     if "CMP (₹)" in clean_df.columns:
         fmt["CMP (₹)"] = "₹{:.2f}"
+    if "RSI (14)" in clean_df.columns:
+        fmt["RSI (14)"] = "{:.1f}"
     if "Meter Score" in clean_df.columns:
         fmt["Meter Score"] = "{:.0f}/100"
     if "Now Meter (0-100)" in clean_df.columns:
@@ -499,6 +621,8 @@ def style_colored_table(df_in, primary_col):
         fmt["Prev Meter"] = "{:.1f}"
     if "Shift (Δ)" in clean_df.columns:
         fmt["Shift (Δ)"] = "{:+.1f}"
+    if "Avg RSI" in clean_df.columns:
+        fmt["Avg RSI"] = "{:.1f}"
     for c in pct_cols:
         fmt[c] = "{:+.2f}%"
 
@@ -507,16 +631,16 @@ def style_colored_table(df_in, primary_col):
         if not isinstance(val, (int, float, np.number)) or pd.isna(val):
             return [""] * len(row)
         if val >= 0:
-            return ["background-color: rgba(16, 185, 129, 0.14);"] * len(row)
-        return ["background-color: rgba(239, 68, 68, 0.14);"] * len(row)
+            return ["background-color: rgba(0, 230, 118, 0.12);"] * len(row)
+        return ["background-color: rgba(255, 82, 82, 0.12);"] * len(row)
 
     def cell_tint(val):
         if not isinstance(val, (int, float, np.number)) or pd.isna(val):
             return ""
         if val > 0:
-            return "background-color: rgba(16, 185, 129, 0.25); color: #00e676; font-weight: 700;"
+            return "background-color: rgba(0, 230, 118, 0.24); color: #00e676; font-weight: 700;"
         elif val < 0:
-            return "background-color: rgba(239, 68, 68, 0.25); color: #ff5252; font-weight: 700;"
+            return "background-color: rgba(255, 82, 82, 0.24); color: #ff5252; font-weight: 700;"
         return ""
 
     try:
@@ -582,15 +706,50 @@ def make_analog_gauge(score, prev_score, title_txt, height_px=215):
     return fig_g
 
 # ==============================================================================
-# ৬. ৪টি মূল কন্ট্রোল মেনু (সংক্ষিপ্ত নাম যাতে বক্সে লেখা না কাটে + অটো-রিসেট লজিক)
+# ৬. ম্যাক্রো মার্কেট পালস রিবন (Nifty 50, Bank Nifty, India VIX, USD/INR)
+# ==============================================================================
+def get_macro_stat(sym):
+    if sym not in full_df.columns or len(full_df[sym].dropna()) < 3:
+        return 0.0, 0.0
+    s = full_df[sym].dropna()
+    return round(float(s.iloc[-1]), 2), calc_return(s, 2)
+
+n50_lvl, n50_1d = get_macro_stat("^NSEI")
+bnk_lvl, bnk_1d = get_macro_stat("^NSEBANK")
+vix_lvl, vix_1d = get_macro_stat("^INDIAVIX")
+usd_lvl, usd_1d = get_macro_stat("USDINR=X")
+
+vix_mood = "🟢 স্বস্তিদায়ক (Low Fear)" if vix_lvl < 15 else ("🟡 সতর্কতা (Moderate)" if vix_lvl < 20 else "🔴 উচ্চ ঝুঁকি (High Fear)")
+
+st.markdown(
+    f"""
+    <div class="macro-strip">
+        <div class="macro-item">🇮🇳 <b>Nifty 50:</b> {n50_lvl:,.1f} <span style="color:{'#00e676' if n50_1d>=0 else '#ff5252'};">({n50_1d:+.2f}%)</span></div>
+        <div class="macro-item">🏦 <b>Bank Nifty:</b> {bnk_lvl:,.1f} <span style="color:{'#00e676' if bnk_1d>=0 else '#ff5252'};">({bnk_1d:+.2f}%)</span></div>
+        <div class="macro-item">⚡ <b>India VIX:</b> {vix_lvl:.2f} <span style="color:{'#ff5252' if vix_1d>0 else '#00e676'};">({vix_1d:+.2f}%)</span> — {vix_mood}</div>
+        <div class="macro-item">💵 <b>USD/INR:</b> ₹{usd_lvl:.2f} <span style="color:{sub_text};">({usd_1d:+.2f}%)</span></div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+# ==============================================================================
+# ৭. ৫টি মূল কন্ট্রোল মেনু (টাইমফ্রেম, সর্টিং, জোন, সেক্টর সার্চ এবং ইনস্ট্যান্ট শেয়ার সার্চ)
 # ==============================================================================
 if "ctrl_sec_jump" not in st.session_state:
     st.session_state["ctrl_sec_jump"] = "সবগুলো সেক্টর (Show All 32)"
 
 def reset_single_sector_lock():
     st.session_state["ctrl_sec_jump"] = "সবগুলো সেক্টর (Show All 32)"
+    try:
+        if "focus_sec" in st.query_params:
+            del st.query_params["focus_sec"]
+    except Exception:
+        pass
 
-c1, c2, c3, c4 = st.columns([1.0, 1.45, 1.45, 1.4])
+all_unique_stock_names = sorted(list(set([t.replace(".NS", "") for s in sectors.values() for t in s])))
+
+c1, c2, c3, c4, c5 = st.columns([0.9, 1.35, 1.35, 1.25, 1.25])
 with c1:
     tf_option = st.selectbox(
         "📅 ১. টাইমফ্রেম:",
@@ -600,7 +759,7 @@ with c1:
     )
 with c2:
     sort_option = st.selectbox(
-        "🔃 ২. কীভাবে সাজাতে চান (Sort By):",
+        "🔃 ২. সাজানোর ক্রম (Sort By):",
         [
             "🚀 Top Gainers (সবচেয়ে বেশি বাড়া আগে)",
             "📉 Top Losers (সবচেয়ে বেশি ডাউন আগে)",
@@ -632,19 +791,17 @@ with c4:
         ["সবগুলো সেক্টর (Show All 32)"] + sorted(list(sectors.keys())),
         key="ctrl_sec_jump",
     )
-
-# যদি ইউজার ভুলবশত ৪ নম্বর মেনুতে কোনো ১টি সেক্টর সিলেক্ট করে রাখে, তবে এক ক্লিকে সব সেক্টরে ফেরার বাটন
-if not quick_sec_jump.startswith("সবগুলো"):
-    reset_c1, reset_c2 = st.columns([3, 1.2])
-    with reset_c1:
-        st.warning(f"📌 আপনি বর্তমানে শুধুমাত্র **{quick_sec_jump}** সেক্টরটি দেখছেন। সব সেক্টর একসাথে দেখতে ডানপাশের বাটনে ক্লিক করুন 👉")
-    with reset_c2:
-        st.button("🔄 সব ৩২টি সেক্টর একসাথে দেখুন", on_click=reset_single_sector_lock, key="btn_reset_all_sec")
+with c5:
+    instant_stock_search = st.selectbox(
+        "⚡ ৫. যেকোনো শেয়ার খুঁজুন (Stock Search):",
+        ["শেয়ার টাইপ করুন..."] + all_unique_stock_names,
+        key="ctrl_stk_search",
+    )
 
 ret_key = f"{tf_option} %"
 
 # ==============================================================================
-# ৭. সেক্টর, স্টক ও নিফটি ৫০ ক্যালকুলেশন + সহজ বাংলায় সিগন্যাল তৈরি
+# ৮. সেক্টর ও স্টকের সম্পূর্ণ ক্যালকুলেশন (RSI-14 এবং Volume Spike সহ)
 # ==============================================================================
 nifty_col = full_df[benchmark] if benchmark in full_df.columns else pd.Series(dtype=float)
 nifty_multi_ret = {tf: calc_return(nifty_col, d) for tf, d in tf_days_map.items()}
@@ -671,6 +828,9 @@ def compute_stock_row(t, s_name_label):
     above_50dma = curr_p >= sma50_val
     above_200dma = curr_p >= sma200_val
 
+    rsi_14 = calc_rsi(s_price, 14)
+    rvol_num, rvol_label = calc_rvol(t)
+
     r_map = {
         "1D %": calc_return(s_price, 2),
         "1W %": calc_return(s_price, 6),
@@ -682,16 +842,17 @@ def compute_stock_row(t, s_name_label):
     }
 
     r_sel = r_map[ret_key]
-    st_score = float(np.clip(50 + (r_sel * 2.0) + (r_map["1W %"] * 1.2), 2, 98))
+    st_score = float(np.clip(50 + (r_sel * 2.0) + (r_map["1W %"] * 1.2) + ((rsi_14 - 50) * 0.3), 2, 98))
     st_prev = float(np.clip(50 + (r_map["3M %"] * 0.9) + (r_map["1Y %"] * 0.3), 2, 98))
 
-    # একজন সাধারণ ইউজারের বোঝার জন্য সহজ বাংলায় স্টক সিগন্যাল
-    if above_50dma and r_sel > 2.0 and dd_52w > -12:
-        action_sig = "🚀 স্ট্রং ব্রেকআউট (Strong Leader)"
-    elif dd_52w < -15 and (r_map["1W %"] > 1.0 or r_map["1M %"] > 2.0):
+    if above_50dma and r_sel > 2.0 and rvol_num >= 1.25:
+        action_sig = "🔥 ভলিউম ব্রেকআউট (Vol Breakout)"
+    elif above_50dma and r_sel > 1.5 and dd_52w > -12:
+        action_sig = "🚀 স্ট্রং লিডার (Strong Leader)"
+    elif dd_52w < -14 and (r_map["1W %"] > 1.0 or r_map["1M %"] > 2.0):
         action_sig = "🔄 নিচ থেকে ঘুরছে (Turnaround)"
-    elif dd_52w < -25:
-        action_sig = "💎 ডিপ ভ্যালু জোন (Deep Value)"
+    elif dd_52w < -25 or rsi_14 < 35:
+        action_sig = "💎 ওভারসোল্ড / ভ্যালু (Deep Value)"
     elif above_50dma:
         action_sig = "🟢 পজিটিভ ট্রেন্ড (Positive)"
     else:
@@ -703,6 +864,9 @@ def compute_stock_row(t, s_name_label):
         "Sector": s_name_label,
         "Signal (সিগন্যাল)": action_sig,
         "CMP (₹)": curr_p,
+        "RSI (14)": rsi_14,
+        "Volume Action": rvol_label,
+        "RVOL_Num": rvol_num,
         "Meter Score": round(st_score, 1),
         "Prev Meter": round(st_prev, 1),
         **r_map,
@@ -729,6 +893,7 @@ for s_name, tickers in sectors.items():
     st_df = pd.DataFrame(st_rows)
     sec_rets = {tf: round(float(st_df[f"{tf} %"].mean()), 2) for tf in ["1D", "1W", "1M", "3M", "6M", "1Y", "5Y"]}
     avg_dd_52w = round(float(st_df["From 52W High %"].mean()), 2)
+    avg_rsi = round(float(st_df["RSI (14)"].mean()), 1)
 
     sel_ret = sec_rets[tf_option]
     alpha_sel = sel_ret - nifty_curr_val
@@ -770,6 +935,7 @@ for s_name, tickers in sectors.items():
         "Curr_Meter": round(curr_meter, 1),
         "Prev_Meter": round(prev_meter, 1),
         "Meter_Diff": meter_diff,
+        "Avg RSI": avg_rsi,
         "Turnaround_Score": turnaround_score,
         "Cooling_Score": cooling_score,
         "Is_Turnaround": is_turnaround,
@@ -792,9 +958,36 @@ for t in NIFTY_50_TICKERS:
 nifty50_df_global = pd.DataFrame(nifty50_rows)
 
 # ==============================================================================
-# ৮. স্ক্রলিং টিকার বার (প্লাসে থাকলে উজ্জ্বল সবুজ এবং মাইনাসে থাকলে উজ্জ্বল লাল!)
+# ৯. ইনস্ট্যান্ট স্টক সার্চ প্যানেল (যদি ইউজার ৫ নম্বর বক্সে কোনো শেয়ার সিলেক্ট করে)
 # ==============================================================================
-# যাতে ইউজার একসাথে সবুজ (উপরে যাওয়া) এবং লাল (নিচে নামা) দুই ধরনের সেক্টরই স্ক্রল হতে দেখে, তাই ১টি টপ গেইনার ও ১টি টপ লুজার পাশাপাশি সাজানো হয়েছে
+if not instant_stock_search.startswith("শেয়ার"):
+    st_sym_lookup = instant_stock_search + ".NS"
+    if st_sym_lookup in all_stocks_master:
+        st_obj = all_stocks_master[st_sym_lookup]
+        st.markdown('<div class="focus-drawer">', unsafe_allow_html=True)
+        sh_c1, sh_c2 = st.columns([5, 1])
+        with sh_c1:
+            st.markdown(
+                f"### ⚡ কুইক স্টক প্রোফাইল: **{st_obj['Stock']}** ({st_obj['Sector']}) — `{st_obj['Signal (সিগন্যাল)']}`"
+            )
+        with sh_c2:
+            st.markdown(
+                f'<a class="action-btn" href="https://in.tradingview.com/chart/?symbol=NSE:{st_obj["Stock"]}" target="_blank">📈 TradingView</a> '
+                f'<a class="action-btn" href="https://www.screener.in/company/{st_obj["Stock"]}/" target="_blank">📊 Screener</a>',
+                unsafe_allow_html=True,
+            )
+        qm1, qm2, qm3, qm4, qm5, qm6 = st.columns(6)
+        qm1.metric("বর্তমান দাম (CMP)", f"₹{st_obj['CMP (₹)']}")
+        qm2.metric(f"রিটার্ন ({tf_option})", f"{st_obj[ret_key]:+.2f}%")
+        qm3.metric("RSI (14)", f"{st_obj['RSI (14)']}", "Overbought >70 | Oversold <35")
+        qm4.metric("Volume Action", st_obj["Volume Action"])
+        qm5.metric("52W High থেকে দূরত্ব", f"{st_obj['From 52W High %']:+.2f}%")
+        qm6.metric("50 DMA ট্রেন্ড", st_obj["50 DMA Trend"])
+        st.markdown("</div>", unsafe_allow_html=True)
+
+# ==============================================================================
+# ১০. ১০০% ক্লিকেবল স্ক্রলিং সেক্টর বার (ক্লিক করলেই সেই সেক্টরের সব শেয়ার ও চার্ট খুলে যাবে!)
+# ==============================================================================
 pos_secs = sorted([s for s in sector_master if s[ret_key] >= 0], key=lambda x: x[ret_key], reverse=True)
 neg_secs = sorted([s for s in sector_master if s[ret_key] < 0], key=lambda x: x[ret_key], reverse=False)
 
@@ -809,22 +1002,126 @@ for i in range(max_len):
 ticker_items = []
 for s in mixed_ticker_secs:
     r_val = s[ret_key]
+    sec_encoded = quote(s["Sector"])
     if r_val >= 0:
         ticker_items.append(
-            f'<span class="ticker-chip-up">🟢 {s["Sector"]}: ▲ {r_val:+.2f}%</span>'
+            f'<a class="ticker-chip-up" href="?focus_sec={sec_encoded}" target="_self" title="ক্লিক করে {s[\'Sector\']}-এর সব শেয়ার ও চার্ট দেখুন">'
+            f'🟢 {s["Sector"]}: ▲ {r_val:+.2f}% 🔍</a>'
         )
     else:
         ticker_items.append(
-            f'<span class="ticker-chip-down">🔴 {s["Sector"]}: ▼ {r_val:+.2f}%</span>'
+            f'<a class="ticker-chip-down" href="?focus_sec={sec_encoded}" target="_self" title="ক্লিক করে {s[\'Sector\']}-এর সব শেয়ার ও চার্ট দেখুন">'
+            f'🔴 {s["Sector"]}: ▼ {r_val:+.2f}% 🔍</a>'
         )
 
+st.caption("💡 **টিপস:** নিচের চলমান বারের ওপর মাউস রাখলে সেটি থেমে যাবে এবং **যেকোনো সেক্টরের ওপর ক্লিক করলেই** সাথে সাথে নিচে সেই সেক্টরের সব শেয়ার ও চার্ট খুলে যাবে:")
 st.markdown(
-    f'<div class="ticker-wrap" title="মাউস রাখলে স্ক্রলিং থামবে"><div class="ticker-move">{"".join(ticker_items * 2)}</div></div>',
+    f'<div class="ticker-wrap"><div class="ticker-move">{"".join(ticker_items * 2)}</div></div>',
     unsafe_allow_html=True,
 )
 
+# যদি ইউজার চলমান টিকার বারে কোনো সেক্টরের ওপর ক্লিক করে, তবে সাথে সাথে তার সম্পূর্ণ ডিটেইলস প্যানেল এখানে খুলবে!
+clicked_sec_raw = None
+try:
+    q_val = st.query_params.get("focus_sec", None)
+    if isinstance(q_val, list):
+        clicked_sec_raw = unquote(q_val[0]) if q_val else None
+    elif q_val:
+        clicked_sec_raw = unquote(q_val)
+except Exception:
+    clicked_sec_raw = None
+
+if clicked_sec_raw:
+    clicked_sec_obj = next((s for s in sector_master if s["Sector"] == clicked_sec_raw), None)
+    if clicked_sec_obj is not None:
+        st.markdown('<div class="focus-drawer">', unsafe_allow_html=True)
+        dr_c1, dr_c2 = st.columns([4.8, 1.2])
+        with dr_c1:
+            s_r_now = clicked_sec_obj[ret_key]
+            st.markdown(
+                f"### 🎯 নির্বাচিত সেক্টর ডিপ-ডাইভ: **{clicked_sec_obj['Sector']}** "
+                f"({tf_option}: `{s_r_now:+.2f}%` | মিটার স্কোর: `{clicked_sec_obj['Curr_Meter']}/100` | গড় RSI: `{clicked_sec_obj['Avg RSI']}`)"
+            )
+            st.markdown(f"**রোটেশন স্ট্যাটাস:** {clicked_sec_obj['Meter_Status']}")
+        with dr_c2:
+            if st.button("✖ এই সেক্টর ভিউ বন্ধ করুন", key="btn_close_ticker_sec"):
+                try:
+                    st.query_params.clear()
+                except Exception:
+                    pass
+                st.rerun()
+
+        c_st_df = clicked_sec_obj["stocks_df"].sort_values(by=ret_key, ascending=False).reset_index(drop=True)
+        c_up = int((c_st_df[ret_key] >= 0).sum())
+        c_dn = len(c_st_df) - c_up
+        st.markdown(
+            f"📊 **সেক্টর ব্রেডথ ({tf_option}):** মোট **{len(c_st_df)}টি শেয়ারের** মধ্যে "
+            f"<span style='color:#00e676; font-weight:800;'>🟢 {c_up}টি শেয়ার উপরে মুভ করছে</span> এবং "
+            f"<span style='color:#ff5252; font-weight:800;'>🔴 {c_dn}টি শেয়ার ডাউন আছে</span>।",
+            unsafe_allow_html=True,
+        )
+
+        # চার্ট ও অ্যানালগ মিটার
+        sub_tk = full_df.tail(tf_days_map[tf_option]).copy()
+        norm_tk = pd.DataFrame(
+            {c: (sub_tk[c] / sub_tk[c].dropna().iloc[0]) * 100 for c in clicked_sec_obj["valid_tickers"] if len(sub_tk[c].dropna()) > 0},
+            index=sub_tk.index,
+        )
+
+        tk_col1, tk_col2 = st.columns([1, 2.1])
+        with tk_col1:
+            fig_tk_g = make_analog_gauge(
+                clicked_sec_obj["Curr_Meter"],
+                clicked_sec_obj["Prev_Meter"],
+                f"Prev: {clicked_sec_obj['Prev_Meter']} ➔ Now: {clicked_sec_obj['Curr_Meter']}",
+                height_px=270,
+            )
+            st.plotly_chart(fig_tk_g, use_container_width=True, theme=None, key="ticker_clicked_gauge")
+        with tk_col2:
+            fig_tk_lines = go.Figure()
+            for t_c in norm_tk.columns:
+                sn = t_c.replace(".NS", "")
+                sr = all_stocks_master[t_c][ret_key]
+                fig_tk_lines.add_trace(
+                    go.Scatter(x=norm_tk.index, y=norm_tk[t_c], name=f"{sn} ({sr:+.1f}%)", mode="lines", line=dict(width=2.3))
+                )
+            fig_tk_lines.update_layout(
+                title=f"{clicked_sec_obj['Sector']} — কোন শেয়ারগুলো মুভ করছে তার লাইভ তুলনামূলক চার্ট ({tf_option})",
+                paper_bgcolor=chart_bg,
+                plot_bgcolor=chart_bg,
+                font=dict(color=text_color, size=11),
+                height=270,
+                hovermode="x unified",
+                margin=dict(t=35, b=12, l=10, r=10),
+                xaxis=dict(gridcolor=grid_col),
+                yaxis=dict(gridcolor=grid_col, title="Base 100"),
+            )
+            st.plotly_chart(fig_tk_lines, use_container_width=True, theme=None, key="ticker_clicked_chart")
+
+        # পূর্ণাঙ্গ শেয়ার ডিটেইলস টেবিল
+        tk_disp_cols = [
+            "Stock", "Signal (সিগন্যাল)", "CMP (₹)", "RSI (14)", "Volume Action",
+            "Meter Score", "1D %", "1W %", "1M %", "3M %", "1Y %", "From 52W High %", "50 DMA Trend"
+        ]
+        st.dataframe(
+            style_colored_table(c_st_df[tk_disp_cols], ret_key),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        st.markdown("##### 🔗 সরাসরি চার্ট (TradingView) ও ফান্ডামেন্টাল (Screener.in) খুলুন:")
+        tk_btns = "".join(
+            [
+                f'<a class="action-btn" href="https://in.tradingview.com/chart/?symbol=NSE:{r["Stock"]}" target="_blank">📈 {r["Stock"]} (TV)</a>'
+                f'<a class="action-btn" href="https://www.screener.in/company/{r["Stock"]}/" target="_blank">📊 Screener</a> &nbsp;'
+                for _, r in c_st_df.iterrows()
+            ]
+        )
+        st.markdown(tk_btns, unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
 # ==============================================================================
-# ৯. ক্লিকেবল ৪টি মেইন KPI কার্ড (লেখা কেটে যাওয়া পুরোপুরি ফিক্সড)
+# ১১. ক্লিকেবল ৪টি মেইন KPI কার্ড
 # ==============================================================================
 all_st_df_global = pd.DataFrame(list(all_stocks_master.values()))
 adv_count = int((all_st_df_global[ret_key] >= 0).sum())
@@ -905,14 +1202,17 @@ with k4:
 # ক্লিকেবল KPI প্যানেল
 active_p = st.session_state["active_kpi_panel"]
 if active_p is not None:
-    st.markdown('<div class="pro-card">', unsafe_allow_html=True)
+    st.markdown('<div class="focus-drawer">', unsafe_allow_html=True)
     top_bar_c1, top_bar_c2 = st.columns([5, 1])
     with top_bar_c2:
         if st.button("✖ লিস্ট বন্ধ করুন", key="close_kpi_panel"):
             st.session_state["active_kpi_panel"] = None
             st.rerun()
 
-    disp_cols_kpi = ["Stock", "Sector", "Signal (সিগন্যাল)", "CMP (₹)", "1D %", "1W %", "1M %", "3M %", "1Y %", "From 52W High %"]
+    disp_cols_kpi = [
+        "Stock", "Sector", "Signal (সিগন্যাল)", "CMP (₹)", "RSI (14)", "Volume Action",
+        "1D %", "1W %", "1M %", "3M %", "1Y %", "From 52W High %"
+    ]
 
     if active_p == "nifty":
         n50_up = int((nifty50_df_global[ret_key] >= 0).sum())
@@ -953,7 +1253,7 @@ if active_p is not None:
             )
 
         t_df = target_sec["stocks_df"].sort_values(by=ret_key, ascending=False).reset_index(drop=True)
-        lc1, lc2 = st.columns([1.3, 1.7])
+        lc1, lc2 = st.columns([1.25, 1.75])
         with lc1:
             sub_k = full_df.tail(tf_days_map[tf_option]).copy()
             norm_k = pd.DataFrame(
@@ -978,7 +1278,7 @@ if active_p is not None:
             )
             st.plotly_chart(fig_k, use_container_width=True, theme=None, key=f"kpi_chart_{active_p}_{tf_option}")
         with lc2:
-            cols_sec_show = ["Stock", "Signal (সিগন্যাল)", "CMP (₹)", "Meter Score", "1D %", "1W %", "1M %", "3M %", "1Y %", "From 52W High %"]
+            cols_sec_show = ["Stock", "Signal (সিগন্যাল)", "CMP (₹)", "RSI (14)", "Volume Action", "1D %", "1W %", "1M %", "1Y %", "From 52W High %"]
             st.dataframe(style_colored_table(t_df[cols_sec_show], ret_key), use_container_width=True, height=310, hide_index=True)
             btn_links = "".join(
                 [
@@ -992,7 +1292,7 @@ if active_p is not None:
     st.markdown("</div>", unsafe_allow_html=True)
 
 # ==============================================================================
-# ১০. গ্লোবাল ফিল্টারিং ও সর্টিং লজিক
+# ১২. গ্লোবাল ফিল্টারিং ও সর্টিং লজিক
 # ==============================================================================
 if not quick_sec_jump.startswith("সবগুলো"):
     filtered_sectors = [s for s in sector_master if s["Sector"] == quick_sec_jump]
@@ -1028,13 +1328,13 @@ elif "Meter: Low to High" in sort_option:
     filtered_sectors = sorted(filtered_sectors, key=lambda x: x["Curr_Meter"], reverse=False)
 
 # ==============================================================================
-# ১১. ৪টি পরিষ্কার ও ইউজার-ফ্রেন্ডলি মেইন ট্যাব (৫ নম্বর অপ্রয়োজনীয় ট্রি-ম্যাপ ট্যাব বাদ দেওয়া হয়েছে)
+# ১৩. ৪টি মেইন প্রো ট্যাব
 # ==============================================================================
 tab1, tab2, tab3, tab4 = st.tabs([
     "🧭 ১. সেক্টর চার্ট, মিটার ও শেয়ার তালিকা",
-    "🔥 ২. সেরা শেয়ার স্ক্যানার (Breakout & Value)",
-    "📊 ৩. সব সেক্টরের তুলনামূলক টেবিল",
-    "📈 ৪. শেয়ারের নিজস্ব চার্ট ও মুভিং অ্যাভারেজ",
+    "🔥 ২. ইনস্টিটিউশনাল স্ক্যানার (Volume, RSI & Breakout)",
+    "📊 ৩. সব সেক্টরের তুলনামূলক টেবিল ও র‍্যাঙ্কিং",
+    "📈 ৪. শেয়ারের নিজস্ব চার্ট, RSI ও মুভিং অ্যাভারেজ",
 ])
 
 # ==============================================================================
@@ -1084,6 +1384,7 @@ with tab1:
                         <b>Alpha vs Nifty:</b> {alpha_val:+.2f}% &nbsp;|&nbsp;
                         <span style="color:#00e676; font-weight:700;">🟢 উপরে: {up_cnt}টি</span> &nbsp;|&nbsp;
                         <span style="color:#ff5252; font-weight:700;">🔴 নিচে: {dn_cnt}টি</span> &nbsp;|&nbsp;
+                        <b>Avg RSI:</b> {sec['Avg RSI']} &nbsp;|&nbsp;
                         🧭 <b>Meter:</b> {sec['Curr_Meter']}/100
                     </div>
                 </div>
@@ -1151,7 +1452,7 @@ with tab1:
 
             is_expanded_default = len(filtered_sectors) == 1
             with st.expander(
-                f"🔍 {s_name} ওপেন করুন — সব শেয়ারের সিগন্যাল, চার্ট ও TradingView লিংক ({len(st_df)}টি শেয়ার)",
+                f"🔍 {s_name} ওপেন করুন — সব শেয়ারের সিগন্যাল, RSI, ভলিউম ও চার্ট ({len(st_df)}টি শেয়ার)",
                 expanded=is_expanded_default,
             ):
                 ex_c1, ex_c2 = st.columns([1, 2])
@@ -1192,7 +1493,8 @@ with tab1:
                     st.plotly_chart(fig_st, use_container_width=True, theme=None, key=f"st_cmp_{unique_key_suffix}")
 
                 disp_cols = [
-                    "Stock", "Signal (সিগন্যাল)", "CMP (₹)", "Meter Score", "1D %", "1W %", "1M %", "3M %", "1Y %", "From 52W High %"
+                    "Stock", "Signal (সিগন্যাল)", "CMP (₹)", "RSI (14)", "Volume Action",
+                    "Meter Score", "1D %", "1W %", "1M %", "3M %", "1Y %", "From 52W High %"
                 ]
                 st.dataframe(
                     style_colored_table(st_df[disp_cols], ret_key),
@@ -1213,18 +1515,29 @@ with tab1:
             st.markdown("<br>", unsafe_allow_html=True)
 
 # ==============================================================================
-# TAB 2: সেরা শেয়ার স্ক্যানার (Breakout, Turnaround & Value)
+# TAB 2: ইনস্টিটিউশনাল স্ক্যানার (Volume Breakout, Turnaround, RSI Oversold & Value)
 # ==============================================================================
 with tab2:
-    st.subheader("🔥 অটোমেটেড শেয়ার স্ক্যানার (শর্ট-টার্ম ব্রেকআউট ও লং-টার্ম ভ্যালু)")
+    st.subheader("🔥 ইনস্টিটিউশনাল শেয়ার স্ক্যানার (Volume Spike, RSI & Breakout)")
     cols_scanner = []
-    for c_item in ["Stock", "Sector", "Signal (সিগন্যাল)", "CMP (₹)", ret_key, "1W %", "1M %", "From 52W High %", "Meter Score"]:
+    for c_item in ["Stock", "Sector", "Signal (সিগন্যাল)", "CMP (₹)", "RSI (14)", "Volume Action", ret_key, "1W %", "From 52W High %"]:
         if c_item not in cols_scanner:
             cols_scanner.append(c_item)
 
     sc_col1, sc_col2 = st.columns(2)
     with sc_col1:
-        st.markdown(f"#### 🚀 ১. শর্ট-টার্ম ব্রেকআউট শেয়ার (Top Momentum - {tf_option})")
+        st.markdown(f"#### 🔥 ১. ইনস্টিটিউশনাল ভলিউম ব্রেকআউট (High Volume Buying - {tf_option})")
+        st.caption("যে শেয়ারগুলোতে সাধারণ সময়ের চেয়ে অনেক বেশি ভলিউমে কেনাবেচা হচ্ছে এবং দাম বাড়ছে:")
+        vol_brk_df = (
+            all_st_df_global[all_st_df_global["1D %"] > 0]
+            .sort_values(by=["RVOL_Num", ret_key], ascending=[False, False])
+            .head(15)
+            .reset_index(drop=True)
+        )
+        st.dataframe(style_colored_table(vol_brk_df[cols_scanner], ret_key), use_container_width=True, hide_index=True)
+
+    with sc_col2:
+        st.markdown(f"#### 🚀 ২. শর্ট-টার্ম মোমেন্টাম লিডার (Top Breakouts - {tf_option})")
         st.caption("যে শেয়ারগুলো 50-DMA এর উপরে আছে এবং সবচেয়ে দ্রুত ছুটছে:")
         brk_df = (
             all_st_df_global[all_st_df_global["Above_50"]]
@@ -1234,8 +1547,10 @@ with tab2:
         )
         st.dataframe(style_colored_table(brk_df[cols_scanner], ret_key), use_container_width=True, hide_index=True)
 
-    with sc_col2:
-        st.markdown("#### 🔄 ২. নিচ থেকে ঘুরে দাঁড়ানো শেয়ার (Turnaround Gems)")
+    st.markdown("---")
+    sc_col3, sc_col4 = st.columns(2)
+    with sc_col3:
+        st.markdown("#### 🔄 ৩. নিচ থেকে ঘুরে দাঁড়ানো শেয়ার (Turnaround Gems)")
         st.caption("যারা ৫২-সপ্তাহের হাই থেকে অনেক নিচে ছিল, কিন্তু এই সপ্তাহে আবার বাড়তে শুরু করেছে:")
         turn_df = (
             all_st_df_global[(all_st_df_global["From 52W High %"] < -10) & (all_st_df_global["1W %"] > 0)]
@@ -1245,34 +1560,19 @@ with tab2:
         )
         st.dataframe(style_colored_table(turn_df[cols_scanner], "1W %"), use_container_width=True, hide_index=True)
 
-    st.markdown("---")
-    sc_col3, sc_col4 = st.columns(2)
-    with sc_col3:
-        st.markdown("#### 💎 ৩. লং-টার্ম ভ্যালু শেয়ার (Deep Value / Beaten Down)")
-        st.caption("৫২-সপ্তাহের হাই থেকে সবচেয়ে বেশি ডিসকাউন্টে থাকা শেয়ার:")
+    with sc_col4:
+        st.markdown("#### 💎 ৪. লং-টার্ম ভ্যালু ও লো-RSI শেয়ার (Oversold / Deep Value)")
+        st.caption("৫২-সপ্তাহের হাই থেকে সবচেয়ে বেশি ডিসকাউন্টে থাকা এবং কম RSI যুক্ত শেয়ার:")
         val_df = all_st_df_global.sort_values(by="From 52W High %", ascending=True).head(15).reset_index(drop=True)
         st.dataframe(style_colored_table(val_df[cols_scanner], "From 52W High %"), use_container_width=True, hide_index=True)
 
-    with sc_col4:
-        st.markdown("#### 📥 ৪. সরাসরি চার্ট লঞ্চার ও এক্সেল ডাউনলোড")
-        quick_pick = st.selectbox(
-            "যেকোনো শেয়ার সিলেক্ট করে সরাসরি চার্ট খুলুন:",
-            sorted(all_st_df_global["Stock"].unique()),
-            key="sc_quick_pick",
-        )
-        if quick_pick:
-            st.markdown(
-                f'<a class="action-btn" href="https://in.tradingview.com/chart/?symbol=NSE:{quick_pick}" target="_blank">📈 TradingView-তে {quick_pick} এর চার্ট খুলুন</a> '
-                f'<a class="action-btn" href="https://www.screener.in/company/{quick_pick}/" target="_blank">📊 Screener.in-এ ফান্ডামেন্টাল দেখুন</a>',
-                unsafe_allow_html=True,
-            )
-        csv_bytes = all_st_df_global.to_csv(index=False).encode("utf-8")
-        st.download_button(
-            label="📥 সব শেয়ারের সম্পূর্ণ ডেটা Excel/CSV হিসেবে ডাউনলোড করুন",
-            data=csv_bytes,
-            file_name="AlphaPulse_Full_Screener.csv",
-            mime="text/csv",
-        )
+    csv_bytes = all_st_df_global.to_csv(index=False).encode("utf-8")
+    st.download_button(
+        label="📥 সব শেয়ারের সম্পূর্ণ ডেটা (RSI ও Volume সহ) Excel/CSV হিসেবে ডাউনলোড করুন",
+        data=csv_bytes,
+        file_name="AlphaPulse_Full_Screener.csv",
+        mime="text/csv",
+    )
 
 # ==============================================================================
 # TAB 3: সব সেক্টরের তুলনামূলক টেবিল ও বার চার্ট
@@ -1280,7 +1580,6 @@ with tab2:
 with tab3:
     st.subheader(f"📊 ৩২টি সেক্টরের এক নজরে র‍্যাঙ্কিং ও তুলনামূলক টেবিল ({tf_option})")
 
-    # ভিজ্যুয়াল বার চার্ট (যেটা এক নজরে বোঝা যায় কোন সেক্টর প্লাসে ও কোনটা মাইনাসে)
     bar_secs = sorted(sector_master, key=lambda x: x[ret_key], reverse=True)
     bar_names = [s["Sector"] for s in bar_secs]
     bar_vals = [s[ret_key] for s in bar_secs]
@@ -1308,7 +1607,7 @@ with tab3:
     st.plotly_chart(fig_bar, use_container_width=True, theme=None, key=f"bar_rank_{tf_option}")
 
     mat_df = pd.DataFrame(filtered_sectors)[
-        ["Sector", "Stage", "Curr_Meter", "Prev_Meter", "Meter_Diff", "1D %", "1W %", "1M %", "3M %", "6M %", "1Y %", "5Y %"]
+        ["Sector", "Stage", "Curr_Meter", "Prev_Meter", "Meter_Diff", "Avg RSI", "1D %", "1W %", "1M %", "3M %", "6M %", "1Y %", "5Y %"]
     ].rename(
         columns={
             "Curr_Meter": "Now Meter (0-100)",
@@ -1325,10 +1624,10 @@ with tab3:
     )
 
 # ==============================================================================
-# TAB 4: যেকোনো শেয়ারের নিজস্ব চার্ট, 20/50/200 DMA এবং স্টকের অ্যানালগ মিটার
+# TAB 4: যেকোনো শেয়ারের নিজস্ব চার্ট, RSI, ভলিউম এবং স্টকের অ্যানালগ মিটার
 # ==============================================================================
 with tab4:
-    st.subheader("📈 সিঙ্গেল স্টক চার্ট, মুভিং অ্যাভারেজ (DMA) ও মোমেন্টাম মিটার")
+    st.subheader("📈 সিঙ্গেল স্টক চার্ট, RSI, ভলিউম এবং মুভিং অ্যাভারেজ (DMA)")
 
     sc1, sc2, sc3 = st.columns(3)
     with sc1:
@@ -1345,9 +1644,9 @@ with tab4:
 
         m1, m2, m3, m4, m5, m6 = st.columns(6)
         m1.metric("বর্তমান দাম (CMP)", f"₹{s_info.get('CMP (₹)', 0)}")
-        m2.metric("1W Return", f"{s_info.get('1W %', 0):+.2f}%")
-        m3.metric("1M Return", f"{s_info.get('1M %', 0):+.2f}%")
-        m4.metric("1Y Return", f"{s_info.get('1Y %', 0):+.2f}%")
+        m2.metric("RSI (14)", f"{s_info.get('RSI (14)', 50)}")
+        m3.metric("Volume Action", s_info.get("Volume Action", ""))
+        m4.metric("1M Return", f"{s_info.get('1M %', 0):+.2f}%")
         m5.metric("52W High থেকে দূরত্ব", f"{s_info.get('From 52W High %', 0):+.2f}%")
         m6.metric("সিগন্যাল", s_info.get("Signal (সিগন্যাল)", ""))
 
