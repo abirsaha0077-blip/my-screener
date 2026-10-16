@@ -121,7 +121,7 @@ benchmark = "^NSEI"
 all_tickers = sorted(list(set([benchmark] + [t for s in sectors.values() for t in s])))
 
 # ==============================================================================
-# ৩. সাইডবার মেনু ও অটো-ক্লোজ লজিক
+# ৩. সাইডবার মেনু
 # ==============================================================================
 with st.sidebar:
     st.markdown("### 🎛️ থিম ও ডিসপ্লে সেটিংস")
@@ -146,16 +146,16 @@ with st.sidebar:
     )
 
 components.html(
-    f"""
+    """
     <script>
-    (function() {{
+    (function() {
         const doc = window.parent.document;
         let closeTimer = null;
 
-        function collapseSidebarNow() {{
+        function collapseSidebarNow() {
             if (doc.querySelector('div[data-baseweb="popover"]')) return;
             const sidebar = doc.querySelector('section[data-testid="stSidebar"]');
-            if (sidebar && sidebar.getAttribute('aria-expanded') === 'true') {{
+            if (sidebar && sidebar.getAttribute('aria-expanded') === 'true') {
                 const closeBtn =
                     doc.querySelector('[data-testid="stSidebarCollapseButton"] button') ||
                     doc.querySelector('[data-testid="stSidebarHeader"] button') ||
@@ -163,24 +163,24 @@ components.html(
                     sidebar.querySelector('button[kind="header"]') ||
                     sidebar.querySelector('button');
                 if (closeBtn) closeBtn.click();
-            }}
+            }
         }
 
-        function attachAutoClose() {{
+        function attachAutoClose() {
             const sidebar = doc.querySelector('section[data-testid="stSidebar"]');
-            if (sidebar && !sidebar.dataset.boundAutoClose) {{
+            if (sidebar && !sidebar.dataset.boundAutoClose) {
                 sidebar.dataset.boundAutoClose = "true";
-                sidebar.addEventListener('mouseleave', () => {{
+                sidebar.addEventListener('mouseleave', () => {
                     clearTimeout(closeTimer);
-                    closeTimer = setTimeout(collapseSidebarNow, {auto_close_sec * 1000});
-                }});
-                sidebar.addEventListener('mouseenter', () => {{
+                    closeTimer = setTimeout(collapseSidebarNow, 3000);
+                });
+                sidebar.addEventListener('mouseenter', () => {
                     clearTimeout(closeTimer);
-                }});
-            }}
+                });
+            }
         }
         setInterval(attachAutoClose, 700);
-    }})();
+    })();
     </script>
     """,
     height=1,
