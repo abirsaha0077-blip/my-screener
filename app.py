@@ -743,7 +743,8 @@ def load_full_market_data():
     stocks_df["Sec_1W"] = stocks_df["Sector"].map(lambda s: sec_map.get(s, {}).get("1W", 0.0))
     stocks_df["Sec_Bull_Turn"] = stocks_df["Sector"].map(lambda s: sec_map.get(s, {}).get("Sec_Bull_Turn", False))
     stocks_df["Sec_Bear_Roll"] = stocks_df["Sector"].map(lambda s: sec_map.get(s, {}).get("Sec_Bear_Roll", False))
-    return stocks_df, sectors_df@st.cache_data(ttl=180, show_spinner=False)
+    return stocks_df, sectors_df
+@st.cache_data(ttl=180, show_spinner=False)
 def run_chartink_15m_scanner(stocks_df: pd.DataFrame):
     if stocks_df.empty:
         return pd.DataFrame(), pd.DataFrame()
