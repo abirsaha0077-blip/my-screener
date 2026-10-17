@@ -66,7 +66,7 @@ DEFAULT_SECTOR = "সবগুলো সেক্টর (Show All 32)"
 DEFAULT_STOCK = "শেয়ার টাইপ করুন..."
 
 # ==============================================================================
-# ৩. সেশন স্টেট ও ব্যাক/ফরওয়ার্ড/হোম নেভিগেশন হিস্ট্রি ইঞ্জিন
+# ৩. সেশন স্টেট ও কুয়েরি প্যারামিটার হ্যান্ডলিং
 # ==============================================================================
 if "selected_sector" not in st.session_state:
     st.session_state.selected_sector = DEFAULT_SECTOR
@@ -74,41 +74,15 @@ if "selected_stock" not in st.session_state:
     st.session_state.selected_stock = DEFAULT_STOCK
 if "kpi_panel" not in st.session_state:
     st.session_state.kpi_panel = None
-if "nav_history" not in st.session_state:
-    st.session_state.nav_history = [{"sec": DEFAULT_SECTOR, "stk": DEFAULT_STOCK, "kpi": None}]
-if "nav_idx" not in st.session_state:
-    st.session_state.nav_idx = 0
 if "last_alerted_stocks" not in st.session_state:
     st.session_state.last_alerted_stocks = ""
 
-def push_nav_state(sec, stk, kpi):
-    snap = {"sec": sec, "stk": stk, "kpi": kpi}
-    hist = st.session_state.nav_history[: st.session_state.nav_idx + 1]
-    if not hist or hist[-1] != snap:
-        hist.append(snap)
-        st.session_state.nav_history = hist
-        st.session_state.nav_idx = len(hist) - 1
-
 qp = st.query_params
 if "nav_action" in qp:
-    act = qp["nav_action"]
-    if act == "home":
+    if qp["nav_action"] == "home":
         st.session_state.selected_sector = DEFAULT_SECTOR
         st.session_state.selected_stock = DEFAULT_STOCK
         st.session_state.kpi_panel = None
-        push_nav_state(DEFAULT_SECTOR, DEFAULT_STOCK, None)
-    elif act == "back" and st.session_state.nav_idx > 0:
-        st.session_state.nav_idx -= 1
-        snap = st.session_state.nav_history[st.session_state.nav_idx]
-        st.session_state.selected_sector = snap["sec"]
-        st.session_state.selected_stock = snap["stk"]
-        st.session_state.kpi_panel = snap["kpi"]
-    elif act == "forward" and st.session_state.nav_idx < len(st.session_state.nav_history) - 1:
-        st.session_state.nav_idx += 1
-        snap = st.session_state.nav_history[st.session_state.nav_idx]
-        st.session_state.selected_sector = snap["sec"]
-        st.session_state.selected_stock = snap["stk"]
-        st.session_state.kpi_panel = snap["kpi"]
     st.query_params.clear()
 
 if "focus_stock" in qp:
@@ -116,7 +90,6 @@ if "focus_stock" in qp:
     full_t = clicked_sym if clicked_sym.endswith(".NS") else f"{clicked_sym}.NS"
     if full_t in ALL_TICKERS:
         st.session_state.selected_stock = full_t
-        push_nav_state(st.session_state.selected_sector, full_t, st.session_state.kpi_panel)
     st.query_params.clear()
 
 if "focus_sec" in qp:
@@ -124,60 +97,72 @@ if "focus_sec" in qp:
     if clicked_sec in SECTOR_STOCKS:
         st.session_state.selected_sector = clicked_sec
         st.session_state.kpi_panel = "custom_sector"
-        push_nav_state(clicked_sec, st.session_state.selected_stock, "custom_sector")
     st.query_params.clear()
 
 # ==============================================================================
-# ৪. টপ হেডার বার (ক্লিকেবল লোগো = মেইন পেজ রিসেট + নেভিগেশন + থিম + মিটার)
+# ৪. টপ হেডার বার (ব্যাক/হোম বাটন ছাড়া ক্লিন হেডার)
 # ==============================================================================
 st.markdown('<div id="top-anchor"></div>', unsafe_allow_html=True)
 
-top_c1, top_c2, top_c3, top_c4, top_c5 = st.columns([4.7, 1.4, 1.6, 1.2, 1.1])
+top_c1, top_c2, top_c3, top_c4 = st.columns([5.8, 1.9, 1.2, 1.1])
 with top_c1:
     st.markdown(
-        '<a href="?nav_action=home" target="_self" class="brand-logo-link" title="ক্লিক করলে সব ফিল্টার রিসেট হয়ে একদম মেইন পেজে চলে আসবে">'
+        '<a href="?nav_action=home" target="_self" class="brand-logo-link" title="ক্লিক করলে সব ফিল্টার রিসেট হয়ে মেইন পেজে চলে আসবে">'
         '<span class="logo-badge">🧭</span>'
         '<span class="brand-title">AlphaPulse Pro — Intraday, Swing & Sector Terminal</span>'
         '</a>',
         unsafe_allow_html=True
     )
 with top_c2:
-    can_back = st.session_state.nav_idx > 0
-    can_fwd = st.session_state.nav_idx < len(st.session_state.nav_history) - 1
-    b_cls = "top-nav-btn" if can_back else "top-nav-btn disabled-nav"
-    f_cls = "top-nav-btn" if can_fwd else "top-nav-btn disabled-nav"
-    st.markdown(
-        f'<div style="display:flex;gap:5px;padding-top:4px;">'
-        f'<a href="?nav_action=back" target="_self" class="{b_cls}" title="আগের ভিউতে ফিরে যান (Back)">⬅️ ব্যাক</a>'
-        f'<a href="?nav_action=home" target="_self" class="top-nav-btn" title="মেইন পেজে যান (Home)">🏠 হোম</a>'
-        f'<a href="?nav_action=forward" target="_self" class="{f_cls}" title="পরের ভিউতে যান (Forward)">➡️</a>'
-        f'</div>',
-        unsafe_allow_html=True
-    )
-with top_c3:
     theme_mode = st.selectbox(
         "থিম",
         ["🌙 Pro Dark (ডার্ক থিম)", "🌌 Cyber Neon (নিয়ন থিম)", "☀️ Clean Light (লাইট থিম)"],
         index=0,
         label_visibility="collapsed"
     )
-with top_c4:
+with top_c3:
     show_analog_meter = st.toggle("🎛️ অ্যানালগ মিটার", value=True)
-with top_c5:
+with top_c4:
     auto_alert_on = st.toggle("🔔 অটো-অ্যালার্ট", value=False, help="অন রাখলে প্রতি ৩ মিনিটে লাইভ ১৫-মিনিট ব্রেকআউট স্ক্যান করবে এবং নতুন স্টক পেলে ঘণ্টা বাজাবে")
 
 # ==============================================================================
-# ৫. সম্পূর্ণ ফিক্সড ও হাই-কনট্রাস্ট CSS
+# ৫. ৩টি সম্পূর্ণ ভিন্ন ও আকর্ষণীয় থিম (Pro Dark vs Cyber Neon vs Clean Light)
 # ==============================================================================
 if "Clean Light" in theme_mode:
-    BG_MAIN, BG_CARD, TEXT_MAIN, TEXT_SUB, BORDER_C = "#f1f5f9", "#ffffff", "#0f172a", "#334155", "#cbd5e1"
-    BTN_BG, BTN_TEXT, BTN_BORDER = "#e2e8f0", "#0f172a", "#94a3b8"
+    BG_MAIN = "#f1f5f9"
+    BG_CARD = "#ffffff"
+    BG_WIN = "#f8fafc"
+    TEXT_MAIN = "#0f172a"
+    TEXT_SUB = "#334155"
+    BORDER_C = "#cbd5e1"
+    ACCENT_C = "#2563eb"
+    BTN_BG = "linear-gradient(135deg, #e2e8f0, #cbd5e1)"
+    BTN_BORDER = "#94a3b8"
+    CARD_SHADOW = "0 4px 12px rgba(0,0,0,0.06)"
 elif "Cyber Neon" in theme_mode:
-    BG_MAIN, BG_CARD, TEXT_MAIN, TEXT_SUB, BORDER_C = "#040911", "#0a1424", "#f8fafc", "#cbd5e1", "#0ea5e966"
-    BTN_BG, BTN_TEXT, BTN_BORDER = "linear-gradient(135deg, #0f172a, #1e293b)", "#38bdf8", "#0ea5e988"
+    # সম্পূর্ণ আলাদা সাইবার ভায়োলেট-পার্পল ও নিয়ন সায়ান/ম্যাজেন্টা থিম
+    BG_MAIN = "#0b031a"
+    BG_CARD = "#160933"
+    BG_WIN = "#1e0c45"
+    TEXT_MAIN = "#f0fdf4"
+    TEXT_SUB = "#e879f9"
+    BORDER_C = "#00f5d488"
+    ACCENT_C = "#00f5d4"
+    BTN_BG = "linear-gradient(135deg, #3b0764, #701a75)"
+    BTN_BORDER = "#00f5d4"
+    CARD_SHADOW = "0 0 18px rgba(0, 245, 212, 0.22)"
 else:
-    BG_MAIN, BG_CARD, TEXT_MAIN, TEXT_SUB, BORDER_C = "#070b14", "#0f172a", "#f8fafc", "#cbd5e1", "#1e293b"
-    BTN_BG, BTN_TEXT, BTN_BORDER = "linear-gradient(135deg, #111c33, #1e293b)", "#38bdf8", "#38bdf866"
+    # Pro Dark থিম (ক্ল্যাসিক ডিপ স্লেট-নেভি)
+    BG_MAIN = "#070b14"
+    BG_CARD = "#0f172a"
+    BG_WIN = "#131d35"
+    TEXT_MAIN = "#f8fafc"
+    TEXT_SUB = "#cbd5e1"
+    BORDER_C = "#1e293b"
+    ACCENT_C = "#38bdf8"
+    BTN_BG = "linear-gradient(135deg, #111c33, #1e293b)"
+    BTN_BORDER = "#38bdf866"
+    CARD_SHADOW = "0 4px 14px rgba(0,0,0,0.3)"
 
 css_block = """
 <style>
@@ -196,8 +181,8 @@ html, body, [data-testid="stAppViewContainer"], .main {
     scroll-behavior: smooth !important;
 }
 .block-container {
-    padding-top: 1.6rem !important;
-    padding-bottom: 5rem !important;
+    padding-top: 1.5rem !important;
+    padding-bottom: 4.8rem !important;
     max-width: 97% !important;
 }
 a.brand-logo-link {
@@ -215,35 +200,16 @@ a.brand-logo-link:hover {
 }
 .logo-badge {
     font-size: 1.75rem;
-    background: linear-gradient(135deg, #0ea5e9, #2563eb);
+    background: linear-gradient(135deg, __ACCENT_C__, #2563eb);
     padding: 3px 8px;
     border-radius: 10px;
     box-shadow: 0 3px 10px rgba(14, 165, 233, 0.4);
 }
 .brand-title {
-    font-size: 1.42rem;
+    font-size: 1.45rem;
     font-weight: 800;
     color: __TEXT_MAIN__ !important;
     letter-spacing: -0.3px;
-}
-a.top-nav-btn {
-    text-decoration: none !important;
-    background: __BTN_BG__;
-    color: __TEXT_MAIN__ !important;
-    border: 1px solid __BTN_BORDER__;
-    padding: 5px 9px;
-    border-radius: 8px;
-    font-size: 0.76rem;
-    font-weight: 700;
-    transition: all 0.2s ease;
-}
-a.top-nav-btn:hover {
-    background: #0284c7 !important;
-    color: #ffffff !important;
-}
-a.disabled-nav {
-    opacity: 0.42;
-    pointer-events: none;
 }
 [data-testid="stWidgetLabel"] p,
 [data-testid="stWidgetLabel"] label,
@@ -277,7 +243,7 @@ div.stDownloadButton > button {
     font-weight: 800 !important;
     font-size: 0.84rem !important;
     padding: 0.45rem 0.9rem !important;
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25) !important;
+    box-shadow: __CARD_SHADOW__ !important;
     transition: all 0.2s ease !important;
 }
 div.stButton > button p,
@@ -291,7 +257,7 @@ button[data-testid="stBaseButton-secondary"]:hover,
 div.stDownloadButton > button:hover {
     background: linear-gradient(135deg, #0284c7, #2563eb) !important;
     color: #ffffff !important;
-    border-color: #38bdf8 !important;
+    border-color: __ACCENT_C__ !important;
     transform: translateY(-2px) !important;
 }
 div.stButton > button:hover p,
@@ -312,11 +278,11 @@ button[data-baseweb="tab"] span {
     font-size: 0.86rem !important;
 }
 button[data-baseweb="tab"][aria-selected="true"] {
-    background: linear-gradient(135deg, rgba(2,132,199,0.25), rgba(37,99,235,0.2)) !important;
-    border-bottom: 3px solid #38bdf8 !important;
+    background: linear-gradient(135deg, rgba(2,132,199,0.28), rgba(37,99,235,0.22)) !important;
+    border-bottom: 3px solid __ACCENT_C__ !important;
 }
 button[data-baseweb="tab"][aria-selected="true"] p {
-    color: #38bdf8 !important;
+    color: __ACCENT_C__ !important;
     font-weight: 800 !important;
 }
 [data-testid="stExpander"] details {
@@ -333,7 +299,7 @@ button[data-baseweb="tab"][aria-selected="true"] p {
 }
 code {
     background: rgba(56, 189, 248, 0.16) !important;
-    color: #38bdf8 !important;
+    color: __ACCENT_C__ !important;
     padding: 2px 8px !important;
     border-radius: 6px !important;
     font-weight: 700 !important;
@@ -349,6 +315,7 @@ code {
     justify-content: space-between;
     align-items: center;
     gap: 8px;
+    box-shadow: __CARD_SHADOW__;
 }
 .pulse-item {
     font-size: 0.85rem;
@@ -356,20 +323,22 @@ code {
     color: __TEXT_MAIN__;
 }
 .intraday-box-bull {
-    background: linear-gradient(145deg, rgba(6,78,59,0.20), __BG_CARD__);
+    background: linear-gradient(145deg, rgba(6,78,59,0.22), __BG_CARD__);
     border: 1px solid #10b98188;
     border-left: 4px solid #10b981;
     border-radius: 10px;
     padding: 8px 12px;
-    margin-bottom: 4px;
+    margin-bottom: 6px;
+    box-shadow: __CARD_SHADOW__;
 }
 .intraday-box-bear {
-    background: linear-gradient(145deg, rgba(127,29,29,0.20), __BG_CARD__);
+    background: linear-gradient(145deg, rgba(127,29,29,0.22), __BG_CARD__);
     border: 1px solid #ef444488;
     border-left: 4px solid #ef4444;
     border-radius: 10px;
     padding: 8px 12px;
-    margin-bottom: 4px;
+    margin-bottom: 6px;
+    box-shadow: __CARD_SHADOW__;
 }
 .box-title-bull {
     color: #34d399;
@@ -426,13 +395,72 @@ a.bear-pill:hover {
     color: #ffffff !important;
     transform: translateY(-1px);
 }
+/* ১৫-মিনিট ইন্ট্রাডে মিনি-ড্যাশবোর্ড উইন্ডো */
+.intraday-mini-window {
+    background: __BG_WIN__;
+    border: 1.5px solid __ACCENT_C__;
+    border-radius: 12px;
+    padding: 10px 14px;
+    margin: 4px 0 8px 0;
+    box-shadow: __CARD_SHADOW__;
+}
+.mini-win-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid __BORDER_C__;
+    padding-bottom: 5px;
+}
+.mini-win-title {
+    font-size: 0.84rem;
+    font-weight: 800;
+    color: __ACCENT_C__;
+}
+.mini-win-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(235px, 1fr));
+    gap: 8px;
+}
+a.mini-stock-card-bull {
+    text-decoration: none !important;
+    background: rgba(16, 185, 129, 0.10);
+    border: 1px solid #10b98177;
+    border-left: 3.5px solid #10b981;
+    border-radius: 8px;
+    padding: 6px 10px;
+    color: __TEXT_MAIN__ !important;
+    display: block;
+    transition: all 0.18s ease;
+}
+a.mini-stock-card-bull:hover {
+    background: rgba(16, 185, 129, 0.22);
+    transform: translateY(-2px);
+}
+a.mini-stock-card-bear {
+    text-decoration: none !important;
+    background: rgba(239, 68, 68, 0.10);
+    border: 1px solid #ef444477;
+    border-left: 3.5px solid #ef4444;
+    border-radius: 8px;
+    padding: 6px 10px;
+    color: __TEXT_MAIN__ !important;
+    display: block;
+    transition: all 0.18s ease;
+}
+a.mini-stock-card-bear:hover {
+    background: rgba(239, 68, 68, 0.22);
+    transform: translateY(-2px);
+}
 a.wa-share-btn {
     text-decoration: none !important;
     background: linear-gradient(135deg, #16a34a, #22c55e);
     color: #ffffff !important;
-    padding: 7px 14px;
+    padding: 6px 14px;
     border-radius: 999px;
-    font-size: 0.80rem;
+    font-size: 0.79rem;
     font-weight: 800;
     display: inline-flex;
     align-items: center;
@@ -453,6 +481,7 @@ a.wa-share-btn:hover {
     overflow: hidden;
     white-space: nowrap;
     margin: 4px 0 12px 0;
+    box-shadow: __CARD_SHADOW__;
 }
 .marquee-track {
     display: inline-block;
@@ -495,7 +524,7 @@ a.sec-pill-down {
 }
 .kpi-card {
     background: __BG_CARD__;
-    border: 1.5px solid #0284c777;
+    border: 1.5px solid __BORDER_C__;
     border-radius: 12px;
     padding: 12px 14px;
     min-height: 112px;
@@ -503,6 +532,7 @@ a.sec-pill-down {
     flex-direction: column;
     justify-content: space-between;
     margin-bottom: 6px;
+    box-shadow: __CARD_SHADOW__;
 }
 .kpi-title {
     color: __TEXT_SUB__;
@@ -535,52 +565,29 @@ a.sec-pill-down {
     font-weight: 700;
     width: fit-content;
 }
-.floating-nav-dock {
+/* শুধুমাত্র ওপরে যান (Top) ফ্লোটিং বাটন */
+a.single-top-btn {
     position: fixed;
     bottom: 58px;
-    right: 18px;
+    right: 20px;
     z-index: 999999;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    background: rgba(15, 23, 42, 0.92);
-    border: 1.5px solid #38bdf888;
-    padding: 6px 10px;
-    border-radius: 999px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(8px);
-}
-a.dock-btn {
-    text-decoration: none !important;
-    color: #f8fafc !important;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.16);
-    padding: 5px 10px;
-    border-radius: 999px;
-    font-size: 0.76rem;
-    font-weight: 800;
-    transition: all 0.18s ease;
-}
-a.dock-btn:hover {
-    background: #0284c7;
-    color: #ffffff !important;
-    transform: translateY(-2px);
-}
-a.dock-btn-top {
     text-decoration: none !important;
     background: linear-gradient(135deg, #0ea5e9, #2563eb);
     color: #ffffff !important;
-    padding: 5px 12px;
+    padding: 8px 16px;
     border-radius: 999px;
-    font-size: 0.78rem;
+    font-size: 0.82rem;
     font-weight: 800;
-    box-shadow: 0 4px 12px rgba(2, 132, 199, 0.5);
+    border: 1.5px solid rgba(255, 255, 255, 0.35);
+    box-shadow: 0 6px 20px rgba(2, 132, 199, 0.55);
+    transition: all 0.2s ease;
 }
-a.dock-btn-top:hover {
-    transform: translateY(-2px) scale(1.03);
+a.single-top-btn:hover {
+    transform: translateY(-3px) scale(1.04);
+    box-shadow: 0 8px 25px rgba(2, 132, 199, 0.8);
 }
 </style>
-""".replace("__BG_MAIN__", BG_MAIN).replace("__BG_CARD__", BG_CARD).replace("__TEXT_MAIN__", TEXT_MAIN).replace("__TEXT_SUB__", TEXT_SUB).replace("__BORDER_C__", BORDER_C).replace("__BTN_BG__", BTN_BG).replace("__BTN_TEXT__", BTN_TEXT).replace("__BTN_BORDER__", BTN_BORDER)
+""".replace("__BG_MAIN__", BG_MAIN).replace("__BG_CARD__", BG_CARD).replace("__BG_WIN__", BG_WIN).replace("__TEXT_MAIN__", TEXT_MAIN).replace("__TEXT_SUB__", TEXT_SUB).replace("__BORDER_C__", BORDER_C).replace("__ACCENT_C__", ACCENT_C).replace("__BTN_BG__", BTN_BG).replace("__BTN_BORDER__", BTN_BORDER).replace("__CARD_SHADOW__", CARD_SHADOW)
 
 st.markdown(css_block, unsafe_allow_html=True)
 
@@ -941,7 +948,7 @@ def run_chartink_15m_scanner(stocks_df: pd.DataFrame):
                         "15m_Vol_x": v15_ratio,
                         "15m_RSI": rsi15,
                         "1D_%": d_info["1D"],
-                        "Match_Mode": "🔥 হুবহু Chartink" if strict_bull_pass else "✅ প্রো সংশোধিত",
+                        "Match_Mode": "🔥 হুবহু Chartink" if strict_bull_pass else "✅ প্রো ব্রেকআউট",
                         "Entry": round(max(c15, h15 * 1.0005), 2),
                         "SL": round(min(l15, vwap15 * 0.995), 2),
                         "Target": round(c15 + 1.6 * atr_d, 2),
@@ -993,7 +1000,7 @@ def run_chartink_15m_scanner(stocks_df: pd.DataFrame):
                 "15m_Vol_x": r["Vol_Ratio"],
                 "15m_RSI": r["RSI"],
                 "1D_%": r["1D"],
-                "Match_Mode": "✅ প্রো সংশোধিত (Near Breakout)",
+                "Match_Mode": "✅ প্রো ব্রেকআউট",
                 "Entry": round(r["Price"] * 1.001, 2),
                 "SL": round(r["Price"] - 1.1 * r["ATR"], 2),
                 "Target": round(r["Price"] + 1.8 * r["ATR"], 2),
@@ -1016,7 +1023,7 @@ def run_chartink_15m_scanner(stocks_df: pd.DataFrame):
                 "15m_Vol_x": r["Vol_Ratio"],
                 "15m_RSI": r["RSI"],
                 "1D_%": r["1D"],
-                "Match_Mode": "📉 15m Breakdown Watch",
+                "Match_Mode": "📉 15m Breakdown",
                 "Short_Below": round(r["Price"] * 0.999, 2),
                 "SL": round(r["Price"] + 1.1 * r["ATR"], 2),
                 "Target": round(r["Price"] - 1.8 * r["ATR"], 2),
@@ -1130,7 +1137,7 @@ pulse_html = (
     f'<div class="pulse-item">🇮🇳 Nifty 50: <span style="color:{"#34d399" if n_d["1D"]>=0 else "#f87171"};">{n_d["price"]:,.1f} ({n_d["1D"]:+.2f}%)</span></div>'
     f'<div class="pulse-item">🏛️ Bank Nifty: <span style="color:{"#34d399" if b_d["1D"]>=0 else "#f87171"};">{b_d["price"]:,.1f} ({b_d["1D"]:+.2f}%)</span></div>'
     f'<div class="pulse-item">⚡ India VIX: <span style="color:{"#34d399" if v_d["1D"]<=0 else "#fbbf24"};">{v_d["price"]:.2f} ({v_d["1D"]:+.2f}%)</span> — {vix_badge}</div>'
-    f'<div class="pulse-item">💵 USD/INR: <span style="color:#38bdf8;">₹{u_d["price"]:.2f} ({u_d["1D"]:+.2f}%)</span></div>'
+    f'<div class="pulse-item">💵 USD/INR: <span style="color:{ACCENT_C};">₹{u_d["price"]:.2f} ({u_d["1D"]:+.2f}%)</span></div>'
     f'</div>'
 )
 st.markdown(pulse_html, unsafe_allow_html=True)
@@ -1175,7 +1182,6 @@ with fc4:
     picked_sec = st.selectbox("🔍 ৪. নির্দিষ্ট সেক্টর খুঁজুন:", sec_list, index=sec_default_idx)
     if picked_sec != st.session_state.selected_sector:
         st.session_state.selected_sector = picked_sec
-        push_nav_state(picked_sec, st.session_state.selected_stock, st.session_state.kpi_panel)
         st.rerun()
 
 with fc5:
@@ -1191,21 +1197,20 @@ with fc5:
     new_stk = picked_stock.split(" (")[0].strip() + ".NS" if picked_stock != DEFAULT_STOCK else DEFAULT_STOCK
     if new_stk != st.session_state.selected_stock:
         st.session_state.selected_stock = new_stk
-        push_nav_state(st.session_state.selected_sector, new_stk, st.session_state.kpi_panel)
         st.rerun()
 
 # ==============================================================================
-# ১০. স্লিম ইন্ট্রাডে ফোকাস বক্স + ১-ক্লিক WhatsApp অ্যালার্ট বাটন
+# ১০. ইন্ট্রাডে ফোকাস বক্স + WhatsApp বাটন + ১৫-মিনিট ইন্ট্রাডে মিনি-ড্যাশবোর্ড উইন্ডো
 # ==============================================================================
 bull_top6, bear_top6 = filter_intraday_focus_stocks(stocks_df)
 
 wa_lines = ["🧭 *AlphaPulse Pro — লাইভ ইন্ট্রাডে অ্যালার্ট*"]
-wa_lines.append("🟢 *বুলিশ ডজি ও ১৫-মিঃ ব্রেকআউট স্টক:*")
+wa_lines.append("🟢 *১৫-মিঃ বুলিশ ব্রেকআউট স্টক (Chartink Logic):*")
 for _, r in bull_15m_df.head(4).iterrows():
-    wa_lines.append(f"• *{r['Symbol']}* (₹{r['15m_Close']}) | Entry: ₹{r['Entry']} | SL: ₹{r['SL']} | Tgt: ₹{r['Target']}")
-wa_lines.append("\n🔴 *বেয়ারিশ ব্রেকডাউন স্টক:*")
+    wa_lines.append(f"• *{r['Symbol']}* (₹{r['15m_Close']}) | VWAP: ₹{r['VWAP']} | Entry: ₹{r['Entry']} | SL: ₹{r['SL']} | Tgt: ₹{r['Target']}")
+wa_lines.append("\n🔴 *১৫-মিঃ বেয়ারিশ ব্রেকডাউন স্টক:*")
 for _, r in bear_15m_df.head(3).iterrows():
-    wa_lines.append(f"• *{r['Symbol']}* (₹{r['15m_Close']}) | Short: ₹{r['Short_Below']} | SL: ₹{r['SL']} | Tgt: ₹{r['Target']}")
+    wa_lines.append(f"• *{r['Symbol']}* (₹{r['15m_Close']}) | VWAP: ₹{r['VWAP']} | Short: ₹{r['Short_Below']} | SL: ₹{r['SL']} | Tgt: ₹{r['Target']}")
 
 wa_encoded_msg = urllib.parse.quote("\n".join(wa_lines))
 wa_direct_url = f"https://api.whatsapp.com/send?text={wa_encoded_msg}"
@@ -1213,7 +1218,7 @@ wa_direct_url = f"https://api.whatsapp.com/send?text={wa_encoded_msg}"
 m_bar1, m_bar2, m_bar3 = st.columns([4.4, 2.3, 3.3])
 with m_bar1:
     st.markdown(
-        '<div style="font-size:0.80rem;color:#cbd5e1;padding-top:6px;">'
+        f'<div style="font-size:0.80rem;color:{TEXT_SUB};padding-top:6px;">'
         '🎯 <b>ইন্ট্রাডে ফোকাস (Doji & 15m Breakout):</b> শেয়ারে ক্লিক করলেই চার্ট ও ট্রেড প্ল্যান খুলবে'
         '</div>',
         unsafe_allow_html=True
@@ -1221,7 +1226,7 @@ with m_bar1:
 with m_bar2:
     st.markdown(
         f'<div style="padding-top:2px;">'
-        f'<a href="{wa_direct_url}" target="_blank" class="wa-share-btn" title="কোনো API ছাড়াই এক ক্লিকে আজকের ইন্ট্রাডে শেয়ারের লিস্ট নিজের WhatsApp-এ পাঠান">'
+        f'<a href="{wa_direct_url}" target="_blank" class="wa-share-btn" title="এক ক্লিকে আজকের ইন্ট্রাডে শেয়ারের লিস্ট নিজের WhatsApp-এ পাঠান">'
         f'📲 এক ক্লিকে WhatsApp-এ পাঠান'
         f'</a></div>',
         unsafe_allow_html=True
@@ -1279,6 +1284,53 @@ else:
     with ib2:
         st.markdown(bear_box_markup, unsafe_allow_html=True)
 
+# ------------------------------------------------------------------------------
+# ১০.১ ইন্ট্রাডে ১৫-মিনিট লজিক মিনি-ড্যাশবোর্ড উইন্ডো (সরাসরি মেইন পেজে)
+# ------------------------------------------------------------------------------
+def build_15m_mini_cards(df_15: pd.DataFrame, is_bull: bool) -> str:
+    cards = []
+    cls = "mini-stock-card-bull" if is_bull else "mini-stock-card-bear"
+    badge_col = "#34d399" if is_bull else "#f87171"
+    icon = "🟢 BUY" if is_bull else "🔴 SHORT"
+    act_lbl = "Entry" if is_bull else "Short"
+    act_col = "Entry" if is_bull else "Short_Below"
+
+    for _, r in df_15.head(4).iterrows():
+        qt = urllib.parse.quote(r["Ticker"])
+        cards.append(
+            f'<a href="?focus_stock={qt}" target="_self" class="{cls}" title="ক্লিক করলে {r["Symbol"]}-এর পূর্ণাঙ্গ চার্ট খুলবে">'
+            f'<div style="display:flex;justify-content:space-between;align-items:center;font-size:0.80rem;font-weight:800;">'
+            f'<span>{icon}: {r["Symbol"]} (₹{r["15m_Close"]})</span>'
+            f'<span style="color:{badge_col};">{r["1D_%"]:+.1f}% | {r["15m_Vol_x"]}x Vol</span>'
+            f'</div>'
+            f'<div style="font-size:0.72rem;color:{TEXT_SUB};margin-top:2px;">'
+            f'VWAP: ₹{r["VWAP"]} | RSI(15m): <b>{r["15m_RSI"]}</b> | {r["Sector"]}'
+            f'</div>'
+            f'<div style="font-size:0.74rem;font-weight:700;margin-top:3px;color:{badge_col};">'
+            f'🎯 {act_lbl}: ₹{r[act_col]} &nbsp;|&nbsp; 🛑 SL: ₹{r["SL"]} &nbsp;|&nbsp; 🚀 Tgt: ₹{r["Target"]}'
+            f'</div>'
+            f'</a>'
+        )
+    return "".join(cards)
+
+if market_day_mode == "🟢 বুলিশ ফোকাস":
+    mini_cards_html = build_15m_mini_cards(bull_15m_df, True)
+elif market_day_mode == "🔴 বেয়ারিশ ফোকাস":
+    mini_cards_html = build_15m_mini_cards(bear_15m_df, False)
+else:
+    mini_cards_html = build_15m_mini_cards(bull_15m_df.head(2), True) + build_15m_mini_cards(bear_15m_df.head(2), False)
+
+mini_window_html = (
+    '<div class="intraday-mini-window">'
+    '<div class="mini-win-header">'
+    '<span class="mini-win-title">⚡ লাইভ ১৫-মিনিট ইন্ট্রাডে স্ক্যানার উইন্ডো (Chartink Logic: Open≈Low/High + VWAP + Prev High/Low + Vol + RSI)</span>'
+    f'<span style="font-size:0.74rem;color:{TEXT_SUB};">যেকোনো কার্ডে ক্লিক করলেই চার্ট খুলবে</span>'
+    '</div>'
+    f'<div class="mini-win-grid">{mini_cards_html}</div>'
+    '</div>'
+)
+st.markdown(mini_window_html, unsafe_allow_html=True)
+
 # ==============================================================================
 # ১১. স্টক প্রোফাইল ও ইন্ট্রাডে ট্রেড সেটআপ প্যানেল
 # ==============================================================================
@@ -1331,7 +1383,6 @@ if st.session_state.selected_stock != DEFAULT_STOCK and st.session_state.selecte
     with sp_col3:
         if st.button("✖ প্যানেল বন্ধ করুন", key="close_stk_panel", use_container_width=True):
             st.session_state.selected_stock = DEFAULT_STOCK
-            push_nav_state(st.session_state.selected_sector, DEFAULT_STOCK, st.session_state.kpi_panel)
             st.rerun()
 
     lv1, lv2, lv3 = st.columns(3)
@@ -1393,7 +1444,7 @@ if st.session_state.selected_stock != DEFAULT_STOCK and st.session_state.selecte
 # ১২. ক্লিকেবল সেক্টর বার
 # ==============================================================================
 st.markdown(
-    '<div style="font-size:0.80rem;color:#cbd5e1;margin-top:4px;">'
+    f'<div style="font-size:0.80rem;color:{TEXT_SUB};margin-top:4px;">'
     '📍 <b>ক্লিকেবল সেক্টর বার:</b> যেকোনো সেক্টরের ওপর ক্লিক করলেই সাথে সাথে সেই সেক্টরের সব শেয়ার খুলে যাবে:'
     '</div>',
     unsafe_allow_html=True
@@ -1436,9 +1487,7 @@ with kc1:
     )
     st.markdown(c1_html, unsafe_allow_html=True)
     if st.button("📊 নিফটি ৫০ মুভার্স লিস্ট দেখুন", key="kpi_btn_1", use_container_width=True):
-        new_k = "nifty_movers" if st.session_state.kpi_panel != "nifty_movers" else None
-        st.session_state.kpi_panel = new_k
-        push_nav_state(st.session_state.selected_sector, st.session_state.selected_stock, new_k)
+        st.session_state.kpi_panel = "nifty_movers" if st.session_state.kpi_panel != "nifty_movers" else None
         st.rerun()
 
 with kc2:
@@ -1451,9 +1500,7 @@ with kc2:
     )
     st.markdown(c2_html, unsafe_allow_html=True)
     if st.button("📈 বাড়তে থাকা ও ডাউন শেয়ার দেখুন", key="kpi_btn_2", use_container_width=True):
-        new_k = "breadth_list" if st.session_state.kpi_panel != "breadth_list" else None
-        st.session_state.kpi_panel = new_k
-        push_nav_state(st.session_state.selected_sector, st.session_state.selected_stock, new_k)
+        st.session_state.kpi_panel = "breadth_list" if st.session_state.kpi_panel != "breadth_list" else None
         st.rerun()
 
 with kc3:
@@ -1468,7 +1515,6 @@ with kc3:
     if st.button(f"🔍 {leader_sec['Sector']}-এর শেয়ার দেখুন", key="kpi_btn_3", use_container_width=True):
         st.session_state.selected_sector = leader_sec["Sector"]
         st.session_state.kpi_panel = "leader_sec"
-        push_nav_state(leader_sec["Sector"], st.session_state.selected_stock, "leader_sec")
         st.rerun()
 
 with kc4:
@@ -1483,7 +1529,6 @@ with kc4:
     if st.button(f"🔍 {laggard_sec['Sector']}-এর শেয়ার দেখুন", key="kpi_btn_4", use_container_width=True):
         st.session_state.selected_sector = laggard_sec["Sector"]
         st.session_state.kpi_panel = "laggard_sec"
-        push_nav_state(laggard_sec["Sector"], st.session_state.selected_stock, "laggard_sec")
         st.rerun()
 
 if st.session_state.kpi_panel is not None:
@@ -1492,7 +1537,6 @@ if st.session_state.kpi_panel is not None:
     with kp_h2:
         if st.button("✖ লিস্ট বন্ধ করুন", key="close_kpi_btn", use_container_width=True):
             st.session_state.kpi_panel = None
-            push_nav_state(st.session_state.selected_sector, st.session_state.selected_stock, None)
             st.rerun()
 
     if st.session_state.kpi_panel == "nifty_movers":
@@ -1537,7 +1581,7 @@ if st.session_state.kpi_panel is not None:
     st.markdown("---")
 
 # ==============================================================================
-# ১৪. ৫টি প্রধান ট্যাব (১৫-মিনিট Chartink স্ক্যানার ও WhatsApp ট্যাব সহ)
+# ১৪. ৫টি প্রধান ট্যাব
 # ==============================================================================
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📈 ১. সেক্টর চার্ট, মিটার ও শেয়ার তালিকা",
@@ -1558,7 +1602,6 @@ with tab1:
         if st.button("🔄 সবগুলো ৩২টি সেক্টর আবার একসাথে দেখুন (Reset to All Sectors)"):
             st.session_state.selected_sector = DEFAULT_SECTOR
             st.session_state.kpi_panel = None
-            push_nav_state(DEFAULT_SECTOR, st.session_state.selected_stock, None)
             st.rerun()
 
     if "Top Gainers" in sort_choice:
@@ -1573,7 +1616,7 @@ with tab1:
         filtered_secs = filtered_secs.sort_values("Meter", ascending=False)
 
     def make_plotly_speedometer(score: int, title_txt: str, ret_val: float):
-        bar_col = "#10b981" if score >= 60 else ("#fbbf24" if score >= 38 else "#ef4444")
+        bar_col = "#00f5d4" if ("Cyber Neon" in theme_mode and score >= 60) else ("#10b981" if score >= 60 else ("#fbbf24" if score >= 38 else "#ef4444"))
         fig_g = go.Figure(go.Indicator(
             mode="gauge+number",
             value=score,
@@ -1584,7 +1627,7 @@ with tab1:
                 "bar": {"color": bar_col, "thickness": 0.34},
                 "bgcolor": "rgba(0,0,0,0)",
                 "borderwidth": 1,
-                "bordercolor": "#334155",
+                "bordercolor": BORDER_C,
                 "steps": [
                     {"range": [0, 38], "color": "rgba(239, 68, 68, 0.20)"},
                     {"range": [38, 60], "color": "rgba(251, 191, 36, 0.20)"},
@@ -1651,7 +1694,7 @@ with tab2:
     ch_top1, ch_top2 = st.columns([6.8, 3.2])
     with ch_top1:
         st.markdown(
-            "#### ⚡ ১৫-মিনিট লাইভ ব্রেকআউট স্ক্যানার (তোমার Chartink লজিকের প্রো ভার্সন)\n"
+            "#### ⚡ ১৫-মিনিট লাইভ ব্রেকআউট স্ক্যানার (তোমার Chartink লজিকের পূর্ণাঙ্গ টেবিল)\n"
             "নিচে **১৫ মিনিটের ক্যান্ডেল, VWAP, গতকালের High/Low ব্রেকআউট, ভলিউম স্পাইক এবং RSI (58–78)** অনুযায়ী বাছাই করা শেয়ারগুলো দেওয়া হলো:"
         )
     with ch_top2:
@@ -1873,18 +1916,12 @@ with tab5:
     )
 
 # ==============================================================================
-# ১৫. ফ্লোটিং স্মার্ট নেভিগেশন ডক + অটো-অ্যালার্ট সাউন্ড ইঞ্জিন
+# ১৫. শুধুমাত্র ‘🚀 ওপরে যান (Top)’ ফ্লোটিং বাটন + অটো-অ্যালার্ট সাউন্ড ইঞ্জিন
 # ==============================================================================
-dock_html = (
-    '<div class="floating-nav-dock">'
-    '<a href="?nav_action=back" target="_self" class="dock-btn" title="আগের পেজে বা শেয়ারে ফিরে যান">⬅️ ব্যাক</a>'
-    '<a href="?nav_action=home" target="_self" class="dock-btn" title="লোগোতে ক্লিক করে একদম মেইন পেজে ফিরে যান">🧭 মেইন পেজ</a>'
-    '<a href="?nav_action=forward" target="_self" class="dock-btn" title="পরের ভিউতে যান">➡️</a>'
-    f'<a href="{wa_direct_url}" target="_blank" class="dock-btn" style="background:#16a34a;border-color:#22c55e;" title="এক ক্লিকে WhatsApp-এ পাঠান">📲 WhatsApp</a>'
-    '<a href="#top-anchor" class="dock-btn-top" id="alphapulse-top-btn" title="স্ক্রল করে একদম ওপরে যান">🚀 ওপরে যান</a>'
-    '</div>'
+st.markdown(
+    '<a href="#top-anchor" class="single-top-btn" id="alphapulse-top-btn" title="স্ক্রল করে একদম ওপরে যান">🚀 ওপরে যান (Top)</a>',
+    unsafe_allow_html=True
 )
-st.markdown(dock_html, unsafe_allow_html=True)
 
 current_top_syms = ",".join(bull_15m_df["Symbol"].head(3).tolist()) if not bull_15m_df.empty else ""
 should_ring = "true" if (auto_alert_on and current_top_syms and current_top_syms != st.session_state.last_alerted_stocks) else "false"
