@@ -112,7 +112,7 @@ if "focus_sec" in qp:
     st.query_params.clear()
 
 # ==============================================================================
-# 4. TOP HEADER BAR WITH LIVE IST MARKET STATUS & REFRESH
+# 4. TOP HEADER BAR (ORIGINAL CLEAN COMPASS ICON + GLOWING BRAND TITLE)
 # ==============================================================================
 st.markdown('<div id="top-anchor"></div>', unsafe_allow_html=True)
 
@@ -123,17 +123,17 @@ is_mkt_open = (ist_now.weekday() < 5) and (
     or (ist_now.hour == 15 and ist_now.minute <= 30)
 )
 mkt_status_html = (
-    f'<span style="color:#34d399;font-weight:800;">🟢 LIVE MARKET ({ist_now.strftime("%I:%M %p IST")})</span>'
+    f'<span style="color:#10b981;font-weight:800;">🟢 LIVE MARKET ({ist_now.strftime("%I:%M %p IST")})</span>'
     if is_mkt_open else
-    f'<span style="color:#fbbf24;font-weight:700;">🕒 MARKET CLOSED ({ist_now.strftime("%a %I:%M %p IST")})</span>'
+    f'<span style="color:#f59e0b;font-weight:700;">🕒 MARKET CLOSED ({ist_now.strftime("%a %I:%M %p IST")})</span>'
 )
 
-top_c1, top_c2, top_c3, top_c4, top_c5 = st.columns([5.1, 1.8, 1.05, 1.05, 1.0])
+top_c1, top_c2, top_c3, top_c4, top_c5 = st.columns([5.2, 1.8, 1.0, 1.0, 1.0])
 with top_c1:
     st.markdown(
         f'<a href="?nav_action=home" target="_self" class="brand-logo-link" title="Click to Reset All Filters & Return to Home">'
-        f'<span class="logo-badge">🧭</span>'
-        f'<div><div class="brand-title">AlphaPulse Pro — Nifty 500 Turnaround & Intraday Terminal</div>'
+        f'<span class="clean-compass-icon">🧭</span>'
+        f'<div><div class="brand-title-glow">AlphaPulse Pro — Nifty 500 Turnaround Terminal</div>'
         f'<div class="brand-subtitle">{len(SECTOR_STOCKS)} Sectors • {len(ALL_TICKERS)}+ Stocks • {mkt_status_html}</div></div></a>',
         unsafe_allow_html=True
     )
@@ -149,80 +149,198 @@ with top_c5:
         st.rerun()
 
 # ==============================================================================
-# 5. DISTINCT 3-THEME ENGINE & RESPONSIVE CSS
+# 5. MODERN FONT ('Plus Jakarta Sans' & 'JetBrains Mono') + UNIFORM ALIGNMENT CSS
 # ==============================================================================
 if "Clean Light" in theme_mode:
-    BG_MAIN, BG_CARD, BG_SUB, TEXT_MAIN, TEXT_SUB, BORDER_C, ACCENT_C = "#f1f5f9", "#ffffff", "#f8fafc", "#0f172a", "#475569", "#cbd5e1", "#2563eb"
-    BTN_BG, BTN_BORDER, CARD_SHADOW = "linear-gradient(135deg,#e2e8f0,#cbd5e1)", "#94a3b8", "0 4px 14px rgba(15,23,42,0.07)"
+    BG_MAIN, BG_CARD, BG_SUB, TEXT_MAIN, TEXT_SUB, BORDER_C, ACCENT_C = "#f4f6fb", "#ffffff", "#eef2f8", "#0f172a", "#475569", "#cbd5e1", "#d97706"
+    BTN_BG, BTN_BORDER, CARD_SHADOW = "linear-gradient(135deg,#ffffff,#e2e8f0)", "#94a3b8", "0 4px 14px rgba(15,23,42,0.06)"
 elif "Cyber Neon" in theme_mode:
-    BG_MAIN, BG_CARD, BG_SUB, TEXT_MAIN, TEXT_SUB, BORDER_C, ACCENT_C = "#080214", "#14062b", "#1d093d", "#f0fdf4", "#e879f9", "#00f5d488", "#00f5d4"
-    BTN_BG, BTN_BORDER, CARD_SHADOW = "linear-gradient(135deg,#3b0764,#701a75)", "#00f5d4", "0 0 20px rgba(0,245,212,0.22)"
+    BG_MAIN, BG_CARD, BG_SUB, TEXT_MAIN, TEXT_SUB, BORDER_C, ACCENT_C = "#080214", "#14062b", "#1d093d", "#f8fafc", "#e879f9", "#00f5d488", "#00f5d4"
+    BTN_BG, BTN_BORDER, CARD_SHADOW = "linear-gradient(135deg,#3b0764,#701a75)", "#00f5d4", "0 0 20px rgba(0,245,212,0.20)"
 else:
-    BG_MAIN, BG_CARD, BG_SUB, TEXT_MAIN, TEXT_SUB, BORDER_C, ACCENT_C = "#060a12", "#0f172a", "#141f38", "#f8fafc", "#94a3b8", "#1e293b", "#38bdf8"
+    BG_MAIN, BG_CARD, BG_SUB, TEXT_MAIN, TEXT_SUB, BORDER_C, ACCENT_C = "#060a12", "#0f172a", "#141f38", "#f8fafc", "#94a3b8", "#1e293b", "#f59e0b"
     BTN_BG, BTN_BORDER, CARD_SHADOW = "linear-gradient(135deg,#111c33,#1e293b)", "#38bdf866", "0 6px 18px rgba(0,0,0,0.38)"
 
 st.markdown(f"""
 <style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
+
 header[data-testid="stHeader"], div[data-testid="stToolbar"], div[data-testid="stDecoration"] {{ display:none !important; }}
-html, body, [data-testid="stAppViewContainer"], .main {{ background-color:{BG_MAIN} !important; color:{TEXT_MAIN} !important; scroll-behavior:smooth !important; }}
-.block-container {{ padding-top:1.15rem !important; padding-bottom:4.8rem !important; max-width:97% !important; }}
-a.brand-logo-link {{ text-decoration:none !important; display:inline-flex; align-items:center; gap:11px; padding:2px 6px; border-radius:12px; transition:all 0.2s ease; }}
-a.brand-logo-link:hover {{ background:rgba(56,189,248,0.10); }}
-.logo-badge {{ font-size:1.72rem; background:linear-gradient(135deg,{ACCENT_C},#2563eb); padding:4px 10px; border-radius:12px; box-shadow:0 4px 12px rgba(14,165,233,0.38); }}
-.brand-title {{ font-size:1.30rem; font-weight:800; color:{TEXT_MAIN} !important; line-height:1.15; }}
+html, body, [data-testid="stAppViewContainer"], .main, p, span, div, label, button {{
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
+}}
+html, body, [data-testid="stAppViewContainer"], .main {{
+    background-color:{BG_MAIN} !important;
+    color:{TEXT_MAIN} !important;
+    scroll-behavior:smooth !important;
+}}
+.block-container {{ padding-top:1.1rem !important; padding-bottom:4.8rem !important; max-width:97% !important; }}
+
+/* ORIGINAL CLEAN COMPASS ICON (NO BLUE RADIUS BOX) & GLOWING DUAL-THEME BRAND TITLE */
+a.brand-logo-link {{
+    text-decoration:none !important;
+    display:inline-flex;
+    align-items:center;
+    gap:10px;
+    padding:2px 4px;
+    transition:transform 0.2s ease;
+}}
+a.brand-logo-link:hover {{ transform:translateY(-1px); }}
+.clean-compass-icon {{
+    font-size:2.2rem;
+    line-height:1;
+    background:transparent !important;
+    border:none !important;
+    padding:0 !important;
+    box-shadow:none !important;
+    filter:drop-shadow(0 2px 6px rgba(245,158,11,0.35));
+}}
+.brand-title-glow {{
+    font-size:1.38rem;
+    font-weight:800;
+    letter-spacing:-0.4px;
+    line-height:1.18;
+    background:linear-gradient(90deg, #f59e0b 0%, #ef4444 48%, #10b981 100%);
+    -webkit-background-clip:text;
+    -webkit-text-fill-color:transparent;
+    filter:drop-shadow(0 1px 8px rgba(245,158,11,0.22));
+}}
 .brand-subtitle {{ font-size:0.73rem; font-weight:600; color:{TEXT_SUB} !important; }}
-[data-testid="stWidgetLabel"] p, [data-testid="stWidgetLabel"] label, .stSelectbox label, .stNumberInput label, .stRadio label, [data-testid="stRadio"] label span, [data-testid="stToggle"] label p, [data-testid="stCheckbox"] label p {{ color:{TEXT_MAIN} !important; font-weight:700 !important; font-size:0.82rem !important; opacity:1 !important; }}
+
+/* LABELS, BUTTONS & LINK BUTTONS (FIXES WHITE LINK BUTTONS) */
+[data-testid="stWidgetLabel"] p, [data-testid="stWidgetLabel"] label, .stSelectbox label, .stNumberInput label, .stRadio label, [data-testid="stRadio"] label span, [data-testid="stToggle"] label p, [data-testid="stCheckbox"] label p {{
+    color:{TEXT_MAIN} !important; font-weight:700 !important; font-size:0.81rem !important; opacity:1 !important;
+}}
 [data-testid="stRadio"] div[role="radiogroup"] {{ background:{BG_CARD}; border:1px solid {BORDER_C}; padding:3px 10px; border-radius:999px; gap:10px !important; }}
-div.stButton > button, button[data-testid="stBaseButton-secondary"], div.stDownloadButton > button {{ background:{BTN_BG} !important; color:{TEXT_MAIN} !important; border:1.5px solid {BTN_BORDER} !important; border-radius:10px !important; font-weight:800 !important; font-size:0.81rem !important; padding:0.42rem 0.85rem !important; box-shadow:{CARD_SHADOW} !important; transition:all 0.2s ease !important; }}
-div.stButton > button p, div.stDownloadButton > button p {{ color:{TEXT_MAIN} !important; font-weight:800 !important; }}
-div.stButton > button:hover, div.stDownloadButton > button:hover {{ background:linear-gradient(135deg,#0284c7,#2563eb) !important; color:#fff !important; border-color:{ACCENT_C} !important; transform:translateY(-2px) !important; }}
-div.stButton > button:hover p {{ color:#fff !important; }}
-button[data-baseweb="tab"] {{ background:{BG_CARD} !important; border:1px solid {BORDER_C} !important; border-radius:10px 10px 0 0 !important; margin-right:4px !important; padding:7px 14px !important; }}
-button[data-baseweb="tab"] p {{ color:{TEXT_SUB} !important; font-weight:700 !important; font-size:0.84rem !important; }}
-button[data-baseweb="tab"][aria-selected="true"] {{ background:linear-gradient(135deg,rgba(2,132,199,0.28),rgba(37,99,235,0.22)) !important; border-bottom:3px solid {ACCENT_C} !important; }}
-button[data-baseweb="tab"][aria-selected="true"] p {{ color:{ACCENT_C} !important; font-weight:800 !important; }}
-[data-testid="stExpander"] details {{ background:{BG_CARD} !important; border:1.5px solid {BORDER_C} !important; border-radius:12px !important; box-shadow:{CARD_SHADOW}; }}
-[data-testid="stExpander"] summary p {{ color:{TEXT_MAIN} !important; font-weight:800 !important; font-size:0.88rem !important; }}
+
+div.stButton > button, button[data-testid="stBaseButton-secondary"], div.stDownloadButton > button,
+div.stLinkButton > a, a[data-testid="stBaseLinkButton-secondary"] {{
+    background:{BTN_BG} !important;
+    color:{TEXT_MAIN} !important;
+    border:1.5px solid {BTN_BORDER} !important;
+    border-radius:10px !important;
+    font-weight:800 !important;
+    font-size:0.80rem !important;
+    padding:0.42rem 0.85rem !important;
+    box-shadow:{CARD_SHADOW} !important;
+    text-decoration:none !important;
+    transition:all 0.2s ease !important;
+}}
+div.stButton > button p, div.stDownloadButton > button p, div.stLinkButton > a p, a[data-testid="stBaseLinkButton-secondary"] p, a[data-testid="stBaseLinkButton-secondary"] span {{
+    color:{TEXT_MAIN} !important; font-weight:800 !important;
+}}
+div.stButton > button:hover, div.stDownloadButton > button:hover, div.stLinkButton > a:hover, a[data-testid="stBaseLinkButton-secondary"]:hover {{
+    background:linear-gradient(135deg,#f59e0b,#ea580c) !important;
+    color:#ffffff !important;
+    border-color:#f59e0b !important;
+    transform:translateY(-2px) !important;
+}}
+div.stButton > button:hover p, div.stLinkButton > a:hover p, a[data-testid="stBaseLinkButton-secondary"]:hover p, a[data-testid="stBaseLinkButton-secondary"]:hover span {{
+    color:#ffffff !important;
+}}
+
+/* HIGH-CONTRAST TABS & SINGLE-LINE EXPANDERS (FIXES STAGGERED GAUGES) */
+button[data-baseweb="tab"] {{
+    background:{BG_CARD} !important;
+    border:1.5px solid {BORDER_C} !important;
+    border-radius:10px 10px 0 0 !important;
+    margin-right:6px !important;
+    padding:8px 16px !important;
+}}
+button[data-baseweb="tab"] p {{
+    color:{TEXT_MAIN} !important;
+    font-weight:700 !important;
+    font-size:0.84rem !important;
+    opacity:0.88 !important;
+}}
+button[data-baseweb="tab"][aria-selected="true"] {{
+    background:linear-gradient(135deg,rgba(245,158,11,0.22),rgba(16,185,129,0.18)) !important;
+    border-color:#f59e0b !important;
+    border-bottom:3px solid #f59e0b !important;
+}}
+button[data-baseweb="tab"][aria-selected="true"] p {{
+    color:#f59e0b !important;
+    font-weight:800 !important;
+    opacity:1 !important;
+}}
+[data-testid="stExpander"] details {{
+    background:{BG_CARD} !important;
+    border:1px solid {BORDER_C} !important;
+    border-radius:10px !important;
+    box-shadow:{CARD_SHADOW};
+}}
+[data-testid="stExpander"] summary {{
+    padding:8px 12px !important;
+}}
+[data-testid="stExpander"] summary p {{
+    color:{TEXT_MAIN} !important;
+    font-weight:700 !important;
+    font-size:0.80rem !important;
+    white-space:nowrap !important;
+    overflow:hidden !important;
+    text-overflow:ellipsis !important;
+}}
+
+/* UNIFORM SINGLE-LINE SECTION HEADERS (FIXES TABLE MISALIGNMENT) */
+. aligned-sec-hdr {{
+    font-size:0.90rem;
+    font-weight:800;
+    color:{TEXT_MAIN};
+    background:{BG_CARD};
+    border:1px solid {BORDER_C};
+    border-left:4px solid #f59e0b;
+    padding:7px 12px;
+    border-radius:8px;
+    margin-bottom:8px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+}}
+
+/* PULSE BAR & TURNAROUND HERO DECK */
 .pulse-bar {{ background:{BG_CARD}; border:1px solid {BORDER_C}; border-radius:12px; padding:8px 14px; margin:6px 0 10px 0; display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:8px; box-shadow:{CARD_SHADOW}; }}
-.pulse-item {{ font-size:0.82rem; font-weight:700; color:{TEXT_MAIN}; }}
-.compass-pill {{ padding:3px 10px; border-radius:999px; font-size:0.75rem; font-weight:800; }}
-/* PRIORITY 1: SECTOR TURNAROUND HERO DECK */
-.turnaround-hero-box {{ background:{BG_CARD}; border:1.5px solid {ACCENT_C}; border-left:5px solid #10b981; border-radius:12px; padding:10px 14px; margin:4px 0 10px 0; box-shadow:{CARD_SHADOW}; }}
-.turnaround-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:8px; margin-top:8px; }}
-a.turn-sec-card {{ text-decoration:none !important; background:{BG_SUB}; border:1px solid #10b98166; border-radius:10px; padding:8px 11px; color:{TEXT_MAIN} !important; display:block; transition:all 0.18s ease; }}
-a.turn-sec-card:hover {{ border-color:{ACCENT_C}; transform:translateY(-2px); box-shadow:0 4px 12px rgba(16,185,129,0.22); }}
-/* PRIORITY 2: COLLAPSIBLE NEXT-DAY INTRADAY WATCHLIST */
-.radar-panel-bull {{ background:{BG_CARD}; border:1px solid #10b98166; border-top:3.5px solid #10b981; border-radius:12px; padding:10px 12px; margin-bottom:8px; height:100%; }}
-.radar-panel-bear {{ background:{BG_CARD}; border:1px solid #ef444466; border-top:3.5px solid #ef4444; border-radius:12px; padding:10px 12px; margin-bottom:8px; height:100%; }}
+.pulse-item {{ font-size:0.81rem; font-weight:700; color:{TEXT_MAIN}; font-family:'JetBrains Mono',monospace !important; }}
+.compass-pill {{ padding:3px 10px; border-radius:999px; font-size:0.74rem; font-weight:800; }}
+.turnaround-hero-box {{ background:{BG_CARD}; border:1.5px solid {BORDER_C}; border-left:5px solid #10b981; border-radius:12px; padding:10px 14px; margin:4px 0 10px 0; box-shadow:{CARD_SHADOW}; }}
+.turnaround-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:8px; margin-top:8px; }}
+a.turn-sec-card {{ text-decoration:none !important; background:{BG_SUB}; border:1px solid #10b98155; border-radius:10px; padding:8px 11px; color:{TEXT_MAIN} !important; display:flex; flex-direction:column; justify-content:space-between; height:84px; transition:all 0.18s ease; }}
+a.turn-sec-card:hover {{ border-color:#f59e0b; transform:translateY(-2px); box-shadow:0 4px 12px rgba(16,185,129,0.22); }}
+.t-sec-name {{ font-weight:800; font-size:0.81rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:145px; }}
+
+/* NEXT-DAY WATCHLIST CARDS */
+.radar-panel-bull {{ background:{BG_CARD}; border:1px solid #10b98166; border-top:3.5px solid #10b981; border-radius:12px; padding:10px 12px; margin-bottom:8px; }}
+.radar-panel-bear {{ background:{BG_CARD}; border:1px solid #ef444466; border-top:3.5px solid #ef4444; border-radius:12px; padding:10px 12px; margin-bottom:8px; }}
 .radar-panel-header {{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-bottom:5px; border-bottom:1px solid {BORDER_C}; }}
 .radar-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(235px,1fr)); gap:7px; }}
-a.radar-row-card {{ text-decoration:none !important; background:{BG_SUB}; border:1px solid {BORDER_C}; border-radius:9px; padding:8px 10px; color:{TEXT_MAIN} !important; display:flex; flex-direction:column; gap:4px; transition:all 0.18s ease; }}
-a.radar-row-card:hover {{ border-color:{ACCENT_C}; transform:translateY(-2px); }}
+a.radar-row-card {{ text-decoration:none !important; background:{BG_SUB}; border:1px solid {BORDER_C}; border-radius:9px; padding:8px 10px; color:{TEXT_MAIN} !important; display:flex; flex-direction:column; justify-content:space-between; min-height:96px; transition:all 0.18s ease; }}
+a.radar-row-card:hover {{ border-color:#f59e0b; transform:translateY(-2px); }}
 .r-top {{ display:flex; justify-content:space-between; align-items:center; }}
-.r-sym {{ font-size:0.88rem; font-weight:800; color:{TEXT_MAIN}; }}
-.r-tag-bull {{ background:rgba(16,185,129,0.16); color:#34d399; border:1px solid #10b98155; padding:1px 6px; border-radius:5px; font-size:0.68rem; font-weight:700; }}
-.r-tag-bear {{ background:rgba(239,68,68,0.16); color:#f87171; border:1px solid #ef444455; padding:1px 6px; border-radius:5px; font-size:0.68rem; font-weight:700; }}
-.r-mid {{ display:flex; justify-content:space-between; font-size:0.75rem; color:{TEXT_SUB}; }}
-.r-reason-box {{ font-size:0.72rem; color:{TEXT_MAIN}; background:rgba(56,189,248,0.10); border-left:2.5px solid {ACCENT_C}; padding:3px 7px; border-radius:4px; }}
-.r-plan {{ display:flex; justify-content:space-between; font-size:0.71rem; font-weight:700; background:rgba(0,0,0,0.18); padding:3px 7px; border-radius:6px; }}
-a.wa-share-btn {{ text-decoration:none !important; background:linear-gradient(135deg,#16a34a,#22c55e); color:#fff !important; padding:5px 13px; border-radius:999px; font-size:0.76rem; font-weight:800; display:inline-flex; align-items:center; gap:5px; }}
+.r-sym {{ font-size:0.84rem; font-weight:800; color:{TEXT_MAIN}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:155px; }}
+.r-tag-bull {{ background:rgba(16,185,129,0.16); color:#10b981; border:1px solid #10b98155; padding:1px 6px; border-radius:5px; font-size:0.66rem; font-weight:800; }}
+.r-tag-bear {{ background:rgba(239,68,68,0.16); color:#ef4444; border:1px solid #ef444455; padding:1px 6px; border-radius:5px; font-size:0.66rem; font-weight:800; }}
+.r-mid {{ display:flex; justify-content:space-between; font-size:0.73rem; color:{TEXT_SUB}; }}
+.r-reason-box {{ font-size:0.70rem; color:{TEXT_MAIN}; background:rgba(245,158,11,0.10); border-left:2.5px solid #f59e0b; padding:3px 7px; border-radius:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
+.r-plan {{ display:flex; justify-content:space-between; font-size:0.70rem; font-weight:700; background:rgba(0,0,0,0.16); padding:3px 7px; border-radius:6px; font-family:'JetBrains Mono',monospace !important; }}
+a.wa-share-btn {{ text-decoration:none !important; background:linear-gradient(135deg,#16a34a,#22c55e); color:#fff !important; padding:5px 13px; border-radius:999px; font-size:0.75rem; font-weight:800; display:inline-flex; align-items:center; gap:5px; }}
+
+/* MARQUEE & KPI CARDS (FIXED EQUAL HEIGHTS) */
 .marquee-wrap {{ background:{BG_CARD}; border:1px solid {BORDER_C}; border-radius:10px; padding:7px 10px; overflow:hidden; white-space:nowrap; margin:6px 0 12px 0; box-shadow:{CARD_SHADOW}; }}
 .marquee-track {{ display:inline-block; animation:ticker-move 55s linear infinite; }}
 .marquee-wrap:hover .marquee-track {{ animation-play-state:paused; }}
 @keyframes ticker-move {{ 0% {{ transform:translateX(0%); }} 100% {{ transform:translateX(-50%); }} }}
-a.sec-pill-up, a.sec-pill-down {{ text-decoration:none !important; display:inline-flex; align-items:center; gap:5px; padding:3px 11px; margin-right:8px; border-radius:999px; font-size:0.75rem; font-weight:700; }}
-a.sec-pill-up {{ background:rgba(16,185,129,0.14); border:1px solid #10b981; color:#34d399 !important; }}
-a.sec-pill-down {{ background:rgba(239,68,68,0.14); border:1px solid #ef4444; color:#f87171 !important; }}
-.kpi-card {{ background:{BG_CARD}; border:1.5px solid {BORDER_C}; border-radius:12px; padding:10px 14px; min-height:104px; display:flex; flex-direction:column; justify-content:space-between; margin-bottom:6px; box-shadow:{CARD_SHADOW}; }}
-.kpi-title {{ color:{TEXT_SUB}; font-size:0.77rem; font-weight:700; }}
-.kpi-val {{ font-size:1.14rem; font-weight:800; color:{TEXT_MAIN}; margin:3px 0; }}
-.kpi-sub-up {{ background:rgba(16,185,129,0.15); color:#34d399; border:1px solid #10b98155; padding:2px 8px; border-radius:6px; font-size:0.70rem; font-weight:700; width:fit-content; }}
-.kpi-sub-down {{ background:rgba(239,68,68,0.15); color:#f87171; border:1px solid #ef444455; padding:2px 8px; border-radius:6px; font-size:0.70rem; font-weight:700; width:fit-content; }}
-.pill-container {{ display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }}
-a.bull-pill, a.bear-pill {{ text-decoration:none !important; padding:3px 9px; border-radius:999px; font-size:0.72rem; font-weight:700; display:inline-flex; align-items:center; gap:4px; }}
-a.bull-pill {{ background:rgba(16,185,129,0.14); border:1px solid #10b98199; color:#34d399 !important; }}
-a.bear-pill {{ background:rgba(239,68,68,0.14); border:1px solid #ef444499; color:#f87171 !important; }}
-a.single-top-btn {{ position:fixed; bottom:58px; right:18px; z-index:999999; text-decoration:none !important; background:linear-gradient(135deg,#0ea5e9,#2563eb); color:#fff !important; padding:8px 15px; border-radius:999px; font-size:0.80rem; font-weight:800; border:1.5px solid rgba(255,255,255,0.35); box-shadow:0 6px 20px rgba(2,132,199,0.55); }}
+a.sec-pill-up, a.sec-pill-down {{ text-decoration:none !important; display:inline-flex; align-items:center; gap:5px; padding:3px 11px; margin-right:8px; border-radius:999px; font-size:0.74rem; font-weight:700; }}
+a.sec-pill-up {{ background:rgba(16,185,129,0.14); border:1px solid #10b981; color:#10b981 !important; }}
+a.sec-pill-down {{ background:rgba(239,68,68,0.14); border:1px solid #ef4444; color:#ef4444 !important; }}
+.kpi-card {{ background:{BG_CARD}; border:1.5px solid {BORDER_C}; border-radius:12px; padding:10px 14px; height:102px; display:flex; flex-direction:column; justify-content:space-between; margin-bottom:6px; box-shadow:{CARD_SHADOW}; }}
+.kpi-title {{ color:{TEXT_SUB}; font-size:0.75rem; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
+.kpi-val {{ font-size:1.08rem; font-weight:800; color:{TEXT_MAIN}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
+.kpi-sub-up {{ background:rgba(16,185,129,0.15); color:#10b981; border:1px solid #10b98155; padding:2px 8px; border-radius:6px; font-size:0.69rem; font-weight:700; width:fit-content; }}
+.kpi-sub-down {{ background:rgba(239,68,68,0.15); color:#ef4444; border:1px solid #ef444455; padding:2px 8px; border-radius:6px; font-size:0.69rem; font-weight:700; width:fit-content; }}
+.pill-container {{ display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }}
+a.bull-pill, a.bear-pill {{ text-decoration:none !important; padding:3px 8px; border-radius:999px; font-size:0.71rem; font-weight:700; display:inline-flex; align-items:center; gap:4px; }}
+a.bull-pill {{ background:rgba(16,185,129,0.14); border:1px solid #10b98199; color:#10b981 !important; }}
+a.bear-pill {{ background:rgba(239,68,68,0.14); border:1px solid #ef444499; color:#ef4444 !important; }}
+a.single-top-btn {{ position:fixed; bottom:58px; right:18px; z-index:999999; text-decoration:none !important; background:linear-gradient(135deg,#f59e0b,#ea580c); color:#fff !important; padding:8px 15px; border-radius:999px; font-size:0.80rem; font-weight:800; border:1.5px solid rgba(255,255,255,0.35); box-shadow:0 6px 20px rgba(245,158,11,0.5); }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -260,7 +378,7 @@ def make_stock_pills(df_sub: pd.DataFrame) -> str:
         qt = urllib.parse.quote(str(r["Ticker"]))
         cls = "bull-pill" if safe_num(r.get("1D", 0.0)) >= 0 else "bear-pill"
         icon = "🟢" if safe_num(r.get("1D", 0.0)) >= 0 else "🔴"
-        pills.append(f'<a class="{cls}" href="?focus_stock={qt}" target="_self">{icon} {r["Symbol"]} Chart</a>')
+        pills.append(f'<a class="{cls}" href="?focus_stock={qt}" target="_self">{icon} {r["Symbol"]}</a>')
     return f'<div class="pill-container">{"".join(pills)}</div>'
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -346,23 +464,23 @@ def load_full_market_data():
             upper_wick = safe_num((h_now - max(o_now, c_now)) / rng, 0.0)
             rng_3d_pct = safe_num(((float(highs.iloc[-3:].max()) - float(lows.iloc[-3:].min())) / c_now) * 100.0, 10.0)
 
-            bull_candle = "Dragonfly Doji" if (body_pct <= 0.28 and lower_wick >= 0.42) else ("Hammer Reversal" if (lower_wick >= 0.48 and body_pct <= 0.42) else ("Bullish Doji" if (body_pct <= 0.28 and c_now >= o_now) else ("Tight Base" if (rng_3d_pct <= 4.2 and c_now >= o_now) else ("Bottom Demand" if (lower_wick >= 0.35 and r_1d >= 0) else None))))
-            bear_candle = "Gravestone Doji" if (body_pct <= 0.28 and upper_wick >= 0.42) else ("Shooting Star" if (upper_wick >= 0.48 and body_pct <= 0.42) else ("Bearish Doji" if (body_pct <= 0.28 and c_now < o_now) else ("Supply Stall" if (rng_3d_pct <= 4.2 and c_now < o_now) else ("Upper Wick Reject" if (upper_wick >= 0.35 and r_1d < 0) else None))))
+            bull_candle = "Dragonfly Doji" if (body_pct <= 0.28 and lower_wick >= 0.42) else ("Hammer" if (lower_wick >= 0.48 and body_pct <= 0.42) else ("Bullish Doji" if (body_pct <= 0.28 and c_now >= o_now) else ("Tight Base" if (rng_3d_pct <= 4.2 and c_now >= o_now) else ("Bottom Turn" if (lower_wick >= 0.35 and r_1d >= 0) else None))))
+            bear_candle = "Gravestone Doji" if (body_pct <= 0.28 and upper_wick >= 0.42) else ("Shooting Star" if (upper_wick >= 0.48 and body_pct <= 0.42) else ("Bearish Doji" if (body_pct <= 0.28 and c_now < o_now) else ("Supply Stall" if (rng_3d_pct <= 4.2 and c_now < o_now) else ("Top Reject" if (upper_wick >= 0.35 and r_1d < 0) else None))))
 
             tr = pd.concat([highs - lows, (highs - closes.shift(1)).abs(), (lows - closes.shift(1)).abs()], axis=1).max(axis=1)
             atr_clean = round(max(safe_num(tr.rolling(14).mean().iloc[-1], c_now * 0.018), c_now * 0.008), 2)
             dist_20 = round(safe_num(((c_now - dma20) / dma20) * 100.0, 0.0), 2) if dma20 > 0 else 0.0
 
             if rsi_val >= 75 or consec_up >= 4:
-                action_sig = "⚠️ Overbought (Wait)"
+                action_sig = "⚠️ Overbought"
             elif bull_candle and consec_up <= 2 and vol_ratio >= 1.15:
                 action_sig = "🟢 Turnaround Buy"
             elif c_now >= dma50 and -2.5 <= dist_20 <= 3.5 and 45 <= rsi_val <= 65:
-                action_sig = "💎 Safe Swing Buy"
+                action_sig = "💎 Swing Buy"
             elif bear_candle and consec_down <= 2 and vol_ratio >= 1.15:
-                action_sig = "🔴 Top Rejection Short"
+                action_sig = "🔴 Top Short"
             else:
-                action_sig = "⚖️ Hold / Watch"
+                action_sig = "⚖️ Watch"
 
             conf_score = int(np.clip(55 + min(vol_ratio * 12, 25) + (10 if c_now >= dma50 else -5) + (8 if (bull_candle or bear_candle) else 0), 45, 96))
 
@@ -387,7 +505,6 @@ def load_full_market_data():
     if stocks_df.empty:
         return pd.DataFrame(), pd.DataFrame()
 
-    # SCIENTIFIC SECTOR TURNAROUND SCORING ENGINE (PRIORITY 1)
     sec_rows = []
     for sec_name, grp in stocks_df.groupby("Sector"):
         s_1d, s_1w, s_1m = safe_num(grp["1D"].mean()), safe_num(grp["1W"].mean()), safe_num(grp["1M"].mean())
@@ -396,13 +513,11 @@ def load_full_market_data():
         s_b20 = safe_num((grp["Above_20DMA"].sum() / max(len(grp), 1)) * 100.0, 50.0)
         s_b50 = safe_num((grp["Above_50DMA"].sum() / max(len(grp), 1)) * 100.0, 50.0)
 
-        # Turnaround Logic: Sector was down/correcting in 1M or 3M, and is now reversing upward in 1D/1W with volume
         was_correcting = (s_1m <= 2.2) or (s_3m <= 3.5) or (s_1w <= 1.5)
         reversing_up = (s_1d >= -0.05) and ((s_1d > (s_1w / 5.0)) or (s_1w > (s_1m / 4.0)))
         sec_bull_turn = bool(was_correcting and reversing_up)
         sec_bear_roll = bool((s_1m >= 1.5 or s_1w >= 1.0) and (s_1d <= 0.15) and (s_1d < (s_1w / 5.0)))
 
-        # Turnaround Score (Higher = stronger bottom recovery with volume)
         turn_score = round(
             (35.0 if sec_bull_turn else 0.0)
             + (max(0.0, 3.0 - s_1m) * 3.2 if reversing_up else 0.0)
@@ -413,12 +528,11 @@ def load_full_market_data():
         )
 
         meter = int(np.clip(safe_num(50.0 + (s_1w * 3.5) + (s_1d * 6.0) + ((s_rsi - 50.0) * 0.6), 50.0), 5, 98))
-        zone = "🔄 Stage 1: Bottom Turnaround" if (sec_bull_turn and s_1d >= 0) else (
-            "🚀 Stage 2: Leading Momentum" if (s_1w >= 2.0 and s_1d >= 0) else (
-                "⚠️ Stage 3: Top Exhaustion" if (sec_bear_roll and s_1d < 0) else "💎 Stage 4: Value / Oversold Watch"
+        zone = "🔄 Turnaround" if (sec_bull_turn and s_1d >= 0) else (
+            "🚀 Leading" if (s_1w >= 2.0 and s_1d >= 0) else (
+                "⚠️ Exhaustion" if (sec_bear_roll and s_1d < 0) else "💎 Value Watch"
             )
         )
-
         top_pick_sym = grp.sort_values(["Vol_Ratio", "1D"], ascending=[False, False]).iloc[0]["Symbol"]
 
         sec_rows.append({
@@ -470,14 +584,14 @@ def run_chartink_15m_scanner(stocks_df: pd.DataFrame):
                     bull_15m.append({
                         "Symbol": tk.replace(".NS", ""), "Ticker": tk, "Sector": d_info["Sector"], "Price": round(c15, 2),
                         "VWAP": round(vwap15, 2), "Vol_Ratio": v15_ratio, "RSI": rsi15, "1D": d_info["1D"], "Confidence": d_info["Confidence"],
-                        "Reason": "⚡ 15m Open≈Low + Close > VWAP & Prev High + Vol Spike", "Entry": round(max(c15, h15 * 1.0005), 2),
+                        "Reason": "⚡ 15m Open≈Low + Above VWAP & Prev High", "Entry": round(max(c15, h15 * 1.0005), 2),
                         "SL": round(min(l15, vwap15 * 0.995), 2), "Target": round(c15 + 1.6 * d_info["ATR"], 2),
                     })
                 if (o15 >= h15 * 0.995 or c15 < o15) and c15 <= d_info["Prev_Low"] * 1.004 and v15_ratio >= 1.30 and (22 <= rsi15 <= 44) and c15 < vwap15:
                     bear_15m.append({
                         "Symbol": tk.replace(".NS", ""), "Ticker": tk, "Sector": d_info["Sector"], "Price": round(c15, 2),
                         "VWAP": round(vwap15, 2), "Vol_Ratio": v15_ratio, "RSI": rsi15, "1D": d_info["1D"], "Confidence": d_info["Confidence"],
-                        "Reason": "📉 15m Open≈High + Close < VWAP & Prev Low + Supply Vol", "Entry": round(min(c15, l15 * 0.9995), 2),
+                        "Reason": "📉 15m Open≈High + Below VWAP & Prev Low", "Entry": round(min(c15, l15 * 0.9995), 2),
                         "SL": round(max(h15, vwap15 * 1.005), 2), "Target": round(c15 - 1.6 * d_info["ATR"], 2),
                     })
             except Exception:
@@ -490,33 +604,25 @@ def run_chartink_15m_scanner(stocks_df: pd.DataFrame):
             bull_15m.append({"Symbol": r["Symbol"], "Ticker": r["Ticker"], "Sector": r["Sector"], "Price": r["Price"], "VWAP": round(r["Price"] * 0.994, 2), "Vol_Ratio": r["Vol_Ratio"], "RSI": r["RSI"], "1D": r["1D"], "Confidence": r["Confidence"], "Reason": "⚡ Near Prev High Breakout + Above 20-DMA", "Entry": r["Buy_Entry"], "SL": r["Buy_SL"], "Target": r["Buy_Target"]})
     if not bear_15m:
         for _, r in active_pool[active_pool["1D"] < 0].head(6).iterrows():
-            bear_15m.append({"Symbol": r["Symbol"], "Ticker": r["Ticker"], "Sector": r["Sector"], "Price": r["Price"], "VWAP": round(r["Price"] * 1.006, 2), "Vol_Ratio": r["Vol_Ratio"], "RSI": r["RSI"], "1D": r["1D"], "Confidence": r["Confidence"], "Reason": "📉 Below Intraday VWAP + Weak Momentum", "Entry": r["Short_Entry"], "SL": r["Short_SL"], "Target": r["Short_Target"]})
+            bear_15m.append({"Symbol": r["Symbol"], "Ticker": r["Ticker"], "Sector": r["Sector"], "Price": r["Price"], "VWAP": round(r["Price"] * 1.006, 2), "Vol_Ratio": r["Vol_Ratio"], "RSI": r["RSI"], "1D": r["1D"], "Confidence": r["Confidence"], "Reason": "📉 Below Intraday VWAP + Supply Pressure", "Entry": r["Short_Entry"], "SL": r["Short_SL"], "Target": r["Short_Target"]})
 
     return pd.DataFrame(bull_15m), pd.DataFrame(bear_15m)
 
 def filter_next_day_intraday_stocks(stocks_df: pd.DataFrame):
     df = stocks_df.copy()
     b_cand = df[(df["Consec_Up"] <= 2) & (df["1D"] >= -0.3) & (df["1D"] <= 3.8) & (df["Vol_Ratio"] >= 1.10)].copy()
-    b_cand["Bull_Candle"] = b_cand["Bull_Candle"].fillna("Tight Base Doji")
+    b_cand["Bull_Candle"] = b_cand["Bull_Candle"].fillna("Tight Base")
     b_cand["Score"] = (b_cand["Vol_Ratio"] * 28.0) + np.where(b_cand["Sec_Bull_Turn"], 35.0, 0.0) + ((1.0 - b_cand["Body_Pct"]) * 22.0)
     bull8 = b_cand.sort_values("Score", ascending=False).head(8).copy()
-    bull8["Reason"] = (
-        "Why: " + bull8["Bull_Candle"].astype(str)
-        + " | Vol " + bull8["Vol_Ratio"].astype(str) + "x"
-        + " | Sector (" + bull8["Sector"].astype(str) + ") 1M " + bull8["Sec_1M"].astype(str) + "% → Turning Up"
-    )
+    bull8["Reason"] = bull8["Bull_Candle"].astype(str) + " • Vol " + bull8["Vol_Ratio"].astype(str) + "x • Sec 1M " + bull8["Sec_1M"].astype(str) + "%→Up"
     bull8["Entry"], bull8["SL"], bull8["Target"] = bull8["Buy_Entry"], bull8["Buy_SL"], bull8["Buy_Target"]
 
     used = set(bull8["Ticker"].tolist())
     br_cand = df[(~df["Ticker"].isin(used)) & (df["Consec_Down"] <= 2) & (df["1D"] <= 0.3) & (df["1D"] >= -3.8) & (df["Vol_Ratio"] >= 1.08)].copy()
-    br_cand["Bear_Candle"] = br_cand["Bear_Candle"].fillna("Top Supply Stall")
+    br_cand["Bear_Candle"] = br_cand["Bear_Candle"].fillna("Supply Stall")
     br_cand["Score"] = (br_cand["Vol_Ratio"] * 28.0) + np.where(br_cand["Sec_Bear_Roll"], 35.0, 0.0) + ((1.0 - br_cand["Body_Pct"]) * 22.0)
     bear8 = br_cand.sort_values("Score", ascending=False).head(8).copy()
-    bear8["Reason"] = (
-        "Why: " + bear8["Bear_Candle"].astype(str)
-        + " | Vol " + bear8["Vol_Ratio"].astype(str) + "x"
-        + " | Sector (" + bear8["Sector"].astype(str) + ") Losing Steam"
-    )
+    bear8["Reason"] = bear8["Bear_Candle"].astype(str) + " • Vol " + bear8["Vol_Ratio"].astype(str) + "x • Top Rejection"
     bear8["Entry"], bear8["SL"], bear8["Target"] = bear8["Short_Entry"], bear8["Short_SL"], bear8["Short_Target"]
     return bull8, bear8
 
@@ -524,10 +630,10 @@ def style_colored_table(df: pd.DataFrame, pct_cols: list):
     def color_pct(val):
         if pd.isna(val) or not isinstance(val, (int, float, np.number)):
             return ""
-        return "color:#34d399;font-weight:700;" if val > 0 else ("color:#f87171;font-weight:700;" if val < 0 else "color:#94a3b8;")
+        return "color:#10b981;font-weight:700;" if val > 0 else ("color:#ef4444;font-weight:700;" if val < 0 else "color:#94a3b8;")
     return df.style.map(color_pct, subset=[c for c in pct_cols if c in df.columns]).format(precision=2)
 
-with st.spinner(f"⚡ Scanning {len(ALL_TICKERS)}+ Nifty 500 Stocks across {len(SECTOR_STOCKS)} Sectors for Bottom Turnarounds..."):
+with st.spinner(f"⚡ Scanning {len(ALL_TICKERS)}+ Nifty 500 Stocks across {len(SECTOR_STOCKS)} Sectors..."):
     pulse = load_pulse_indices()
     stocks_df, sectors_df = load_full_market_data()
 
@@ -542,24 +648,24 @@ n_d, b_d, v_d, u_d = pulse["NIFTY"], pulse["BANKNIFTY"], pulse["VIX"], pulse["US
 adv_today, dec_today = int((stocks_df["1D"] > 0).sum()), int((stocks_df["1D"] < 0).sum())
 
 if n_d["1D"] >= 0.20 and adv_today >= dec_today:
-    c_txt, c_sty = "🟢 Bullish Market — Focus on Turnaround BUY Setups", "background:rgba(16,185,129,0.18);color:#34d399;border:1px solid #10b98166;"
+    c_txt, c_sty = "🟢 Bullish Bias — Track Turnaround BUY Setups", "background:rgba(16,185,129,0.16);color:#10b981;border:1px solid #10b98155;"
 elif n_d["1D"] <= -0.20 and dec_today > adv_today:
-    c_txt, c_sty = "🔴 Bearish Market — Focus on Top Rejection SHORT Setups", "background:rgba(239,68,68,0.18);color:#f87171;border:1px solid #ef444466;"
+    c_txt, c_sty = "🔴 Bearish Bias — Track Top SHORT Setups", "background:rgba(239,68,68,0.16);color:#ef4444;border:1px solid #ef444455;"
 else:
-    c_txt, c_sty = "⚖️ Rotational Market — Track Bottom Turnaround Sectors", "background:rgba(251,191,36,0.18);color:#fbbf24;border:1px solid #fbbf2466;"
+    c_txt, c_sty = "⚖️ Rotational Market — Focus on Turnaround Sectors", "background:rgba(245,158,11,0.16);color:#f59e0b;border:1px solid #f59e0b55;"
 
 st.markdown(
     f'<div class="pulse-bar">'
-    f'<div class="pulse-item">🇮🇳 Nifty 50: <span style="color:{"#34d399" if n_d["1D"]>=0 else "#f87171"};">{n_d["price"]:,.1f} ({n_d["1D"]:+.2f}%)</span></div>'
-    f'<div class="pulse-item">🏛️ Bank Nifty: <span style="color:{"#34d399" if b_d["1D"]>=0 else "#f87171"};">{b_d["price"]:,.1f} ({b_d["1D"]:+.2f}%)</span></div>'
-    f'<div class="pulse-item">⚡ India VIX: <span style="color:#34d399;">{v_d["price"]:.2f} ({v_d["1D"]:+.2f}%)</span></div>'
-    f'<div class="pulse-item">💵 USD/INR: <span style="color:{ACCENT_C};">₹{u_d["price"]:.2f}</span></div>'
+    f'<div class="pulse-item">🇮🇳 Nifty 50: <span style="color:{"#10b981" if n_d["1D"]>=0 else "#ef4444"};">{n_d["price"]:,.1f} ({n_d["1D"]:+.2f}%)</span></div>'
+    f'<div class="pulse-item">🏛️ Bank Nifty: <span style="color:{"#10b981" if b_d["1D"]>=0 else "#ef4444"};">{b_d["price"]:,.1f} ({b_d["1D"]:+.2f}%)</span></div>'
+    f'<div class="pulse-item">⚡ India VIX: <span style="color:#10b981;">{v_d["price"]:.2f} ({v_d["1D"]:+.2f}%)</span></div>'
+    f'<div class="pulse-item">💵 USD/INR: <span style="color:#f59e0b;">₹{u_d["price"]:.2f}</span></div>'
     f'<div class="compass-pill" style="{c_sty}">🧭 {c_txt}</div></div>',
     unsafe_allow_html=True
 )
 
 # ==============================================================================
-# 8. 4-COLUMN FILTER BAR (DEFAULT SORT = BOTTOM TURNAROUND FIRST)
+# 8. 4-COLUMN FILTER BAR
 # ==============================================================================
 fc1, fc2, fc3, fc4 = st.columns([1.2, 2.7, 3.05, 3.05])
 with fc1:
@@ -593,41 +699,41 @@ with fc4:
         st.rerun()
 
 # ==============================================================================
-# 9. PRIORITY 1 (HERO FOCUS): SECTOR TURNAROUND RADAR (BOTTOMING OUT SECTORS)
+# 9. PRIORITY 1 (HERO FOCUS): SECTOR TURNAROUND RADAR (EQUAL HEIGHT CARDS)
 # ==============================================================================
 turnaround_secs = sectors_df.sort_values(["Sec_Bull_Turn", "Turnaround_Score"], ascending=[False, False]).head(8)
 turn_cards = []
 for _, ts in turnaround_secs.iterrows():
     q_s = urllib.parse.quote(ts["Sector"])
     turn_cards.append(
-        f'<a href="?focus_sec={q_s}" target="_self" class="turn-sec-card" title="Click to inspect all stocks in {ts["Sector"]}">'
+        f'<a href="?focus_sec={q_s}" target="_self" class="turn-sec-card" title="{ts["Sector"]} — Click to view all stocks">'
         f'<div style="display:flex;justify-content:space-between;align-items:center;">'
-        f'<span style="font-weight:800;font-size:0.86rem;">🔄 {ts["Sector"]}</span>'
-        f'<span style="background:rgba(16,185,129,0.18);color:#34d399;padding:1px 7px;border-radius:6px;font-size:0.68rem;font-weight:800;">Score: {ts["Turnaround_Score"]}</span>'
+        f'<span class="t-sec-name">🔄 {ts["Sector"]}</span>'
+        f'<span style="background:rgba(16,185,129,0.16);color:#10b981;padding:1px 6px;border-radius:5px;font-size:0.67rem;font-weight:800;">Score {ts["Turnaround_Score"]}</span>'
         f'</div>'
-        f'<div style="font-size:0.74rem;color:{TEXT_SUB};margin:4px 0;">'
-        f'1M: <b style="color:{"#34d399" if ts["1M"]>=0 else "#f87171"};">{ts["1M"]:+.1f}%</b> → '
-        f'1W: <b style="color:{"#34d399" if ts["1W"]>=0 else "#f87171"};">{ts["1W"]:+.1f}%</b> → '
-        f'1D: <b style="color:{"#34d399" if ts["1D"]>=0 else "#f87171"};">{ts["1D"]:+.2f}%</b>'
+        f'<div style="font-size:0.72rem;color:{TEXT_SUB};font-family:\'JetBrains Mono\',monospace !important;">'
+        f'1M:<b style="color:{"#10b981" if ts["1M"]>=0 else "#ef4444"};">{ts["1M"]:+.1f}%</b> ➔ '
+        f'1W:<b style="color:{"#10b981" if ts["1W"]>=0 else "#ef4444"};">{ts["1W"]:+.1f}%</b> ➔ '
+        f'1D:<b style="color:{"#10b981" if ts["1D"]>=0 else "#ef4444"};">{ts["1D"]:+.1f}%</b>'
         f'</div>'
-        f'<div style="display:flex;justify-content:space-between;font-size:0.71rem;color:{ACCENT_C};font-weight:700;">'
-        f'<span>📊 Vol: {ts["Avg_Vol"]}x | >20DMA: {ts["Breadth_20DMA"]}%</span>'
-        f'<span>⭐ Top: {ts["Top_Pick"]}</span>'
+        f'<div style="display:flex;justify-content:space-between;font-size:0.70rem;color:#f59e0b;font-weight:700;">'
+        f'<span>Vol: {ts["Avg_Vol"]}x | >20DMA: {ts["Breadth_20DMA"]}%</span>'
+        f'<span>⭐ {ts["Top_Pick"]}</span>'
         f'</div></a>'
     )
 
 st.markdown(
     f'<div class="turnaround-hero-box">'
     f'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">'
-    f'<span style="font-size:0.92rem;font-weight:800;color:#34d399;">🧭 PRIORITY 1 — Sector Turnaround Radar (Sectors Reversing Up from Bottom with Volume)</span>'
-    f'<span style="font-size:0.74rem;color:{TEXT_SUB};">Click any sector card to open its stocks & charts</span>'
+    f'<span style="font-size:0.88rem;font-weight:800;color:#10b981;">🧭 PRIORITY 1 — Sector Turnaround Radar (Bottoming Out Sectors Reversing Up with Volume)</span>'
+    f'<span style="font-size:0.72rem;color:{TEXT_SUB};">Click any sector card to inspect its stocks</span>'
     f'</div>'
     f'<div class="turnaround-grid">{"".join(turn_cards)}</div></div>',
     unsafe_allow_html=True
 )
 
 # ==============================================================================
-# 10. PRIORITY 2 (HIDDEN BY DEFAULT): NEXT-DAY INTRADAY WATCHLIST + EXACT REASONS
+# 10. PRIORITY 2 (HIDDEN BY DEFAULT): NEXT-DAY INTRADAY WATCHLIST + REASONS
 # ==============================================================================
 bull_next8, bear_next8 = filter_next_day_intraday_stocks(stocks_df)
 
@@ -639,12 +745,12 @@ for _, r in bear_next8.head(4).iterrows():
     wa_lines.append(f"• *{r['Symbol']}* (₹{r['Price']}) | Short: ₹{r['Entry']} | SL: ₹{r['SL']} | Tgt: ₹{r['Target']} [{r['Bear_Candle']}]")
 wa_direct_url = f"https://api.whatsapp.com/send?text={urllib.parse.quote(chr(10).join(wa_lines))}"
 
-with st.expander("🎯 PRIORITY 2 — Next-Day Intraday Stock Watchlist (Bullish Turnaround & Bearish Rejection + Exact Reasons) — Click to Open", expanded=False):
+with st.expander("🎯 PRIORITY 2 — Next-Day Intraday Watchlist (Bullish Turnaround & Bearish Rejection + Reasons) — Click to Expand", expanded=False):
     nd_c1, nd_c2 = st.columns([7.2, 2.8])
     with nd_c1:
-        nd_bias = st.radio("Select Watchlist View:", ["🌗 Both Bullish & Bearish", "🟢 Bullish Turnaround Only", "🔴 Bearish Rejection Only"], horizontal=True, label_visibility="collapsed")
+        nd_bias = st.radio("View:", ["🌗 Both Bullish & Bearish", "🟢 Bullish Only", "🔴 Bearish Only"], horizontal=True, label_visibility="collapsed")
     with nd_c2:
-        st.markdown(f'<div style="text-align:right;"><a href="{wa_direct_url}" target="_blank" class="wa-share-btn">📲 Send Watchlist to WhatsApp</a></div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="text-align:right;"><a href="{wa_direct_url}" target="_blank" class="wa-share-btn">📲 Send to WhatsApp</a></div>', unsafe_allow_html=True)
 
     def build_nextday_box(df_sub: pd.DataFrame, is_bull: bool) -> str:
         cards = []
@@ -652,24 +758,24 @@ with st.expander("🎯 PRIORITY 2 — Next-Day Intraday Stock Watchlist (Bullish
             qt = urllib.parse.quote(str(r["Ticker"]))
             tag_cls = "r-tag-bull" if is_bull else "r-tag-bear"
             tag_txt = f"🟢 BUY • {r['Confidence']}%" if is_bull else f"🔴 SHORT • {r['Confidence']}%"
-            c_col = "#34d399" if r["1D"] >= 0 else "#f87171"
+            c_col = "#10b981" if r["1D"] >= 0 else "#ef4444"
             lbl = "Buy" if is_bull else "Short"
             cards.append(
-                f'<a href="?focus_stock={qt}" target="_self" class="radar-row-card" title="Click to open {r["Symbol"]} chart">'
-                f'<div class="r-top"><span class="r-sym">{r["Symbol"]} ({r["Sector"]})</span><span class="{tag_cls}">{tag_txt}</span></div>'
-                f'<div class="r-mid"><span>Price: ₹{r["Price"]:,.1f} <span style="color:{c_col};font-weight:700;">({r["1D"]:+.1f}%)</span></span><span>RSI: {r["RSI"]} | Vol: {r["Vol_Ratio"]:.1f}x</span></div>'
+                f'<a href="?focus_stock={qt}" target="_self" class="radar-row-card" title="{r["Symbol"]} ({r["Sector"]}) — {r["Reason"]}">'
+                f'<div class="r-top"><span class="r-sym">{r["Symbol"]} <span style="font-size:0.70rem;color:{TEXT_SUB};font-weight:600;">({r["Sector"]})</span></span><span class="{tag_cls}">{tag_txt}</span></div>'
+                f'<div class="r-mid"><span>₹{r["Price"]:,.1f} <span style="color:{c_col};font-weight:700;">({r["1D"]:+.1f}%)</span></span><span>RSI: {r["RSI"]} | Vol: {r["Vol_Ratio"]:.1f}x</span></div>'
                 f'<div class="r-reason-box">💡 {r["Reason"]}</div>'
-                f'<div class="r-plan"><span style="color:{ACCENT_C};">🎯 {lbl}: ₹{r["Entry"]}</span><span style="color:#f87171;">🛑 SL: ₹{r["SL"]}</span><span style="color:#34d399;">🚀 Tgt: ₹{r["Target"]}</span></div>'
+                f'<div class="r-plan"><span style="color:#f59e0b;">🎯 {lbl}: ₹{r["Entry"]}</span><span style="color:#ef4444;">🛑 SL: ₹{r["SL"]}</span><span style="color:#10b981;">🚀 Tgt: ₹{r["Target"]}</span></div>'
                 f'</a>'
             )
         p_cls = "radar-panel-bull" if is_bull else "radar-panel-bear"
-        h_col = "#34d399" if is_bull else "#f87171"
-        h_txt = "🟢 Bullish Next-Day Intraday Picks (Bottom Doji/Hammer + Volume)" if is_bull else "🔴 Bearish Next-Day Intraday Picks (Top Rejection + Supply)"
-        return f'<div class="{p_cls}"><div class="radar-panel-header"><span style="color:{h_col};font-weight:800;font-size:0.84rem;">{h_txt}</span></div><div class="radar-grid">{"".join(cards)}</div></div>'
+        h_col = "#10b981" if is_bull else "#ef4444"
+        h_txt = "🟢 Bullish Next-Day Picks (Doji/Hammer + Turnaround)" if is_bull else "🔴 Bearish Next-Day Picks (Top Rejection + Supply)"
+        return f'<div class="{p_cls}"><div class="radar-panel-header"><span style="color:{h_col};font-weight:800;font-size:0.82rem;">{h_txt}</span></div><div class="radar-grid">{"".join(cards)}</div></div>'
 
-    if nd_bias == "🟢 Bullish Turnaround Only":
+    if nd_bias == "🟢 Bullish Only":
         st.markdown(build_nextday_box(bull_next8, True), unsafe_allow_html=True)
-    elif nd_bias == "🔴 Bearish Rejection Only":
+    elif nd_bias == "🔴 Bearish Only":
         st.markdown(build_nextday_box(bear_next8, False), unsafe_allow_html=True)
     else:
         b_col1, b_col2 = st.columns(2)
@@ -689,7 +795,7 @@ bar_items = [
 st.markdown(f'<div class="marquee-wrap"><div class="marquee-track">{"".join(bar_items) * 2}</div></div>', unsafe_allow_html=True)
 
 # ==============================================================================
-# 12. STOCK INSPECTOR, 5-POINT CHECKLIST & SMART CHART (AUTO-SCROLL TARGET)
+# 12. STOCK INSPECTOR, 5-POINT CHECKLIST & SMART CHART
 # ==============================================================================
 st.markdown('<div id="stock-inspector-anchor"></div>', unsafe_allow_html=True)
 
@@ -722,7 +828,7 @@ if st.session_state.selected_stock != DEFAULT_STOCK and st.session_state.selecte
     st.markdown("---")
     sp1, sp2, sp3 = st.columns([6.2, 2.0, 1.8])
     with sp1:
-        st.markdown(f"#### 🎯 Stock Trade Inspector: **{sym_clean}** (`{s_info['Sector']}`) — ₹{p_now:,.2f} ({s_info['1D']:+.2f}% | {s_info['Action_Signal']})")
+        st.markdown(f"#### 🎯 Stock Inspector: **{sym_clean}** (`{s_info['Sector']}`) — ₹{p_now:,.2f} ({s_info['1D']:+.2f}% | {s_info['Action_Signal']})")
     with sp2:
         st.markdown(f'<a href="https://api.whatsapp.com/send?text={single_wa_txt}" target="_blank" class="wa-share-btn">📲 WhatsApp Setup</a>', unsafe_allow_html=True)
     with sp3:
@@ -735,8 +841,8 @@ if st.session_state.selected_stock != DEFAULT_STOCK and st.session_state.selecte
     with lv1:
         st.info(
             f"🛡️ **Safety Checklist ({passed_cnt}/5 Passed):**\n\n"
-            f"{'✅' if chk_trend else '⚠️'} Above 50-DMA | {'✅' if chk_vol else '⚠️'} Vol ({s_info['Vol_Ratio']}x) | "
-            f"{'✅' if chk_rsi else '⚠️'} RSI ({s_info['RSI']}) | {'✅' if chk_streak else '⚠️'} Not Overextended\n\n"
+            f"{'✅' if chk_trend else '⚠️'} >50-DMA | {'✅' if chk_vol else '⚠️'} Vol ({s_info['Vol_Ratio']}x) | "
+            f"{'✅' if chk_rsi else '⚠️'} RSI ({s_info['RSI']}) | {'✅' if chk_streak else '⚠️'} Fresh Base\n\n"
             f"📦 **Safe Qty (₹500 Risk):** `{safe_qty} Shares`"
         )
     with lv2:
@@ -763,7 +869,7 @@ if st.session_state.selected_stock != DEFAULT_STOCK and st.session_state.selecte
             fig_st.add_hline(y=s_info["Buy_Target"], line_dash="dash", line_color="#10b981", annotation_text=f"Target: ₹{s_info['Buy_Target']}", row=1, col=1)
 
         fig_st.add_trace(go.Bar(x=sub_df.index, y=sub_df["Volume"], name="Volume", marker_color=["#10b981" if c >= o else "#ef4444" for c, o in zip(sub_df["Close"], sub_df["Open"])]), row=2, col=1)
-        fig_st.update_layout(height=370, template="plotly_dark" if "Clean Light" not in theme_mode else "plotly_white", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=10, r=10, t=20, b=10), xaxis_rangeslider_visible=False)
+        fig_st.update_layout(height=360, template="plotly_dark" if "Clean Light" not in theme_mode else "plotly_white", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=10, r=10, t=20, b=10), xaxis_rangeslider_visible=False)
         st.plotly_chart(fig_st, use_container_width=True)
 
     l1, l2, l3 = st.columns(3)
@@ -786,25 +892,25 @@ nifty_tf = n_d.get(tf_choice, n_d["1W"])
 
 kc1, kc2, kc3, kc4 = st.columns(4)
 with kc1:
-    st.markdown(f'<div class="kpi-card"><div class="kpi-title">Nifty 50 Benchmark ({tf_choice})</div><div class="kpi-val" style="color:{"#34d399" if nifty_tf>=0 else "#f87171"};">{nifty_tf:+.2f}%</div><div class="kpi-sub-up">1W: {n_d["1W"]:+.2f}% | 1Y: {n_d["1Y"]:+.1f}%</div></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="kpi-card"><div class="kpi-title">Nifty 50 Benchmark ({tf_choice})</div><div class="kpi-val" style="color:{"#10b981" if nifty_tf>=0 else "#ef4444"};">{nifty_tf:+.2f}%</div><div class="kpi-sub-up">1W: {n_d["1W"]:+.2f}% | 1Y: {n_d["1Y"]:+.1f}%</div></div>', unsafe_allow_html=True)
     if st.button("📊 Top Gainers & Losers", key="k1", use_container_width=True):
         st.session_state.kpi_panel = None if st.session_state.kpi_panel == "nifty_movers" else "nifty_movers"
         st.session_state.scroll_target = "kpi-panel-anchor"
         st.rerun()
 with kc2:
-    st.markdown(f'<div class="kpi-card"><div class="kpi-title">Nifty 500 Breadth ({tf_choice})</div><div class="kpi-val"><span style="color:#34d399;">🟢 {adv_count} Up</span> | <span style="color:#f87171;">🔴 {dec_count} Down</span></div><div class="kpi-sub-up">{pct_50dma}% Above 50-DMA</div></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="kpi-card"><div class="kpi-title">Nifty 500 Breadth ({tf_choice})</div><div class="kpi-val"><span style="color:#10b981;">🟢 {adv_count} Up</span> | <span style="color:#ef4444;">🔴 {dec_count} Down</span></div><div class="kpi-sub-up">{pct_50dma}% Above 50-DMA</div></div>', unsafe_allow_html=True)
     if st.button("📈 Advancing vs Declining", key="k2", use_container_width=True):
         st.session_state.kpi_panel = None if st.session_state.kpi_panel == "breadth_list" else "breadth_list"
         st.session_state.scroll_target = "kpi-panel-anchor"
         st.rerun()
 with kc3:
     st.markdown(f'<div class="kpi-card"><div class="kpi-title">#1 Turnaround Sector</div><div class="kpi-val">🔄 {top_turn_sec["Sector"]}</div><div class="kpi-sub-up">Score: {top_turn_sec["Turnaround_Score"]} | 1D: {top_turn_sec["1D"]:+.2f}%</div></div>', unsafe_allow_html=True)
-    if st.button(f"🔍 Inspect {top_turn_sec['Sector']}", key="k3", use_container_width=True):
+    if st.button("🔍 Inspect Turnaround Leader", key="k3", use_container_width=True):
         st.session_state.selected_sector, st.session_state.kpi_panel, st.session_state.scroll_target = top_turn_sec["Sector"], "turn_sec", "kpi-panel-anchor"
         st.rerun()
 with kc4:
     st.markdown(f'<div class="kpi-card"><div class="kpi-title">Top Momentum Sector ({tf_choice})</div><div class="kpi-val">👑 {leader_sec["Sector"]}</div><div class="kpi-sub-up">▲ {leader_sec[tf_choice]:+.2f}% (Meter: {leader_sec["Meter"]})</div></div>', unsafe_allow_html=True)
-    if st.button(f"🔍 Inspect {leader_sec['Sector']}", key="k4", use_container_width=True):
+    if st.button("🔍 Inspect Momentum Leader", key="k4", use_container_width=True):
         st.session_state.selected_sector, st.session_state.kpi_panel, st.session_state.scroll_target = leader_sec["Sector"], "leader_sec", "kpi-panel-anchor"
         st.rerun()
 
@@ -820,44 +926,44 @@ if st.session_state.kpi_panel is not None:
     if st.session_state.kpi_panel == "nifty_movers":
         mv1, mv2 = st.columns(2)
         with mv1:
-            st.markdown(f"##### 🚀 Top 15 Gainers ({tf_choice})")
+            st.markdown(f'<div class="aligned-sec-hdr">🚀 Top 15 Gainers ({tf_choice})</div>', unsafe_allow_html=True)
             g15 = stocks_df.sort_values(tf_choice, ascending=False).head(15)
             st.dataframe(style_colored_table(g15[["Symbol", "Sector", "Price", "1D", "1W", "Vol_Ratio", "Action_Signal"]], ["1D", "1W"]), use_container_width=True, hide_index=True)
             st.markdown(make_stock_pills(g15), unsafe_allow_html=True)
         with mv2:
-            st.markdown(f"##### 📉 Top 15 Losers ({tf_choice})")
+            st.markdown(f'<div class="aligned-sec-hdr">📉 Top 15 Losers ({tf_choice})</div>', unsafe_allow_html=True)
             l15 = stocks_df.sort_values(tf_choice, ascending=True).head(15)
             st.dataframe(style_colored_table(l15[["Symbol", "Sector", "Price", "1D", "1W", "Vol_Ratio", "Action_Signal"]], ["1D", "1W"]), use_container_width=True, hide_index=True)
             st.markdown(make_stock_pills(l15), unsafe_allow_html=True)
     elif st.session_state.kpi_panel == "breadth_list":
         br1, br2 = st.columns(2)
         with br1:
-            st.markdown("##### 🟢 Strong Advancing Stocks")
+            st.markdown('<div class="aligned-sec-hdr">🟢 Strong Advancing Stocks</div>', unsafe_allow_html=True)
             up15 = stocks_df[stocks_df[tf_choice] > 0].sort_values("Vol_Ratio", ascending=False).head(15)
             st.dataframe(style_colored_table(up15[["Symbol", "Sector", "Price", "1D", "Vol_Ratio", "Action_Signal"]], ["1D"]), use_container_width=True, hide_index=True)
             st.markdown(make_stock_pills(up15), unsafe_allow_html=True)
         with br2:
-            st.markdown("##### 🔴 Declining / Oversold Watchlist")
+            st.markdown('<div class="aligned-sec-hdr">🔴 Declining / Oversold Watchlist</div>', unsafe_allow_html=True)
             dn15 = stocks_df[stocks_df[tf_choice] < 0].sort_values("Vol_Ratio", ascending=False).head(15)
             st.dataframe(style_colored_table(dn15[["Symbol", "Sector", "Price", "1D", "Vol_Ratio", "Action_Signal"]], ["1D"]), use_container_width=True, hide_index=True)
             st.markdown(make_stock_pills(dn15), unsafe_allow_html=True)
     else:
         sec_f = st.session_state.selected_sector
-        st.markdown(f"#### 🔍 Sector Stocks & Trade Plans: **{sec_f}**")
+        st.markdown(f'<div class="aligned-sec-hdr">🔍 Sector Stocks & Trade Plans: {sec_f}</div>', unsafe_allow_html=True)
         sub_s = stocks_df[stocks_df["Sector"] == sec_f].sort_values(tf_choice, ascending=False)
         st.dataframe(style_colored_table(sub_s[["Symbol", "Price", "1D", "1W", "1M", "Vol_Ratio", "RSI", "Action_Signal", "Buy_Entry", "Buy_SL", "Buy_Target"]], ["1D", "1W", "1M"]), use_container_width=True, hide_index=True)
         st.markdown(make_stock_pills(sub_s), unsafe_allow_html=True)
     st.markdown("---")
 
 # ==============================================================================
-# 14. 4 CONSOLIDATED TABS (PRIORITY 1, PRIORITY 3 LIVE-ONLY, SWING, MATRIX)
+# 14. 4 CONSOLIDATED TABS (PERFECT ROW-BY-ROW ALIGNMENT IN ALL TABS)
 # ==============================================================================
-live_tab_badge = "🟢 LIVE NOW" if is_mkt_open else "⏸️ Market Hours Only"
+live_tab_badge = "🟢 LIVE" if is_mkt_open else "⏸️ Standby"
 tab1, tab2, tab3, tab4 = st.tabs([
     f"🔄 1. {len(SECTOR_STOCKS)} Sector Turnaround & Gauges",
     f"⚡ 2. Live Intraday Stock Finder ({live_tab_badge})",
     "💎 3. Swing & Positional Radar",
-    f"📋 4. All {len(SECTOR_STOCKS)} Sectors Rotation Matrix"
+    f"📋 4. All {len(SECTOR_STOCKS)} Sectors Matrix"
 ])
 
 with tab1:
@@ -869,96 +975,101 @@ with tab1:
             st.rerun()
 
     if "Bottom Turnaround" in sort_choice:
-        f_secs = f_secs.sort_values(["Sec_Bull_Turn", "Turnaround_Score"], ascending=[False, False])
+        f_secs = f_secs.sort_values(["Sec_Bull_Turn", "Turnaround_Score"], ascending=[False, False]).reset_index(drop=True)
     elif "Top Gainers" in sort_choice:
-        f_secs = f_secs.sort_values(tf_choice, ascending=False)
+        f_secs = f_secs.sort_values(tf_choice, ascending=False).reset_index(drop=True)
     elif "Top Losers" in sort_choice:
-        f_secs = f_secs.sort_values(tf_choice, ascending=True)
+        f_secs = f_secs.sort_values(tf_choice, ascending=True).reset_index(drop=True)
     elif "High Volume" in sort_choice:
-        f_secs = f_secs.sort_values("Avg_Vol", ascending=False)
+        f_secs = f_secs.sort_values("Avg_Vol", ascending=False).reset_index(drop=True)
     else:
-        f_secs = f_secs.sort_values("Meter", ascending=False)
+        f_secs = f_secs.sort_values("Meter", ascending=False).reset_index(drop=True)
 
     def make_gauge(score: int, title_txt: str, ret_val: float):
-        bar_col = "#00f5d4" if ("Cyber Neon" in theme_mode and score >= 60) else ("#10b981" if score >= 60 else ("#fbbf24" if score >= 38 else "#ef4444"))
+        bar_col = "#00f5d4" if ("Cyber Neon" in theme_mode and score >= 60) else ("#10b981" if score >= 60 else ("#f59e0b" if score >= 38 else "#ef4444"))
+        short_title = title_txt if len(title_txt) <= 30 else title_txt[:28] + ".."
         fig = go.Figure(go.Indicator(
             mode="gauge+number", value=score,
-            number={"suffix": f" ({ret_val:+.1f}%)", "font": {"size": 14, "color": TEXT_MAIN}},
-            title={"text": title_txt, "font": {"size": 13, "color": TEXT_MAIN}},
-            gauge={"axis": {"range": [0, 100]}, "bar": {"color": bar_col, "thickness": 0.34}, "bordercolor": BORDER_C,
-                   "steps": [{"range": [0, 38], "color": "rgba(239,68,68,0.18)"}, {"range": [38, 60], "color": "rgba(251,191,36,0.18)"}, {"range": [60, 100], "color": "rgba(16,185,129,0.18)"}]}
+            number={"suffix": f" ({ret_val:+.1f}%)", "font": {"size": 13, "color": TEXT_MAIN}},
+            title={"text": short_title, "font": {"size": 12, "color": TEXT_MAIN}},
+            gauge={"axis": {"range": [0, 100], "tickwidth": 1}, "bar": {"color": bar_col, "thickness": 0.34}, "bordercolor": BORDER_C,
+                   "steps": [{"range": [0, 38], "color": "rgba(239,68,68,0.16)"}, {"range": [38, 60], "color": "rgba(245,158,11,0.16)"}, {"range": [60, 100], "color": "rgba(16,185,129,0.16)"}]}
         ))
-        fig.update_layout(height=160, margin=dict(l=14, r=14, t=32, b=8), paper_bgcolor="rgba(0,0,0,0)", font=dict(color=TEXT_MAIN))
+        fig.update_layout(height=152, margin=dict(l=14, r=14, t=30, b=6), paper_bgcolor="rgba(0,0,0,0)", font=dict(color=TEXT_MAIN))
         return fig
 
-    sec_cols = st.columns(2)
-    for idx, (_, s_row) in enumerate(f_secs.iterrows()):
-        s_name, s_ret, s_meter = s_row["Sector"], safe_num(s_row[tf_choice]), int(safe_num(s_row["Meter"], 50))
-        s_stocks = stocks_df[stocks_df["Sector"] == s_name].sort_values(tf_choice, ascending=False)
-        with sec_cols[idx % 2]:
-            if show_analog_meter:
-                st.plotly_chart(make_gauge(s_meter, f"🧭 {s_name}", s_ret), use_container_width=True, key=f"g_{s_name}")
-            with st.expander(f"📂 {s_name} ({s_ret:+.2f}% | {s_row['Zone']} | Turn Score: {s_row['Turnaround_Score']}) — {len(s_stocks)} Stocks", expanded=(len(f_secs) == 1)):
-                st.dataframe(style_colored_table(s_stocks[["Symbol", "Price", "1D", "1W", "1M", "Vol_Ratio", "RSI", "Action_Signal", "Buy_Entry", "Buy_SL", "Buy_Target"]], ["1D", "1W", "1M"]), use_container_width=True, hide_index=True)
-                st.markdown(make_stock_pills(s_stocks), unsafe_allow_html=True)
+    # ROW-BY-ROW PAIR ALIGNMENT: Ensures Left & Right Sector Boxes are 100% Level on Every Row
+    for row_start in range(0, len(f_secs), 2):
+        row_cols = st.columns(2)
+        for offset in range(2):
+            idx = row_start + offset
+            if idx >= len(f_secs):
+                break
+            s_row = f_secs.iloc[idx]
+            s_name, s_ret, s_meter = s_row["Sector"], safe_num(s_row[tf_choice]), int(safe_num(s_row["Meter"], 50))
+            s_stocks = stocks_df[stocks_df["Sector"] == s_name].sort_values(tf_choice, ascending=False)
+            with row_cols[offset]:
+                if show_analog_meter:
+                    st.plotly_chart(make_gauge(s_meter, f"🧭 {s_name}", s_ret), use_container_width=True, key=f"g_{s_name}")
+                short_exp_lbl = f"📂 {s_name} ({s_ret:+.1f}% • {s_row['Zone']} • Score {s_row['Turnaround_Score']})"
+                with st.expander(short_exp_lbl, expanded=(len(f_secs) == 1)):
+                    st.dataframe(style_colored_table(s_stocks[["Symbol", "Price", "1D", "1W", "1M", "Vol_Ratio", "RSI", "Action_Signal", "Buy_Entry", "Buy_SL", "Buy_Target"]], ["1D", "1W", "1M"]), use_container_width=True, hide_index=True)
+                    st.markdown(make_stock_pills(s_stocks), unsafe_allow_html=True)
 
-# ------------------------------------------------------------------------------
-# TAB 2 (PRIORITY 3): LIVE MARKET INTRADAY STOCK FINDER (ACTIVE 9:15 - 3:30 IST)
-# ------------------------------------------------------------------------------
 with tab2:
-    st.markdown("#### ⚡ PRIORITY 3 — Live 15-Minute Intraday Stock Finder (Chartink Conditions)")
+    st.markdown('<div class="aligned-sec-hdr">⚡ PRIORITY 3 — Live 15-Minute Intraday Stock Finder (Chartink Conditions)</div>', unsafe_allow_html=True)
     force_test_scan = False
     if not is_mkt_open:
         st.warning(
-            f"⏸️ **Live Intraday Stock Finder is on Standby (Market Closed — {ist_now.strftime('%A %I:%M %p IST')}).**\n\n"
-            "As per your workflow, this scanner automatically activates **ONLY during live market hours (Monday – Friday, 9:15 AM to 3:30 PM IST)** when live 15-minute candles and VWAP form."
+            f"⏸️ **Live Intraday Stock Finder is on Standby (Market Closed — {ist_now.strftime('%A %I:%M %p IST')}).** "
+            "Automatically activates during live market hours (Mon–Fri, 9:15 AM – 3:30 PM IST)."
         )
-        force_test_scan = st.checkbox("🔓 Preview Last Market Session's 15-Minute Scan Results (Test / Review Mode)", value=False)
+        force_test_scan = st.checkbox("🔓 Preview Last Session's 15-Minute Scan Results", value=False)
 
     if is_mkt_open or force_test_scan:
-        with st.spinner("⚡ Scanning 15-Minute Candles, Intraday VWAP, Prev High/Low & Volume Spikes..."):
+        with st.spinner("⚡ Scanning 15m Candles, VWAP & Volume Spikes..."):
             bull_15m_df, bear_15m_df = run_chartink_15m_scanner(stocks_df)
         c1, c2 = st.columns(2)
         with c1:
-            st.markdown("##### 🟢 Live 15m Bullish Breakouts (`Open≈Low`, `Close > VWAP & Prev High`, `RSI > 60`)")
-            st.dataframe(style_colored_table(bull_15m_df[["Symbol", "Sector", "Price", "VWAP", "Vol_Ratio", "RSI", "1D", "Reason", "Entry", "SL", "Target"]], ["1D"]), use_container_width=True, hide_index=True)
+            st.markdown('<div class="aligned-sec-hdr">🟢 15m Bullish Breakouts (Above VWAP & Prev High)</div>', unsafe_allow_html=True)
+            st.dataframe(style_colored_table(bull_15m_df[["Symbol", "Sector", "Price", "VWAP", "Vol_Ratio", "RSI", "1D", "Entry", "SL", "Target"]], ["1D"]), use_container_width=True, hide_index=True)
             st.markdown(make_stock_pills(bull_15m_df), unsafe_allow_html=True)
         with c2:
-            st.markdown("##### 🔴 Live 15m Bearish Breakdowns (`Open≈High`, `Close < VWAP & Prev Low`, `RSI < 42`)")
+            st.markdown('<div class="aligned-sec-hdr">🔴 15m Bearish Breakdowns (Below VWAP & Prev Low)</div>', unsafe_allow_html=True)
             b15_disp = bear_15m_df.rename(columns={"Entry": "Short_Below"})
-            st.dataframe(style_colored_table(b15_disp[["Symbol", "Sector", "Price", "VWAP", "Vol_Ratio", "RSI", "1D", "Reason", "Short_Below", "SL", "Target"]], ["1D"]), use_container_width=True, hide_index=True)
+            st.dataframe(style_colored_table(b15_disp[["Symbol", "Sector", "Price", "VWAP", "Vol_Ratio", "RSI", "1D", "Short_Below", "SL", "Target"]], ["1D"]), use_container_width=True, hide_index=True)
             st.markdown(make_stock_pills(bear_15m_df), unsafe_allow_html=True)
     else:
         bull_15m_df = pd.DataFrame()
 
     st.markdown("---")
-    st.markdown("#### 🧮 Smart Intraday Position Size & Risk Calculator")
+    st.markdown('<div class="aligned-sec-hdr">🧮 Smart Intraday Position Size & Risk Calculator</div>', unsafe_allow_html=True)
     def_ent = float(stocks_df[stocks_df["Ticker"] == st.session_state.selected_stock]["Buy_Entry"].iloc[0]) if st.session_state.selected_stock in stocks_df["Ticker"].values else 500.0
     def_sl = float(stocks_df[stocks_df["Ticker"] == st.session_state.selected_stock]["Buy_SL"].iloc[0]) if st.session_state.selected_stock in stocks_df["Ticker"].values else 490.0
     rc1, rc2, rc3, rc4 = st.columns(4)
     with rc1:
         cap_amt = st.number_input("💰 Total Capital (₹):", min_value=1000.0, value=50000.0, step=5000.0)
     with rc2:
-        risk_pct = st.number_input("⚠️ Safe Risk % per Trade:", min_value=0.25, max_value=5.0, value=1.0, step=0.25)
+        risk_pct = st.number_input("⚠️ Safe Risk %:", min_value=0.25, max_value=5.0, value=1.0, step=0.25)
     with rc3:
         ent_p = st.number_input("🎯 Entry Price (₹):", min_value=1.0, value=def_ent, step=1.0)
     with rc4:
         sl_p = st.number_input("🛑 Stop-Loss (₹):", min_value=0.5, value=def_sl, step=1.0)
     max_loss = cap_amt * (risk_pct / 100.0)
     diff = abs(ent_p - sl_p)
-    st.success(f"✅ **Max Allowed Loss:** ₹{max_loss:,.0f} &nbsp;|&nbsp; 📦 **Safe Quantity to Buy:** `{int(max_loss / diff) if diff > 0 else 0} Shares` &nbsp;|&nbsp; 🎯 **1:2 Target:** `₹{(ent_p + 2*diff if ent_p >= sl_p else ent_p - 2*diff):,.2f}`")
+    st.success(f"✅ **Max Safe Loss:** ₹{max_loss:,.0f} &nbsp;|&nbsp; 📦 **Safe Quantity:** `{int(max_loss / diff) if diff > 0 else 0} Shares` &nbsp;|&nbsp; 🎯 **1:2 Target:** `₹{(ent_p + 2*diff if ent_p >= sl_p else ent_p - 2*diff):,.2f}`")
 
 with tab3:
     sw1, sw2 = st.columns(2)
     with sw1:
-        st.markdown("##### 🚀 Safe Trend Pullback Picks (Above 50-DMA + Near 20-DMA Support)")
+        st.markdown('<div class="aligned-sec-hdr">🚀 Safe Trend Pullback Picks (>50-DMA & Near 20-DMA)</div>', unsafe_allow_html=True)
         sp_df = stocks_df[(stocks_df["Above_50DMA"]) & (stocks_df["Dist_20DMA"].between(-3.0, 4.5)) & (stocks_df["RSI"].between(44, 64))].sort_values("Vol_Ratio", ascending=False).head(18)
-        st.dataframe(style_colored_table(sp_df[["Symbol", "Sector", "Price", "1D", "1W", "1M", "Vol_Ratio", "RSI", "Buy_Entry", "Buy_SL", "Buy_Target"]], ["1D", "1W", "1M"]), use_container_width=True, hide_index=True)
+        st.dataframe(style_colored_table(sp_df[["Symbol", "Sector", "Price", "1D", "1W", "1M", "Vol_Ratio", "RSI", "Buy_Entry", "Buy_SL", "Buy_Target"]], ["1D", "1W", "1M"]), use_container_width=True, hide_index=True, height=420)
         st.markdown(make_stock_pills(sp_df), unsafe_allow_html=True)
     with sw2:
-        st.markdown("##### 🌱 Bottom Turnaround Value Picks (Down in 1M + Reversing Up Today with Volume)")
+        st.markdown('<div class="aligned-sec-hdr">🌱 Bottom Turnaround Value Picks (Oversold Recovery)</div>', unsafe_allow_html=True)
         vr_df = stocks_df[(stocks_df["1M"] < 0) & (stocks_df["1D"] > 0) & (stocks_df["RSI"] <= 52)].sort_values("Vol_Ratio", ascending=False).head(18)
-        st.dataframe(style_colored_table(vr_df[["Symbol", "Sector", "Price", "1D", "1W", "1M", "Vol_Ratio", "RSI", "Buy_Entry", "Buy_SL", "Buy_Target"]], ["1D", "1W", "1M"]), use_container_width=True, hide_index=True)
+        st.dataframe(style_colored_table(vr_df[["Symbol", "Sector", "Price", "1D", "1W", "1M", "Vol_Ratio", "RSI", "Buy_Entry", "Buy_SL", "Buy_Target"]], ["1D", "1W", "1M"]), use_container_width=True, hide_index=True, height=420)
         st.markdown(make_stock_pills(vr_df), unsafe_allow_html=True)
     st.markdown("---")
     st.download_button(f"📥 Download Complete {len(ALL_TICKERS)}+ Nifty 500 Stocks Report (CSV / Excel)", data=stocks_df.to_csv(index=False).encode("utf-8"), file_name="alphapulse_nifty500_report.csv", mime="text/csv", use_container_width=True)
