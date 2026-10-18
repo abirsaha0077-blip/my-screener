@@ -7,6 +7,8 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime, timezone, timedelta
 import urllib.parse
+import urllib.request
+import xml.etree.ElementTree as ET
 import warnings
 
 warnings.filterwarnings("ignore")
@@ -15,7 +17,7 @@ warnings.filterwarnings("ignore")
 # 1. PAGE CONFIGURATION
 # ==============================================================================
 st.set_page_config(
-    page_title="AlphaPulse Pro | Sector Turnaround & Intraday Terminal",
+    page_title="AlphaPulse Pro | Sector Turnaround & AI Intraday Terminal",
     page_icon="🧭",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -84,7 +86,9 @@ for k, v in [
     ("scroll_target", None),
     ("last_alerted", ""),
     ("show_ai_helper", False),
-    ("show_nse_heatmap", False)
+    ("show_nse_heatmap", False),
+    ("show_stock_ai_verdict", True),
+    ("sector_toast_shown", False)
 ]:
     if k not in st.session_state:
         st.session_state[k] = v
@@ -103,6 +107,7 @@ if "focus_stock" in qp:
     full_t = clicked_sym if clicked_sym.endswith(".NS") else f"{clicked_sym}.NS"
     if full_t in ALL_TICKERS:
         st.session_state.selected_stock = full_t
+        st.session_state.show_stock_ai_verdict = False
         st.session_state.scroll_target = "stock-inspector-anchor"
     st.query_params.clear()
 
@@ -143,7 +148,7 @@ with top_c1:
 with top_c2:
     theme_mode = st.selectbox("Theme", ["🌙 Pro Dark (Slate)", "🌌 Cyber Neon (Violet)", "☀️ Clean Light (Day)"], index=0, label_visibility="collapsed")
 with top_c3:
-    if st.button("🤖 AI Help", use_container_width=True, help="Open Live AI Trading Assistant & Gemini Chat"):
+    if st.button("🤖 AI Market Brief", use_container_width=True, help="Open Live Market AI Summary"):
         st.session_state.show_ai_helper = not st.session_state.show_ai_helper
 with top_c4:
     show_analog_meter = st.toggle("🎛️ Meters", value=True)
@@ -155,7 +160,7 @@ with top_c6:
         st.rerun()
 
 # ==============================================================================
-# 5. THEME ENGINE & ICON-SAFE RESPONSIVE CSS (FIXES _arrow_right OVERLAP BUG)
+# 5. THEME ENGINE & ICON-SAFE RESPONSIVE CSS
 # ==============================================================================
 if "Clean Light" in theme_mode:
     BG_MAIN, BG_CARD, BG_SUB, TEXT_MAIN, TEXT_SUB, BORDER_C, ACCENT_C = "#f4f6fb", "#ffffff", "#eef2f8", "#0f172a", "#475569", "#cbd5e1", "#d97706"
@@ -173,7 +178,6 @@ st.markdown(f"""
 
 header[data-testid="stHeader"], div[data-testid="stToolbar"], div[data-testid="stDecoration"] {{ display:none !important; }}
 
-/* APPLY MODERN FONT WITHOUT BREAKING STREAMLIT MATERIAL ICONS (_arrow_right FIX) */
 html, body, [data-testid="stAppViewContainer"], .main, p, label, button, input, .stMarkdown {{
     font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
 }}
@@ -258,7 +262,74 @@ div.stButton > button:hover p, div.stLinkButton > a:hover p, a[data-testid="stBa
     color:#ffffff !important;
 }}
 
-/* HIGH-CONTRAST TABS & CLEAN EXPANDERS WITH PROPER SPACING */
+/* PRIMARY GOLDEN-ORANGE AI VERDICT BUTTON (MATCHING USER SCREENSHOT) */
+button[data-testid="stBaseButton-primary"] {{
+    background:linear-gradient(135deg, #f59e0b 0%, #ea580c 100%) !important;
+    color:#ffffff !important;
+    border:1.5px solid #fbbf24 !important;
+    border-radius:10px !important;
+    font-weight:800 !important;
+    font-size:0.82rem !important;
+    box-shadow:0 4px 16px rgba(245, 158, 11, 0.45) !important;
+}}
+button[data-testid="stBaseButton-primary"] p {{
+    color:#ffffff !important;
+    font-weight:800 !important;
+}}
+button[data-testid="stBaseButton-primary"]:hover {{
+    background:linear-gradient(135deg, #fbbf24 0%, #f97316 100%) !important;
+    transform:translateY(-2px) scale(1.01) !important;
+}}
+
+/* LIVE MARKET SECTOR FOCUS ALERT BANNER */
+.sector-alert-banner {{
+    background:linear-gradient(90deg, rgba(245,158,11,0.16) 0%, rgba(16,185,129,0.14) 50%, rgba(15,23,42,0.92) 100%);
+    border:1.5px solid #f59e0b;
+    border-left:5px solid #f59e0b;
+    border-radius:12px;
+    padding:8px 14px;
+    margin:4px 0 10px 0;
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:space-between;
+    align-items:center;
+    gap:8px;
+    box-shadow:0 4px 16px rgba(245,158,11,0.15);
+}}
+a.alert-sec-chip {{
+    text-decoration:none !important;
+    background:rgba(245,158,11,0.20);
+    border:1px solid #f59e0b;
+    color:{TEXT_MAIN} !important;
+    padding:3px 10px;
+    border-radius:999px;
+    font-size:0.75rem;
+    font-weight:800;
+    transition:all 0.18s ease;
+}}
+a.alert-sec-chip:hover {{
+    background:#f59e0b;
+    color:#ffffff !important;
+    transform:translateY(-1px);
+}}
+
+/* IN-APP AI DECISION ENGINE BOX */
+.ai-verdict-box {{
+    background:{BG_CARD};
+    border:2px solid #f59e0b;
+    border-radius:14px;
+    padding:14px 18px;
+    margin:10px 0 14px 0;
+    box-shadow:0 8px 26px rgba(245,158,11,0.18);
+}}
+.ai-sub-card {{
+    background:{BG_SUB};
+    border:1px solid {BORDER_C};
+    border-radius:10px;
+    padding:10px 12px;
+    height:100%;
+}}
+
 button[data-baseweb="tab"] {{
     background:{BG_CARD} !important;
     border:1.5px solid {BORDER_C} !important;
@@ -266,117 +337,29 @@ button[data-baseweb="tab"] {{
     margin-right:6px !important;
     padding:8px 16px !important;
 }}
-button[data-baseweb="tab"] p {{
-    color:{TEXT_MAIN} !important;
-    font-weight:700 !important;
-    font-size:0.84rem !important;
-}}
+button[data-baseweb="tab"] p {{ color:{TEXT_MAIN} !important; font-weight:700 !important; font-size:0.84rem !important; }}
 button[data-baseweb="tab"][aria-selected="true"] {{
     background:linear-gradient(135deg,rgba(245,158,11,0.22),rgba(16,185,129,0.18)) !important;
     border-color:#f59e0b !important;
     border-bottom:3px solid #f59e0b !important;
 }}
-button[data-baseweb="tab"][aria-selected="true"] p {{
-    color:#f59e0b !important;
-    font-weight:800 !important;
-}}
-[data-testid="stExpander"] details {{
-    background:{BG_CARD} !important;
-    border:1px solid {BORDER_C} !important;
-    border-radius:10px !important;
-    box-shadow:{CARD_SHADOW};
-    margin-top:2px !important;
-}}
-[data-testid="stExpander"] summary {{
-    padding:9px 14px !important;
-    display:flex !important;
-    align-items:center !important;
-    gap:8px !important;
-}}
-[data-testid="stExpander"] summary p {{
-    color:{TEXT_MAIN} !important;
-    font-weight:700 !important;
-    font-size:0.82rem !important;
-    margin:0 !important;
-}}
+button[data-baseweb="tab"][aria-selected="true"] p {{ color:#f59e0b !important; font-weight:800 !important; }}
+[data-testid="stExpander"] details {{ background:{BG_CARD} !important; border:1px solid {BORDER_C} !important; border-radius:10px !important; box-shadow:{CARD_SHADOW}; margin-top:2px !important; }}
+[data-testid="stExpander"] summary {{ padding:9px 14px !important; display:flex !important; align-items:center !important; gap:8px !important; }}
+[data-testid="stExpander"] summary p {{ color:{TEXT_MAIN} !important; font-weight:700 !important; font-size:0.82rem !important; margin:0 !important; }}
 
-.aligned-sec-hdr {{
-    font-size:0.88rem;
-    font-weight:800;
-    color:{TEXT_MAIN};
-    background:{BG_CARD};
-    border:1px solid {BORDER_C};
-    border-left:4px solid #f59e0b;
-    padding:8px 12px;
-    border-radius:8px;
-    margin-bottom:8px;
-    white-space:nowrap;
-    overflow:hidden;
-    text-overflow:ellipsis;
-}}
+.aligned-sec-hdr {{ font-size:0.88rem; font-weight:800; color:{TEXT_MAIN}; background:{BG_CARD}; border:1px solid {BORDER_C}; border-left:4px solid #f59e0b; padding:8px 12px; border-radius:8px; margin-bottom:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
 
-/* NSE-STYLE LIVE HEATMAP TILES (MATCHING NSE HEATMAP SCREENSHOT) */
-.nse-heatmap-container {{
-    background:{BG_CARD};
-    border:1.5px solid {BORDER_C};
-    border-radius:14px;
-    padding:14px 16px;
-    margin:8px 0 14px 0;
-    box-shadow:{CARD_SHADOW};
-}}
-.nse-legend-bar {{
-    display:flex;
-    gap:5px;
-    align-items:center;
-    flex-wrap:wrap;
-}}
-.nse-leg-pill {{
-    padding:2px 9px;
-    border-radius:999px;
-    font-size:0.68rem;
-    font-weight:800;
-    color:#ffffff;
-}}
-.nse-heatmap-grid {{
-    display:grid;
-    grid-template-columns:repeat(auto-fill, minmax(175px, 1fr));
-    gap:8px;
-    margin-top:10px;
-}}
-a.nse-tile {{
-    text-decoration:none !important;
-    color:#ffffff !important;
-    padding:10px 12px;
-    border-radius:8px;
-    display:flex;
-    flex-direction:column;
-    justify-content:space-between;
-    height:74px;
-    box-shadow:0 3px 8px rgba(0,0,0,0.22);
-    transition:transform 0.16s ease, filter 0.16s ease;
-    border:1px solid rgba(255,255,255,0.15);
-}}
-a.nse-tile:hover {{
-    transform:translateY(-2px) scale(1.02);
-    filter:brightness(1.12);
-}}
-.nse-tile-name {{
-    font-size:0.74rem;
-    font-weight:800;
-    text-transform:uppercase;
-    white-space:nowrap;
-    overflow:hidden;
-    text-overflow:ellipsis;
-}}
-.nse-tile-bot {{
-    display:flex;
-    justify-content:space-between;
-    align-items:baseline;
-    font-family:'JetBrains Mono',monospace !important;
-}}
+.nse-heatmap-container {{ background:{BG_CARD}; border:1.5px solid {BORDER_C}; border-radius:14px; padding:14px 16px; margin:8px 0 14px 0; box-shadow:{CARD_SHADOW}; }}
+.nse-legend-bar {{ display:flex; gap:5px; align-items:center; flex-wrap:wrap; }}
+.nse-leg-pill {{ padding:2px 9px; border-radius:999px; font-size:0.68rem; font-weight:800; color:#ffffff; }}
+.nse-heatmap-grid {{ display:grid; grid-template-columns:repeat(auto-fill, minmax(175px, 1fr)); gap:8px; margin-top:10px; }}
+a.nse-tile {{ text-decoration:none !important; color:#ffffff !important; padding:10px 12px; border-radius:8px; display:flex; flex-direction:column; justify-content:space-between; height:74px; box-shadow:0 3px 8px rgba(0,0,0,0.22); transition:transform 0.16s ease, filter 0.16s ease; border:1px solid rgba(255,255,255,0.15); }}
+a.nse-tile:hover {{ transform:translateY(-2px) scale(1.02); filter:brightness(1.12); }}
+.nse-tile-name {{ font-size:0.74rem; font-weight:800; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
+.nse-tile-bot {{ display:flex; justify-content:space-between; align-items:baseline; font-family:'JetBrains Mono',monospace !important; }}
 
-/* PULSE BAR & TURNAROUND HERO DECK */
-.pulse-bar {{ background:{BG_CARD}; border:1px solid {BORDER_C}; border-radius:12px; padding:8px 14px; margin:6px 0 10px 0; display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:8px; box-shadow:{CARD_SHADOW}; }}
+.pulse-bar {{ background:{BG_CARD}; border:1px solid {BORDER_C}; border-radius:12px; padding:8px 14px; margin:6px 0 6px 0; display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:8px; box-shadow:{CARD_SHADOW}; }}
 .pulse-item {{ font-size:0.81rem; font-weight:700; color:{TEXT_MAIN}; font-family:'JetBrains Mono',monospace !important; }}
 .compass-pill {{ padding:3px 10px; border-radius:999px; font-size:0.74rem; font-weight:800; }}
 .turnaround-hero-box {{ background:{BG_CARD}; border:1.5px solid {BORDER_C}; border-left:5px solid #10b981; border-radius:12px; padding:10px 14px; margin:4px 0 10px 0; box-shadow:{CARD_SHADOW}; }}
@@ -385,7 +368,6 @@ a.turn-sec-card {{ text-decoration:none !important; background:{BG_SUB}; border:
 a.turn-sec-card:hover {{ border-color:#f59e0b; transform:translateY(-2px); box-shadow:0 4px 12px rgba(16,185,129,0.22); }}
 .t-sec-name {{ font-weight:800; font-size:0.81rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:145px; }}
 
-/* NEXT-DAY WATCHLIST CARDS */
 .radar-panel-bull {{ background:{BG_CARD}; border:1px solid #10b98166; border-top:3.5px solid #10b981; border-radius:12px; padding:10px 12px; margin-bottom:8px; }}
 .radar-panel-bear {{ background:{BG_CARD}; border:1px solid #ef444466; border-top:3.5px solid #ef4444; border-radius:12px; padding:10px 12px; margin-bottom:8px; }}
 .radar-panel-header {{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-bottom:5px; border-bottom:1px solid {BORDER_C}; }}
@@ -401,7 +383,6 @@ a.radar-row-card:hover {{ border-color:#f59e0b; transform:translateY(-2px); }}
 .r-plan {{ display:flex; justify-content:space-between; font-size:0.70rem; font-weight:700; background:rgba(0,0,0,0.16); padding:3px 7px; border-radius:6px; font-family:'JetBrains Mono',monospace !important; }}
 a.wa-share-btn {{ text-decoration:none !important; background:linear-gradient(135deg,#16a34a,#22c55e); color:#fff !important; padding:5px 13px; border-radius:999px; font-size:0.75rem; font-weight:800; display:inline-flex; align-items:center; gap:5px; }}
 
-/* MARQUEE & KPI CARDS */
 .marquee-wrap {{ background:{BG_CARD}; border:1px solid {BORDER_C}; border-radius:10px; padding:7px 10px; overflow:hidden; white-space:nowrap; margin:6px 0 12px 0; box-shadow:{CARD_SHADOW}; }}
 .marquee-track {{ display:inline-block; animation:ticker-move 55s linear infinite; }}
 .marquee-wrap:hover .marquee-track {{ animation-play-state:paused; }}
@@ -419,44 +400,13 @@ a.bull-pill, a.bear-pill {{ text-decoration:none !important; padding:3px 8px; bo
 a.bull-pill {{ background:rgba(16,185,129,0.14); border:1px solid #10b98199; color:#10b981 !important; }}
 a.bear-pill {{ background:rgba(239,68,68,0.14); border:1px solid #ef444499; color:#ef4444 !important; }}
 
-/* FLOATING RIGHT DOCK (AI HELP + TOP BUTTON) */
-.floating-right-dock {{
-    position:fixed;
-    bottom:58px;
-    right:18px;
-    z-index:999999;
-    display:flex;
-    flex-direction:column;
-    gap:7px;
-    align-items:flex-end;
-}}
-a.floating-ai-btn {{
-    text-decoration:none !important;
-    background:linear-gradient(135deg,#7c3aed,#2563eb);
-    color:#ffffff !important;
-    padding:7px 14px;
-    border-radius:999px;
-    font-size:0.78rem;
-    font-weight:800;
-    border:1.5px solid rgba(255,255,255,0.35);
-    box-shadow:0 6px 18px rgba(124,58,237,0.5);
-}}
-a.single-top-btn {{
-    text-decoration:none !important;
-    background:linear-gradient(135deg,#f59e0b,#ea580c);
-    color:#fff !important;
-    padding:7px 15px;
-    border-radius:999px;
-    font-size:0.79rem;
-    font-weight:800;
-    border:1.5px solid rgba(255,255,255,0.35);
-    box-shadow:0 6px 20px rgba(245,158,11,0.5);
-}}
+.floating-right-dock {{ position:fixed; bottom:58px; right:18px; z-index:999999; display:flex; flex-direction:column; gap:7px; align-items:flex-end; }}
+a.single-top-btn {{ text-decoration:none !important; background:linear-gradient(135deg,#f59e0b,#ea580c); color:#fff !important; padding:7px 15px; border-radius:999px; font-size:0.79rem; font-weight:800; border:1.5px solid rgba(255,255,255,0.35); box-shadow:0 6px 20px rgba(245,158,11,0.5); }}
 </style>
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 6. NAN-SAFE DATA ENGINE (42 SECTORS & 420+ NIFTY 500 STOCKS)
+# 6. NAN-SAFE DATA ENGINE & LIVE NEWS + AI VERDICT ENGINE
 # ==============================================================================
 def safe_num(val, default: float = 0.0) -> float:
     try:
@@ -491,6 +441,150 @@ def make_stock_pills(df_sub: pd.DataFrame) -> str:
         icon = "🟢" if safe_num(r.get("1D", 0.0)) >= 0 else "🔴"
         pills.append(f'<a class="{cls}" href="?focus_stock={qt}" target="_self">{icon} {r["Symbol"]}</a>')
     return f'<div class="pill-container">{"".join(pills)}</div>'
+
+@st.cache_data(ttl=600, show_spinner=False)
+def fetch_live_stock_news_and_sentiment(sym_clean: str):
+    """Fetches real-time Google News RSS headlines for the stock and computes sentiment score."""
+    headlines = []
+    pos_words = ["surge", "jump", "gain", "win", "order", "profit", "buy", "upgrade", "bullish", "high", "growth", "rally", "beat", "expand", "record", "bonus", "dividend", "turnaround", "strong", "up"]
+    neg_words = ["fall", "drop", "loss", "crash", "downgrade", "sell", "weak", "slump", "penalty", "probe", "low", "cut", "miss", "decline", "bearish", "concern", "risk", "debt", "down"]
+    pos_hits, neg_hits = 0, 0
+
+    try:
+        q = urllib.parse.quote(f"{sym_clean} share price NSE India")
+        url = f"https://news.google.com/rss/search?q={q}&hl=en-IN&gl=IN&ceid=IN:en"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            xml_data = resp.read()
+        root = ET.fromstring(xml_data)
+        for item in root.findall(".//item")[:5]:
+            title_el = item.find("title")
+            pub_el = item.find("pubDate")
+            if title_el is not None and title_el.text:
+                t_txt = title_el.text.strip()
+                p_txt = pub_el.text[:16] if (pub_el is not None and pub_el.text) else ""
+                headlines.append((t_txt, p_txt))
+                t_low = t_txt.lower()
+                pos_hits += sum(1 for w in pos_words if w in t_low)
+                neg_hits += sum(1 for w in neg_words if w in t_low)
+    except Exception:
+        pass
+
+    if pos_hits > neg_hits:
+        sent_label = "🟢 Positive News Flow (Bullish Catalyst)"
+        sent_score = min(25, 16 + (pos_hits - neg_hits) * 3)
+    elif neg_hits > pos_hits:
+        sent_label = "🔴 Negative / Cautious News Flow"
+        sent_score = max(4, 12 - (neg_hits - pos_hits) * 3)
+    else:
+        sent_label = "⚖️ Neutral / Normal Market News Flow"
+        sent_score = 15
+
+    return headlines, sent_label, sent_score
+
+def generate_ai_stock_verdict(s_info: pd.Series, n_d: dict, v_d: dict, adv_cnt: int, dec_cnt: int):
+    """Combines Chart Technicals + Live News + Market/Sector Condition into an instant AI Trade Decision."""
+    sym = s_info["Symbol"]
+    headlines, news_label, news_pts = fetch_live_stock_news_and_sentiment(sym)
+
+    # 1. Technical Score (out of 45)
+    tech_pts = 0
+    tech_notes = []
+    if s_info["Above_50DMA"] and s_info["Above_20DMA"]:
+        tech_pts += 16
+        tech_notes.append("✅ Price is trading above both 20-DMA & 50-DMA (Strong Uptrend).")
+    elif s_info["Above_20DMA"]:
+        tech_pts += 12
+        tech_notes.append("🔄 Price crossed above 20-DMA (Short-term Bottom Recovery).")
+    else:
+        tech_pts += 4
+        tech_notes.append("⚠️ Price is below 20-DMA & 50-DMA (Weak Chart Structure).")
+
+    if 45 <= s_info["RSI"] <= 68:
+        tech_pts += 12
+        tech_notes.append(f"✅ RSI ({s_info['RSI']}) is in the ideal Bullish Momentum zone (Not Overbought).")
+    elif s_info["RSI"] > 74:
+        tech_pts += 4
+        tech_notes.append(f"⚠️ RSI ({s_info['RSI']}) is Overbought — high risk of profit booking.")
+    else:
+        tech_pts += 7
+        tech_notes.append(f"🔄 RSI ({s_info['RSI']}) is in Oversold/Base zone — wait for volume breakout.")
+
+    if s_info["Vol_Ratio"] >= 1.25:
+        tech_pts += 10
+        tech_notes.append(f"🔥 Strong Institutional Volume Buildup ({s_info['Vol_Ratio']}x vs 20-day average).")
+    elif s_info["Vol_Ratio"] >= 1.0:
+        tech_pts += 6
+        tech_notes.append(f"📊 Normal Volume participation ({s_info['Vol_Ratio']}x).")
+    else:
+        tech_pts += 2
+        tech_notes.append(f"⚠️ Low Volume ({s_info['Vol_Ratio']}x) — lacks breakout conviction.")
+
+    if pd.notna(s_info["Bull_Candle"]) and s_info["Consec_Up"] <= 2:
+        tech_pts += 7
+        tech_notes.append(f"🕯️ Bullish Pattern Detected: {s_info['Bull_Candle']} (Fresh base, not overextended).")
+    elif pd.notna(s_info["Bear_Candle"]):
+        tech_pts -= 4
+        tech_notes.append(f"🕯️ Bearish Rejection Pattern: {s_info['Bear_Candle']} near highs.")
+
+    # 2. Market & Sector Condition Score (out of 30)
+    mkt_pts = 0
+    mkt_notes = []
+    if n_d["1D"] >= -0.15 and adv_cnt >= dec_cnt * 0.8:
+        mkt_pts += 10
+        mkt_notes.append(f"✅ Broad Market (Nifty {n_d['1D']:+.2f}%) & Breadth ({adv_cnt} Up) are supportive.")
+    else:
+        mkt_pts += 4
+        mkt_notes.append(f"⚠️ Broad Market is under pressure ({dec_cnt} Declining) — keep strict Stop-Loss.")
+
+    if v_d["price"] < 16.0:
+        mkt_pts += 8
+        mkt_notes.append(f"✅ India VIX ({v_d['price']:.2f}) is low & calm — safe environment for breakout trades.")
+    else:
+        mkt_pts += 3
+        mkt_notes.append(f"⚠️ Elevated India VIX ({v_d['price']:.2f}) — reduce position size.")
+
+    if s_info["Sec_1D"] >= 0 or s_info["Sec_Bull_Turn"]:
+        mkt_pts += 12
+        mkt_notes.append(f"🚀 Sector ({s_info['Sector']}) is positive/turning around today ({s_info['Sec_1D']:+.2f}%).")
+    else:
+        mkt_pts += 4
+        mkt_notes.append(f"⚠️ Sector ({s_info['Sector']}) is lagging today ({s_info['Sec_1D']:+.2f}%).")
+
+    total_ai_score = int(np.clip(tech_pts + mkt_pts + news_pts, 18, 97))
+
+    if total_ai_score >= 70 and s_info["Consec_Up"] <= 3:
+        verdict_badge = "🟢 AI VERDICT: YES — HIGH-PROBABILITY BUY SETUP (ট্রেড নেওয়া যেতে পারে)"
+        verdict_color = "#10b981"
+        bangla_summary = (
+            f"✅ **চূড়ান্ত পরামর্শ:** **{sym}** শেয়ারটিতে চার্ট, ভলিউম ({s_info['Vol_Ratio']}x), সেক্টর এবং মার্কেট কন্ডিশন অনুকূলে আছে। "
+            f"শেয়ারটি যদি **₹{s_info['Buy_Entry']}**-এর ওপরে টিকে থাকে, তবে **₹{s_info['Buy_SL']}** স্টপ-লস (SL) রেখে **₹{s_info['Buy_Target']}** টার্গেটের জন্য বুলিশ ট্রেড নেওয়া যুক্তিসঙ্গত হবে।"
+        )
+    elif total_ai_score >= 54:
+        verdict_badge = "🟡 AI VERDICT: WAIT FOR CONFIRMATION / BREAKOUT (ব্রেকআউটের জন্য অপেক্ষা করুন)"
+        verdict_color = "#f59e0b"
+        bangla_summary = (
+            f"⚖️ **চূড়ান্ত পরামর্শ:** **{sym}** শেয়ারটি এখন কনসোলিডেশন বা মাঝারি জোনে আছে। তড়িঘড়ি করে এন্ট্রি না নিয়ে "
+            f"দাম **₹{s_info['Buy_Entry']}** ব্রেক করে ওপরে ভলিউম সহ ক্যান্ডেল ক্লোজ দিলে তবেই **₹{s_info['Buy_SL']}** স্টপ-লসে এন্ট্রি নেওয়া নিরাপদ হবে।"
+        )
+    else:
+        verdict_badge = "🔴 AI VERDICT: AVOID BUYING / BEARISH PRESSURE (বাই ট্রেড এড়িয়ে চলুন)"
+        verdict_color = "#ef4444"
+        bangla_summary = (
+            f"🛑 **চূড়ান্ত পরামর্শ:** **{sym}** শেয়ারটিতে বর্তমানে বুলিশ ট্রেড নেওয়া ঝুঁকিপূর্ণ (চার্ট বা সেক্টর দুর্বল)। "
+            f"বাই ট্রেড এড়িয়ে চলুন; তবে মার্কেট বেয়ারিশ থাকলে **₹{s_info['Short_Entry']}**-এর নিচে নামলে **₹{s_info['Short_SL']}** স্টপ-লসে শর্ট (Short) সেটআপ ট্র্যাক করতে পারেন।"
+        )
+
+    return {
+        "score": total_ai_score,
+        "badge": verdict_badge,
+        "color": verdict_color,
+        "bangla": bangla_summary,
+        "tech_notes": tech_notes,
+        "mkt_notes": mkt_notes,
+        "news_label": news_label,
+        "headlines": headlines
+    }
 
 @st.cache_data(ttl=300, show_spinner=False)
 def load_pulse_indices():
@@ -623,7 +717,6 @@ def load_full_market_data():
         s_vol, s_rsi = safe_num(grp["Vol_Ratio"].mean(), 1.0), safe_num(grp["RSI"].mean(), 50.0)
         s_b20 = safe_num((grp["Above_20DMA"].sum() / max(len(grp), 1)) * 100.0, 50.0)
         s_b50 = safe_num((grp["Above_50DMA"].sum() / max(len(grp), 1)) * 100.0, 50.0)
-        avg_price = safe_num(grp["Price"].mean(), 1000.0)
 
         was_correcting = (s_1m <= 2.2) or (s_3m <= 3.5) or (s_1w <= 1.5)
         reversing_up = (s_1d >= -0.05) and ((s_1d > (s_1w / 5.0)) or (s_1w > (s_1m / 4.0)))
@@ -648,7 +741,7 @@ def load_full_market_data():
         top_pick_sym = grp.sort_values(["Vol_Ratio", "1D"], ascending=[False, False]).iloc[0]["Symbol"]
 
         sec_rows.append({
-            "Sector": sec_name, "Count": len(grp), "Top_Pick": top_pick_sym, "Avg_Price": round(avg_price, 1),
+            "Sector": sec_name, "Count": len(grp), "Top_Pick": top_pick_sym,
             "1D": round(s_1d, 2), "1W": round(s_1w, 2), "1M": round(s_1m, 2),
             "3M": round(s_3m, 2), "6M": round(s_6m, 2), "1Y": round(s_1y, 2),
             "Avg_Vol": round(s_vol, 2), "RSI": round(s_rsi, 1),
@@ -754,17 +847,24 @@ if stocks_df.empty or sectors_df.empty:
     st.stop()
 
 # ==============================================================================
-# 7. MARKET PULSE RIBBON & AI COMPASS
+# 7. MARKET PULSE RIBBON + LIVE SECTOR FOCUS ALERT NOTIFICATION BAR
 # ==============================================================================
 n_d, b_d, v_d, u_d = pulse["NIFTY"], pulse["BANKNIFTY"], pulse["VIX"], pulse["USDINR"]
 adv_today, dec_today = int((stocks_df["1D"] > 0).sum()), int((stocks_df["1D"] < 0).sum())
+turnaround_secs = sectors_df.sort_values(["Sec_Bull_Turn", "Turnaround_Score"], ascending=[False, False]).head(8)
 
 if n_d["1D"] >= 0.20 and adv_today >= dec_today:
     c_txt, c_sty = "🟢 Bullish Bias — Track Turnaround BUY Setups", "background:rgba(16,185,129,0.16);color:#10b981;border:1px solid #10b98155;"
+    focus_alert_secs = sectors_df[(sectors_df["Sec_Bull_Turn"]) | (sectors_df["1D"] > 0.4)].sort_values("Turnaround_Score", ascending=False).head(3)
+    alert_regime_msg = "🚨 LIVE SECTOR FOCUS ALERT (Bullish Market Condition) — Priority Buy Focus on:"
 elif n_d["1D"] <= -0.20 and dec_today > adv_today:
     c_txt, c_sty = "🔴 Bearish Bias — Track Top SHORT Setups", "background:rgba(239,68,68,0.16);color:#ef4444;border:1px solid #ef444455;"
+    focus_alert_secs = sectors_df.sort_values("1D", ascending=True).head(3)
+    alert_regime_msg = "🚨 LIVE SECTOR FOCUS ALERT (Bearish Market Pressure) — Track Short / Defensive Focus on:"
 else:
     c_txt, c_sty = "⚖️ Rotational Market — Focus on Turnaround Sectors", "background:rgba(245,158,11,0.16);color:#f59e0b;border:1px solid #f59e0b55;"
+    focus_alert_secs = turnaround_secs.head(3)
+    alert_regime_msg = "🚨 LIVE SECTOR FOCUS ALERT (Rotational Market) — Bottom Turnaround Focus on:"
 
 st.markdown(
     f'<div class="pulse-bar">'
@@ -776,8 +876,30 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+# Live Sector Focus Alert Notification Chips & Toast
+alert_chips_html = []
+for _, a_row in focus_alert_secs.iterrows():
+    q_as = urllib.parse.quote(a_row["Sector"])
+    alert_chips_html.append(
+        f'<a href="?focus_sec={q_as}" target="_self" class="alert-sec-chip" title="Click to open {a_row["Sector"]} stocks">'
+        f'🎯 {a_row["Sector"]} ({a_row["1D"]:+.2f}% • Vol {a_row["Avg_Vol"]}x • Top: {a_row["Top_Pick"]})</a>'
+    )
+
+st.markdown(
+    f'<div class="sector-alert-banner">'
+    f'<span style="font-size:0.80rem;font-weight:800;color:#f59e0b;">{alert_regime_msg}</span>'
+    f'<div style="display:flex;flex-wrap:wrap;gap:6px;">{"".join(alert_chips_html)}</div>'
+    f'</div>',
+    unsafe_allow_html=True
+)
+
+if not st.session_state.sector_toast_shown and not focus_alert_secs.empty:
+    top_f_sec = focus_alert_secs.iloc[0]
+    st.toast(f"🚨 Sector Focus Alert: Focus on {top_f_sec['Sector']} ({top_f_sec['1D']:+.2f}%, Top Pick: {top_f_sec['Top_Pick']})", icon="🧭")
+    st.session_state.sector_toast_shown = True
+
 # ==============================================================================
-# 8. 5-COLUMN FILTER & ACTION BAR (WITH NSE HEATMAP & AI HELP BUTTONS)
+# 8. 5-COLUMN FILTER & ACTION BAR
 # ==============================================================================
 fc1, fc2, fc3, fc4, fc5 = st.columns([1.1, 2.3, 2.5, 2.4, 1.7])
 with fc1:
@@ -815,40 +937,25 @@ with fc5:
         st.session_state.show_nse_heatmap = not st.session_state.show_nse_heatmap
 
 # ==============================================================================
-# 8.1 INTERACTIVE AI HELP ASSISTANT PANEL (LIVE PROMPT + GEMINI LINK)
+# 8.1 INTERACTIVE AI MARKET BRIEF PANEL
 # ==============================================================================
-turnaround_secs = sectors_df.sort_values(["Sec_Bull_Turn", "Turnaround_Score"], ascending=[False, False]).head(8)
 bull_next8, bear_next8 = filter_next_day_intraday_stocks(stocks_df)
 
 if st.session_state.show_ai_helper:
     top_turn_names = ", ".join([f"{r['Sector']} ({r['1D']:+.1f}%)" for _, r in turnaround_secs.head(4).iterrows()])
     top_bull_syms = ", ".join([f"{r['Symbol']} (₹{r['Price']}, Buy>{r['Entry']}, SL {r['SL']})" for _, r in bull_next8.head(4).iterrows()])
     top_bear_syms = ", ".join([f"{r['Symbol']} (₹{r['Price']}, Short<{r['Entry']}, SL {r['SL']})" for _, r in bear_next8.head(3).iterrows()])
-    sel_stk_txt = ""
-    if st.session_state.selected_stock != DEFAULT_STOCK and st.session_state.selected_stock in stocks_df["Ticker"].values:
-        sr = stocks_df[stocks_df["Ticker"] == st.session_state.selected_stock].iloc[0]
-        sel_stk_txt = f"\nSelected Stock Focus: {sr['Symbol']} ({sr['Sector']}) at ₹{sr['Price']} (1D: {sr['1D']:+.2f}%, RSI: {sr['RSI']}, Vol: {sr['Vol_Ratio']}x, Buy>{sr['Buy_Entry']}, SL:{sr['Buy_SL']}, Tgt:{sr['Buy_Target']})."
-
-    live_ai_prompt = (
-        f"বন্ধু, আজকের লাইভ মার্কেট ডেটা দেখো:\n"
-        f"• Nifty 50: {n_d['price']:,.1f} ({n_d['1D']:+.2f}%), Bank Nifty: {b_d['price']:,.1f} ({b_d['1D']:+.2f}%), India VIX: {v_d['price']:.2f}\n"
-        f"• Top Turnaround Sectors: {top_turn_names}\n"
-        f"• Top Bullish Intraday Picks: {top_bull_syms}\n"
-        f"• Top Bearish Intraday Picks: {top_bear_syms}{sel_stk_txt}\n"
-        f"এই ডেটা অনুযায়ী এখন লাইভ মার্কেটে কোন সেক্টর ও কোন শেয়ারটিতে ট্রেড নেওয়া সবচেয়ে নিরাপদ হবে আমাকে গাইড করো।"
-    )
     with st.container():
-        st.markdown('<div class="aligned-sec-hdr">🤖 AI Live Market Assistant — Copy Live Market Summary & Chat with Gemini</div>', unsafe_allow_html=True)
-        ai_c1, ai_c2, ai_c3 = st.columns([6.5, 2.0, 1.5])
-        with ai_c1:
-            st.code(live_ai_prompt, language="markdown")
-        with ai_c2:
-            st.link_button("💬 Open Gemini AI Chat", "https://gemini.google.com/app", use_container_width=True)
-            st.caption("উপরের বক্সের ডানদিকের Copy আইকনে ক্লিক করে মেসেজটি কপি করে Gemini চ্যাটে পেস্ট করো।")
-        with ai_c3:
-            if st.button("✖ Close AI Help", use_container_width=True):
-                st.session_state.show_ai_helper = False
-                st.rerun()
+        st.markdown('<div class="aligned-sec-hdr">🤖 AI Live Market Intelligence Summary</div>', unsafe_allow_html=True)
+        st.info(
+            f"🧭 **Market Regime:** {c_txt}\n\n"
+            f"🔄 **Top Turnaround Sectors to Focus:** {top_turn_names}\n\n"
+            f"🟢 **Top Bullish Intraday Setups:** {top_bull_syms}\n\n"
+            f"🔴 **Top Bearish Intraday Setups:** {top_bear_syms}"
+        )
+        if st.button("✖ Close AI Brief"):
+            st.session_state.show_ai_helper = False
+            st.rerun()
 
 # ==============================================================================
 # 8.2 NSE SECTORAL HEATMAP & BULLISH / BEARISH SECTOR RECOMMENDATION PANEL
@@ -860,17 +967,17 @@ if st.session_state.show_nse_heatmap:
 
     def get_nse_tile_color(val: float) -> str:
         if val >= 3.0:
-            return "#047857"   # Dark Green (+3% to +5%)
+            return "#047857"
         elif val >= 1.0:
-            return "#10b981"   # Medium Green (+1% to +3%)
+            return "#10b981"
         elif val >= 0.0:
-            return "#34d399"   # Light Green (0% to +1%)
+            return "#34d399"
         elif val >= -1.0:
-            return "#f87171"   # Light Pink/Red (0% to -1%)
+            return "#f87171"
         elif val >= -3.0:
-            return "#ef4444"   # Medium Red (-1% to -3%)
+            return "#ef4444"
         else:
-            return "#b91c1c"   # Dark Red (<-3%)
+            return "#b91c1c"
 
     heatmap_tiles = []
     for _, srow in sectors_df.sort_values(tf_choice, ascending=False).iterrows():
@@ -1021,7 +1128,7 @@ bar_items = [
 st.markdown(f'<div class="marquee-wrap"><div class="marquee-track">{"".join(bar_items) * 2}</div></div>', unsafe_allow_html=True)
 
 # ==============================================================================
-# 12. STOCK INSPECTOR, 5-POINT CHECKLIST & SMART CHART
+# 12. STOCK INSPECTOR, CHART & ONE-CLICK AUTOMATIC AI TRADE VERDICT ENGINE
 # ==============================================================================
 st.markdown('<div id="stock-inspector-anchor"></div>', unsafe_allow_html=True)
 
@@ -1098,6 +1205,7 @@ if st.session_state.selected_stock != DEFAULT_STOCK and st.session_state.selecte
         fig_st.update_layout(height=360, template="plotly_dark" if "Clean Light" not in theme_mode else "plotly_white", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=10, r=10, t=20, b=10), xaxis_rangeslider_visible=False)
         st.plotly_chart(fig_st, use_container_width=True)
 
+    # 4 ACTION BUTTONS BELOW CHART (4TH GOLDEN BUTTON TRIGGERS IN-APP AI DECISION ENGINE)
     l1, l2, l3, l4 = st.columns(4)
     with l1:
         st.link_button(f"📈 TradingView ({sym_clean})", f"https://in.tradingview.com/chart/?symbol=NSE%3A{sym_clean}", use_container_width=True)
@@ -1106,7 +1214,39 @@ if st.session_state.selected_stock != DEFAULT_STOCK and st.session_state.selecte
     with l3:
         st.link_button(f"📰 Google Finance ({sym_clean})", f"https://www.google.com/finance/quote/{sym_clean}:NSE", use_container_width=True)
     with l4:
-        st.link_button(f"🤖 Ask Gemini About {sym_clean}", "https://gemini.google.com/app", use_container_width=True)
+        if st.button(f"🤖 Ask AI Verdict ({sym_clean})", type="primary", use_container_width=True, help="Click for Instant AI Decision based on Chart + Live News + Market Condition"):
+            st.session_state.show_stock_ai_verdict = not st.session_state.show_stock_ai_verdict
+
+    # AUTOMATIC IN-APP AI DECISION ENGINE (CHART + NEWS + MARKET CONDITION)
+    if st.session_state.show_stock_ai_verdict:
+        with st.spinner(f"🤖 Analyzing {sym_clean} Chart, Sector Rotation & Live News Headlines..."):
+            ai_res = generate_ai_stock_verdict(s_info, n_d, v_d, adv_today, dec_today)
+
+        news_items_html = "".join([
+            f'<div style="font-size:0.75rem;margin-bottom:5px;padding-bottom:4px;border-bottom:1px dashed {BORDER_C};">'
+            f'📰 {hl} <span style="color:{TEXT_SUB};font-size:0.68rem;">({dt})</span></div>'
+            for hl, dt in ai_res["headlines"]
+        ]) or '<div style="font-size:0.75rem;color:#94a3b8;">No major breaking news in last 24h — stock is moving on technicals & sector flow.</div>'
+
+        tech_items_html = "".join([f'<div style="font-size:0.76rem;margin-bottom:4px;">{tn}</div>' for tn in ai_res["tech_notes"]])
+        mkt_items_html = "".join([f'<div style="font-size:0.76rem;margin-bottom:4px;">{mn}</div>' for mn in ai_res["mkt_notes"]])
+
+        st.markdown(
+            f'<div class="ai-verdict-box">'
+            f'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;border-bottom:1px solid {BORDER_C};padding-bottom:8px;">'
+            f'<span style="font-size:0.98rem;font-weight:800;color:{ai_res["color"]};">{ai_res["badge"]}</span>'
+            f'<span style="background:{ai_res["color"]}22;color:{ai_res["color"]};border:1px solid {ai_res["color"]};padding:3px 10px;border-radius:999px;font-size:0.78rem;font-weight:800;">AI Confidence Score: {ai_res["score"]}/100</span>'
+            f'</div>'
+            f'<div style="font-size:0.84rem;line-height:1.5;margin-bottom:12px;background:rgba(245,158,11,0.08);padding:8px 12px;border-radius:8px;border-left:4px solid {ai_res["color"]};">'
+            f'{ai_res["bangla"]}'
+            f'</div>'
+            f'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;">'
+            f'<div class="ai-sub-card"><div style="font-size:0.80rem;font-weight:800;color:#38bdf8;margin-bottom:6px;">📈 1. Chart & Technical Analysis</div>{tech_items_html}</div>'
+            f'<div class="ai-sub-card"><div style="font-size:0.80rem;font-weight:800;color:#10b981;margin-bottom:6px;">🌍 2. Market & Sector Condition</div>{mkt_items_html}</div>'
+            f'<div class="ai-sub-card"><div style="font-size:0.80rem;font-weight:800;color:#f59e0b;margin-bottom:6px;">📰 3. {ai_res["news_label"]}</div>{news_items_html}</div>'
+            f'</div></div>',
+            unsafe_allow_html=True
+        )
     st.markdown("---")
 
 # ==============================================================================
@@ -1309,11 +1449,10 @@ with tab4:
     st.dataframe(style_colored_table(sectors_df.sort_values("Turnaround_Score", ascending=False)[["Sector", "Zone", "Turnaround_Score", "Meter", "1D", "1W", "1M", "3M", "6M", "1Y", "Avg_Vol", "RSI", "Breadth_20DMA", "Breadth_50DMA", "Top_Pick"]], ["1D", "1W", "1M", "3M", "6M", "1Y"]), use_container_width=True, hide_index=True)
 
 # ==============================================================================
-# 15. FLOATING RIGHT DOCK (‘🤖 AI Help’ + ‘🚀 Top’) & AUTO-SCROLL ENGINE
+# 15. FLOATING ‘🚀 Top’ BUTTON & AUTO-SCROLL ENGINE
 # ==============================================================================
 st.markdown(
     '<div class="floating-right-dock">'
-    '<a href="https://gemini.google.com/app" target="_blank" class="floating-ai-btn" title="Open Gemini AI Live Chat">🤖 AI Chat</a>'
     '<a href="#top-anchor" class="single-top-btn" id="alphapulse-top-btn" title="Scroll back to top">🚀 Top</a>'
     '</div>',
     unsafe_allow_html=True
