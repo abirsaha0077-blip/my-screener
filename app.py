@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from datetime import datetime, timezone, timedelta
 import urllib.parse
 import warnings
 
@@ -60,31 +61,28 @@ SECTOR_STOCKS = {
 
 ALL_TICKERS = sorted(list({t for lst in SECTOR_STOCKS.values() for t in lst}))
 TICKER_TO_SECTOR = {t: sec for sec, lst in SECTOR_STOCKS.items() for t in lst}
-
 DEFAULT_SECTOR = "All 32 Sectors"
 DEFAULT_STOCK = "Search or Select Stock..."
 
 # ==============================================================================
-# 3. SESSION STATE & DEEP-LINK AUTO-SCROLL HANDLER
+# 3. SESSION STATE & URL QUERY PARAMETER HANDLER
 # ==============================================================================
-if "selected_sector" not in st.session_state:
-    st.session_state.selected_sector = DEFAULT_SECTOR
-if "selected_stock" not in st.session_state:
-    st.session_state.selected_stock = DEFAULT_STOCK
-if "kpi_panel" not in st.session_state:
-    st.session_state.kpi_panel = None
-if "scroll_target" not in st.session_state:
-    st.session_state.scroll_target = None
-if "last_alerted_stocks" not in st.session_state:
-    st.session_state.last_alerted_stocks = ""
+for k, v in [
+    ("selected_sector", DEFAULT_SECTOR),
+    ("selected_stock", DEFAULT_STOCK),
+    ("kpi_panel", None),
+    ("scroll_target", None),
+    ("last_alerted", "")
+]:
+    if k not in st.session_state:
+        st.session_state[k] = v
 
 qp = st.query_params
 if "nav_action" in qp:
-    if qp["nav_action"] == "home":
-        st.session_state.selected_sector = DEFAULT_SECTOR
-        st.session_state.selected_stock = DEFAULT_STOCK
-        st.session_state.kpi_panel = None
-        st.session_state.scroll_target = None
+    st.session_state.selected_sector = DEFAULT_SECTOR
+    st.session_state.selected_stock = DEFAULT_STOCK
+    st.session_state.kpi_panel = None
+    st.session_state.scroll_target = None
     st.query_params.clear()
 
 if "focus_stock" in qp:
@@ -104,463 +102,111 @@ if "focus_sec" in qp:
     st.query_params.clear()
 
 # ==============================================================================
-# 4. TOP HEADER BAR (CLEAN & RESPONSIVE)
+# 4. TOP HEADER BAR WITH LIVE IST MARKET STATUS & REFRESH
 # ==============================================================================
 st.markdown('<div id="top-anchor"></div>', unsafe_allow_html=True)
 
-top_c1, top_c2, top_c3, top_c4 = st.columns([5.8, 1.9, 1.15, 1.15])
+ist_now = datetime.now(timezone(timedelta(hours=5, minutes=30)))
+is_mkt_open = (ist_now.weekday() < 5) and ((ist_now.hour == 9 and ist_now.minute >= 15) or (10 <= ist_now.hour <= 14) or (ist_now.hour == 15 and ist_now.minute <= 30))
+mkt_status_html = (
+    f'<span style="color:#34d399;font-weight:800;">🟢 LIVE MARKET ({ist_now.strftime("%I:%M %p IST")})</span>'
+    if is_mkt_open else
+    f'<span style="color:#fbbf24;font-weight:700;">🕒 MARKET CLOSED ({ist_now.strftime("%a %I:%M %p IST")})</span>'
+)
+
+top_c1, top_c2, top_c3, top_c4, top_c5 = st.columns([5.1, 1.8, 1.05, 1.05, 1.0])
 with top_c1:
     st.markdown(
-        '<a href="?nav_action=home" target="_self" class="brand-logo-link" title="Click to Reset All Filters & Return to Main Terminal">'
-        '<span class="logo-badge">🧭</span>'
-        '<div>'
-        '<div class="brand-title">AlphaPulse Pro — Market Intelligence Terminal</div>'
-        '<div class="brand-subtitle">Intraday Doji Turnaround • 15m Chartink Breakout • 32-Sector Rotation</div>'
-        '</div>'
-        '</a>',
+        f'<a href="?nav_action=home" target="_self" class="brand-logo-link" title="Click to Reset All Filters & Return to Home">'
+        f'<span class="logo-badge">🧭</span>'
+        f'<div><div class="brand-title">AlphaPulse Pro — Market Intelligence Terminal</div>'
+        f'<div class="brand-subtitle">Intraday Doji Turnaround • 15m Chartink Breakout • {mkt_status_html}</div></div></a>',
         unsafe_allow_html=True
     )
 with top_c2:
-    theme_mode = st.selectbox(
-        "Theme",
-        ["🌙 Pro Dark (Slate)", "🌌 Cyber Neon (Violet)", "☀️ Clean Light (Day)"],
-        index=0,
-        label_visibility="collapsed"
-    )
+    theme_mode = st.selectbox("Theme", ["🌙 Pro Dark (Slate)", "🌌 Cyber Neon (Violet)", "☀️ Clean Light (Day)"], index=0, label_visibility="collapsed")
 with top_c3:
     show_analog_meter = st.toggle("🎛️ Meters", value=True)
 with top_c4:
     auto_alert_on = st.toggle("🔔 Auto-Scan", value=False, help="Auto-scans every 3 mins with audio alert on new 15m breakout")
+with top_c5:
+    if st.button("🔄 Refresh", use_container_width=True, help="Fetch latest market prices immediately"):
+        st.cache_data.clear()
+        st.rerun()
 
 # ==============================================================================
-# 5. DISTINCT 3-THEME ENGINE & TERMINAL CSS
+# 5. DISTINCT 3-THEME ENGINE & RESPONSIVE CSS
 # ==============================================================================
 if "Clean Light" in theme_mode:
-    BG_MAIN = "#f1f5f9"
-    BG_CARD = "#ffffff"
-    BG_SUB = "#f8fafc"
-    TEXT_MAIN = "#0f172a"
-    TEXT_SUB = "#475569"
-    BORDER_C = "#cbd5e1"
-    ACCENT_C = "#2563eb"
-    BTN_BG = "linear-gradient(135deg, #e2e8f0, #cbd5e1)"
-    BTN_BORDER = "#94a3b8"
-    CARD_SHADOW = "0 4px 14px rgba(15, 23, 42, 0.07)"
+    BG_MAIN, BG_CARD, BG_SUB, TEXT_MAIN, TEXT_SUB, BORDER_C, ACCENT_C = "#f1f5f9", "#ffffff", "#f8fafc", "#0f172a", "#475569", "#cbd5e1", "#2563eb"
+    BTN_BG, BTN_BORDER, CARD_SHADOW = "linear-gradient(135deg,#e2e8f0,#cbd5e1)", "#94a3b8", "0 4px 14px rgba(15,23,42,0.07)"
 elif "Cyber Neon" in theme_mode:
-    BG_MAIN = "#080214"
-    BG_CARD = "#14062b"
-    BG_SUB = "#1d093d"
-    TEXT_MAIN = "#f0fdf4"
-    TEXT_SUB = "#e879f9"
-    BORDER_C = "#00f5d488"
-    ACCENT_C = "#00f5d4"
-    BTN_BG = "linear-gradient(135deg, #3b0764, #701a75)"
-    BTN_BORDER = "#00f5d4"
-    CARD_SHADOW = "0 0 20px rgba(0, 245, 212, 0.22)"
+    BG_MAIN, BG_CARD, BG_SUB, TEXT_MAIN, TEXT_SUB, BORDER_C, ACCENT_C = "#080214", "#14062b", "#1d093d", "#f0fdf4", "#e879f9", "#00f5d488", "#00f5d4"
+    BTN_BG, BTN_BORDER, CARD_SHADOW = "linear-gradient(135deg,#3b0764,#701a75)", "#00f5d4", "0 0 20px rgba(0,245,212,0.22)"
 else:
-    BG_MAIN = "#060a12"
-    BG_CARD = "#0f172a"
-    BG_SUB = "#141f38"
-    TEXT_MAIN = "#f8fafc"
-    TEXT_SUB = "#94a3b8"
-    BORDER_C = "#1e293b"
-    ACCENT_C = "#38bdf8"
-    BTN_BG = "linear-gradient(135deg, #111c33, #1e293b)"
-    BTN_BORDER = "#38bdf866"
-    CARD_SHADOW = "0 6px 18px rgba(0, 0, 0, 0.38)"
+    BG_MAIN, BG_CARD, BG_SUB, TEXT_MAIN, TEXT_SUB, BORDER_C, ACCENT_C = "#060a12", "#0f172a", "#141f38", "#f8fafc", "#94a3b8", "#1e293b", "#38bdf8"
+    BTN_BG, BTN_BORDER, CARD_SHADOW = "linear-gradient(135deg,#111c33,#1e293b)", "#38bdf866", "0 6px 18px rgba(0,0,0,0.38)"
 
-css_block = """
+st.markdown(f"""
 <style>
-header[data-testid="stHeader"], div[data-testid="stToolbar"], div[data-testid="stDecoration"] {
-    display: none !important;
-}
-html, body, [data-testid="stAppViewContainer"], .main {
-    background-color: __BG_MAIN__ !important;
-    color: __TEXT_MAIN__ !important;
-    scroll-behavior: smooth !important;
-}
-.block-container {
-    padding-top: 1.25rem !important;
-    padding-bottom: 4.8rem !important;
-    max-width: 97% !important;
-}
-a.brand-logo-link {
-    text-decoration: none !important;
-    display: inline-flex;
-    align-items: center;
-    gap: 12px;
-    padding: 3px 8px;
-    border-radius: 12px;
-    transition: all 0.2s ease;
-}
-a.brand-logo-link:hover {
-    background: rgba(56, 189, 248, 0.12);
-    transform: translateY(-1px);
-}
-.logo-badge {
-    font-size: 1.75rem;
-    background: linear-gradient(135deg, __ACCENT_C__, #2563eb);
-    padding: 4px 10px;
-    border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.38);
-}
-.brand-title {
-    font-size: 1.36rem;
-    font-weight: 800;
-    color: __TEXT_MAIN__ !important;
-    line-height: 1.15;
-}
-.brand-subtitle {
-    font-size: 0.74rem;
-    font-weight: 600;
-    color: __TEXT_SUB__ !important;
-}
-[data-testid="stWidgetLabel"] p,
-[data-testid="stWidgetLabel"] label,
-.stSelectbox label,
-.stNumberInput label,
-.stTextInput label,
-.stRadio label,
-[data-testid="stRadio"] label p,
-[data-testid="stRadio"] label span,
-[data-testid="stRadio"] div[role="radiogroup"] label,
-[data-testid="stToggle"] label p {
-    color: __TEXT_MAIN__ !important;
-    font-weight: 700 !important;
-    font-size: 0.82rem !important;
-    opacity: 1 !important;
-}
-[data-testid="stRadio"] div[role="radiogroup"] {
-    background: __BG_CARD__;
-    border: 1px solid __BORDER_C__;
-    padding: 3px 10px;
-    border-radius: 999px;
-    gap: 10px !important;
-}
-div.stButton > button,
-button[data-testid="stBaseButton-secondary"],
-div.stDownloadButton > button {
-    background: __BTN_BG__ !important;
-    color: __TEXT_MAIN__ !important;
-    border: 1.5px solid __BTN_BORDER__ !important;
-    border-radius: 10px !important;
-    font-weight: 800 !important;
-    font-size: 0.82rem !important;
-    padding: 0.42rem 0.85rem !important;
-    box-shadow: __CARD_SHADOW__ !important;
-    transition: all 0.2s ease !important;
-}
-div.stButton > button p,
-button[data-testid="stBaseButton-secondary"] p,
-div.stDownloadButton > button p {
-    color: __TEXT_MAIN__ !important;
-    font-weight: 800 !important;
-}
-div.stButton > button:hover,
-button[data-testid="stBaseButton-secondary"]:hover,
-div.stDownloadButton > button:hover {
-    background: linear-gradient(135deg, #0284c7, #2563eb) !important;
-    color: #ffffff !important;
-    border-color: __ACCENT_C__ !important;
-    transform: translateY(-2px) !important;
-}
-div.stButton > button:hover p,
-button[data-testid="stBaseButton-secondary"]:hover p {
-    color: #ffffff !important;
-}
-button[data-baseweb="tab"] {
-    background: __BG_CARD__ !important;
-    border: 1px solid __BORDER_C__ !important;
-    border-radius: 10px 10px 0 0 !important;
-    margin-right: 4px !important;
-    padding: 7px 14px !important;
-}
-button[data-baseweb="tab"] p,
-button[data-baseweb="tab"] span {
-    color: __TEXT_SUB__ !important;
-    font-weight: 700 !important;
-    font-size: 0.84rem !important;
-}
-button[data-baseweb="tab"][aria-selected="true"] {
-    background: linear-gradient(135deg, rgba(2,132,199,0.28), rgba(37,99,235,0.22)) !important;
-    border-bottom: 3px solid __ACCENT_C__ !important;
-}
-button[data-baseweb="tab"][aria-selected="true"] p {
-    color: __ACCENT_C__ !important;
-    font-weight: 800 !important;
-}
-[data-testid="stExpander"] details {
-    background: __BG_CARD__ !important;
-    border: 1px solid __BORDER_C__ !important;
-    border-radius: 10px !important;
-}
-[data-testid="stExpander"] summary,
-[data-testid="stExpander"] summary p,
-[data-testid="stExpander"] summary span {
-    color: __TEXT_MAIN__ !important;
-    font-weight: 700 !important;
-    font-size: 0.86rem !important;
-}
-.pulse-bar {
-    background: __BG_CARD__;
-    border: 1px solid __BORDER_C__;
-    border-radius: 12px;
-    padding: 8px 14px;
-    margin: 6px 0 10px 0;
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    align-items: center;
-    gap: 8px;
-    box-shadow: __CARD_SHADOW__;
-}
-.pulse-item {
-    font-size: 0.82rem;
-    font-weight: 700;
-    color: __TEXT_MAIN__;
-}
-.compass-pill {
-    padding: 3px 10px;
-    border-radius: 999px;
-    font-size: 0.75rem;
-    font-weight: 800;
-}
-/* UNIFIED INTRADAY TERMINAL RADAR PANELS */
-.radar-panel-bull {
-    background: __BG_CARD__;
-    border: 1px solid #10b98166;
-    border-top: 3.5px solid #10b981;
-    border-radius: 12px;
-    padding: 10px 12px;
-    margin-bottom: 8px;
-    box-shadow: __CARD_SHADOW__;
-}
-.radar-panel-bear {
-    background: __BG_CARD__;
-    border: 1px solid #ef444466;
-    border-top: 3.5px solid #ef4444;
-    border-radius: 12px;
-    padding: 10px 12px;
-    margin-bottom: 8px;
-    box-shadow: __CARD_SHADOW__;
-}
-.radar-panel-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 8px;
-    padding-bottom: 5px;
-    border-bottom: 1px solid __BORDER_C__;
-}
-.radar-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(245px, 1fr));
-    gap: 7px;
-}
-a.radar-row-card {
-    text-decoration: none !important;
-    background: __BG_SUB__;
-    border: 1px solid __BORDER_C__;
-    border-radius: 9px;
-    padding: 7px 10px;
-    color: __TEXT_MAIN__ !important;
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    transition: all 0.18s ease;
-}
-a.radar-row-card:hover {
-    border-color: __ACCENT_C__;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-}
-.r-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-.r-sym {
-    font-size: 0.86rem;
-    font-weight: 800;
-    color: __TEXT_MAIN__;
-}
-.r-tag-bull {
-    background: rgba(16, 185, 129, 0.16);
-    color: #34d399;
-    border: 1px solid #10b98155;
-    padding: 1px 6px;
-    border-radius: 5px;
-    font-size: 0.67rem;
-    font-weight: 700;
-}
-.r-tag-bear {
-    background: rgba(239, 68, 68, 0.16);
-    color: #f87171;
-    border: 1px solid #ef444455;
-    padding: 1px 6px;
-    border-radius: 5px;
-    font-size: 0.67rem;
-    font-weight: 700;
-}
-.r-mid {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.73rem;
-    color: __TEXT_SUB__;
-}
-.r-plan {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.72rem;
-    font-weight: 700;
-    background: rgba(0,0,0,0.18);
-    padding: 3px 7px;
-    border-radius: 6px;
-    margin-top: 2px;
-}
-a.wa-share-btn {
-    text-decoration: none !important;
-    background: linear-gradient(135deg, #16a34a, #22c55e);
-    color: #ffffff !important;
-    padding: 5px 13px;
-    border-radius: 999px;
-    font-size: 0.76rem;
-    font-weight: 800;
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    box-shadow: 0 3px 10px rgba(34, 197, 94, 0.35);
-}
-.marquee-wrap {
-    background: __BG_CARD__;
-    border: 1px solid __BORDER_C__;
-    border-radius: 10px;
-    padding: 7px 10px;
-    overflow: hidden;
-    white-space: nowrap;
-    margin: 4px 0 12px 0;
-    box-shadow: __CARD_SHADOW__;
-}
-.marquee-track {
-    display: inline-block;
-    animation: ticker-move 45s linear infinite;
-}
-.marquee-wrap:hover .marquee-track {
-    animation-play-state: paused;
-}
-@keyframes ticker-move {
-    0% { transform: translateX(0%); }
-    100% { transform: translateX(-50%); }
-}
-a.sec-pill-up, a.sec-pill-down {
-    text-decoration: none !important;
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 3px 11px;
-    margin-right: 8px;
-    border-radius: 999px;
-    font-size: 0.75rem;
-    font-weight: 700;
-}
-a.sec-pill-up {
-    background: rgba(16,185,129,0.14);
-    border: 1px solid #10b981;
-    color: #34d399 !important;
-}
-a.sec-pill-down {
-    background: rgba(239,68,68,0.14);
-    border: 1px solid #ef4444;
-    color: #f87171 !important;
-}
-.kpi-card {
-    background: __BG_CARD__;
-    border: 1.5px solid __BORDER_C__;
-    border-radius: 12px;
-    padding: 10px 14px;
-    min-height: 104px;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    margin-bottom: 6px;
-    box-shadow: __CARD_SHADOW__;
-}
-.kpi-title {
-    color: __TEXT_SUB__;
-    font-size: 0.77rem;
-    font-weight: 700;
-}
-.kpi-val {
-    font-size: 1.16rem;
-    font-weight: 800;
-    color: __TEXT_MAIN__;
-    margin: 3px 0;
-}
-.kpi-sub-up {
-    background: rgba(16,185,129,0.15);
-    color: #34d399;
-    border: 1px solid #10b98155;
-    padding: 2px 8px;
-    border-radius: 6px;
-    font-size: 0.70rem;
-    font-weight: 700;
-    width: fit-content;
-}
-.kpi-sub-down {
-    background: rgba(239,68,68,0.15);
-    color: #f87171;
-    border: 1px solid #ef444455;
-    padding: 2px 8px;
-    border-radius: 6px;
-    font-size: 0.70rem;
-    font-weight: 700;
-    width: fit-content;
-}
-.pill-container {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 6px;
-}
-a.bull-pill, a.bear-pill {
-    text-decoration: none !important;
-    padding: 3px 9px;
-    border-radius: 999px;
-    font-size: 0.72rem;
-    font-weight: 700;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-}
-a.bull-pill {
-    background: rgba(16,185,129,0.14);
-    border: 1px solid #10b98199;
-    color: #34d399 !important;
-}
-a.bear-pill {
-    background: rgba(239,68,68,0.14);
-    border: 1px solid #ef444499;
-    color: #f87171 !important;
-}
-a.single-top-btn {
-    position: fixed;
-    bottom: 58px;
-    right: 18px;
-    z-index: 999999;
-    text-decoration: none !important;
-    background: linear-gradient(135deg, #0ea5e9, #2563eb);
-    color: #ffffff !important;
-    padding: 8px 15px;
-    border-radius: 999px;
-    font-size: 0.80rem;
-    font-weight: 800;
-    border: 1.5px solid rgba(255, 255, 255, 0.35);
-    box-shadow: 0 6px 20px rgba(2, 132, 199, 0.55);
-}
+header[data-testid="stHeader"], div[data-testid="stToolbar"], div[data-testid="stDecoration"] {{ display:none !important; }}
+html, body, [data-testid="stAppViewContainer"], .main {{ background-color:{BG_MAIN} !important; color:{TEXT_MAIN} !important; scroll-behavior:smooth !important; }}
+.block-container {{ padding-top:1.2rem !important; padding-bottom:4.8rem !important; max-width:97% !important; }}
+a.brand-logo-link {{ text-decoration:none !important; display:inline-flex; align-items:center; gap:11px; padding:2px 6px; border-radius:12px; transition:all 0.2s ease; }}
+a.brand-logo-link:hover {{ background:rgba(56,189,248,0.10); }}
+.logo-badge {{ font-size:1.72rem; background:linear-gradient(135deg,{ACCENT_C},#2563eb); padding:4px 10px; border-radius:12px; box-shadow:0 4px 12px rgba(14,165,233,0.38); }}
+.brand-title {{ font-size:1.34rem; font-weight:800; color:{TEXT_MAIN} !important; line-height:1.15; }}
+.brand-subtitle {{ font-size:0.73rem; font-weight:600; color:{TEXT_SUB} !important; }}
+[data-testid="stWidgetLabel"] p, [data-testid="stWidgetLabel"] label, .stSelectbox label, .stNumberInput label, .stRadio label, [data-testid="stRadio"] label span, [data-testid="stToggle"] label p {{ color:{TEXT_MAIN} !important; font-weight:700 !important; font-size:0.82rem !important; opacity:1 !important; }}
+[data-testid="stRadio"] div[role="radiogroup"] {{ background:{BG_CARD}; border:1px solid {BORDER_C}; padding:3px 10px; border-radius:999px; gap:10px !important; }}
+div.stButton > button, button[data-testid="stBaseButton-secondary"], div.stDownloadButton > button {{ background:{BTN_BG} !important; color:{TEXT_MAIN} !important; border:1.5px solid {BTN_BORDER} !important; border-radius:10px !important; font-weight:800 !important; font-size:0.81rem !important; padding:0.42rem 0.85rem !important; box-shadow:{CARD_SHADOW} !important; transition:all 0.2s ease !important; }}
+div.stButton > button p, div.stDownloadButton > button p {{ color:{TEXT_MAIN} !important; font-weight:800 !important; }}
+div.stButton > button:hover, div.stDownloadButton > button:hover {{ background:linear-gradient(135deg,#0284c7,#2563eb) !important; color:#fff !important; border-color:{ACCENT_C} !important; transform:translateY(-2px) !important; }}
+div.stButton > button:hover p {{ color:#fff !important; }}
+button[data-baseweb="tab"] {{ background:{BG_CARD} !important; border:1px solid {BORDER_C} !important; border-radius:10px 10px 0 0 !important; margin-right:4px !important; padding:7px 14px !important; }}
+button[data-baseweb="tab"] p {{ color:{TEXT_SUB} !important; font-weight:700 !important; font-size:0.84rem !important; }}
+button[data-baseweb="tab"][aria-selected="true"] {{ background:linear-gradient(135deg,rgba(2,132,199,0.28),rgba(37,99,235,0.22)) !important; border-bottom:3px solid {ACCENT_C} !important; }}
+button[data-baseweb="tab"][aria-selected="true"] p {{ color:{ACCENT_C} !important; font-weight:800 !important; }}
+[data-testid="stExpander"] details {{ background:{BG_CARD} !important; border:1px solid {BORDER_C} !important; border-radius:10px !important; }}
+[data-testid="stExpander"] summary p {{ color:{TEXT_MAIN} !important; font-weight:700 !important; font-size:0.85rem !important; }}
+.pulse-bar {{ background:{BG_CARD}; border:1px solid {BORDER_C}; border-radius:12px; padding:8px 14px; margin:6px 0 10px 0; display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:8px; box-shadow:{CARD_SHADOW}; }}
+.pulse-item {{ font-size:0.82rem; font-weight:700; color:{TEXT_MAIN}; }}
+.compass-pill {{ padding:3px 10px; border-radius:999px; font-size:0.75rem; font-weight:800; }}
+.radar-panel-bull {{ background:{BG_CARD}; border:1px solid #10b98166; border-top:3.5px solid #10b981; border-radius:12px; padding:10px 12px; margin-bottom:8px; box-shadow:{CARD_SHADOW}; height:100%; }}
+.radar-panel-bear {{ background:{BG_CARD}; border:1px solid #ef444466; border-top:3.5px solid #ef4444; border-radius:12px; padding:10px 12px; margin-bottom:8px; box-shadow:{CARD_SHADOW}; height:100%; }}
+.radar-panel-header {{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-bottom:5px; border-bottom:1px solid {BORDER_C}; }}
+.radar-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(225px,1fr)); gap:7px; }}
+a.radar-row-card {{ text-decoration:none !important; background:{BG_SUB}; border:1px solid {BORDER_C}; border-radius:9px; padding:7px 10px; color:{TEXT_MAIN} !important; display:flex; flex-direction:column; gap:3px; transition:all 0.18s ease; }}
+a.radar-row-card:hover {{ border-color:{ACCENT_C}; transform:translateY(-2px); box-shadow:0 4px 12px rgba(0,0,0,0.3); }}
+.r-top {{ display:flex; justify-content:space-between; align-items:center; }}
+.r-sym {{ font-size:0.86rem; font-weight:800; color:{TEXT_MAIN}; }}
+.r-tag-bull {{ background:rgba(16,185,129,0.16); color:#34d399; border:1px solid #10b98155; padding:1px 6px; border-radius:5px; font-size:0.67rem; font-weight:700; }}
+.r-tag-bear {{ background:rgba(239,68,68,0.16); color:#f87171; border:1px solid #ef444455; padding:1px 6px; border-radius:5px; font-size:0.67rem; font-weight:700; }}
+.r-mid {{ display:flex; justify-content:space-between; font-size:0.74rem; color:{TEXT_SUB}; }}
+.r-reason {{ font-size:0.71rem; color:{TEXT_SUB}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
+.r-plan {{ display:flex; justify-content:space-between; font-size:0.71rem; font-weight:700; background:rgba(0,0,0,0.18); padding:3px 7px; border-radius:6px; margin-top:2px; }}
+a.wa-share-btn {{ text-decoration:none !important; background:linear-gradient(135deg,#16a34a,#22c55e); color:#fff !important; padding:5px 13px; border-radius:999px; font-size:0.76rem; font-weight:800; display:inline-flex; align-items:center; gap:5px; box-shadow:0 3px 10px rgba(34,197,94,0.35); }}
+.marquee-wrap {{ background:{BG_CARD}; border:1px solid {BORDER_C}; border-radius:10px; padding:7px 10px; overflow:hidden; white-space:nowrap; margin:4px 0 12px 0; box-shadow:{CARD_SHADOW}; }}
+.marquee-track {{ display:inline-block; animation:ticker-move 45s linear infinite; }}
+.marquee-wrap:hover .marquee-track {{ animation-play-state:paused; }}
+@keyframes ticker-move {{ 0% {{ transform:translateX(0%); }} 100% {{ transform:translateX(-50%); }} }}
+a.sec-pill-up, a.sec-pill-down {{ text-decoration:none !important; display:inline-flex; align-items:center; gap:5px; padding:3px 11px; margin-right:8px; border-radius:999px; font-size:0.75rem; font-weight:700; }}
+a.sec-pill-up {{ background:rgba(16,185,129,0.14); border:1px solid #10b981; color:#34d399 !important; }}
+a.sec-pill-down {{ background:rgba(239,68,68,0.14); border:1px solid #ef4444; color:#f87171 !important; }}
+.kpi-card {{ background:{BG_CARD}; border:1.5px solid {BORDER_C}; border-radius:12px; padding:10px 14px; min-height:104px; display:flex; flex-direction:column; justify-content:space-between; margin-bottom:6px; box-shadow:{CARD_SHADOW}; }}
+.kpi-title {{ color:{TEXT_SUB}; font-size:0.77rem; font-weight:700; }}
+.kpi-val {{ font-size:1.15rem; font-weight:800; color:{TEXT_MAIN}; margin:3px 0; }}
+.kpi-sub-up {{ background:rgba(16,185,129,0.15); color:#34d399; border:1px solid #10b98155; padding:2px 8px; border-radius:6px; font-size:0.70rem; font-weight:700; width:fit-content; }}
+.kpi-sub-down {{ background:rgba(239,68,68,0.15); color:#f87171; border:1px solid #ef444455; padding:2px 8px; border-radius:6px; font-size:0.70rem; font-weight:700; width:fit-content; }}
+.pill-container {{ display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }}
+a.bull-pill, a.bear-pill {{ text-decoration:none !important; padding:3px 9px; border-radius:999px; font-size:0.72rem; font-weight:700; display:inline-flex; align-items:center; gap:4px; transition:all 0.15s ease; }}
+a.bull-pill {{ background:rgba(16,185,129,0.14); border:1px solid #10b98199; color:#34d399 !important; }}
+a.bull-pill:hover {{ background:#10b981; color:#03150e !important; }}
+a.bear-pill {{ background:rgba(239,68,68,0.14); border:1px solid #ef444499; color:#f87171 !important; }}
+a.bear-pill:hover {{ background:#ef4444; color:#fff !important; }}
+a.single-top-btn {{ position:fixed; bottom:58px; right:18px; z-index:999999; text-decoration:none !important; background:linear-gradient(135deg,#0ea5e9,#2563eb); color:#fff !important; padding:8px 15px; border-radius:999px; font-size:0.80rem; font-weight:800; border:1.5px solid rgba(255,255,255,0.35); box-shadow:0 6px 20px rgba(2,132,199,0.55); }}
 </style>
-""".replace("__BG_MAIN__", BG_MAIN).replace("__BG_CARD__", BG_CARD).replace("__BG_SUB__", BG_SUB).replace("__TEXT_MAIN__", TEXT_MAIN).replace("__TEXT_SUB__", TEXT_SUB).replace("__BORDER_C__", BORDER_C).replace("__ACCENT_C__", ACCENT_C).replace("__BTN_BG__", BTN_BG).replace("__BTN_BORDER__", BTN_BORDER).replace("__CARD_SHADOW__", CARD_SHADOW)
-
-st.markdown(css_block, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
 # ==============================================================================
 # 6. NAN-SAFE DATA ENGINE, CANDLESTICK & 15M CHARTINK SCANNER
@@ -572,7 +218,6 @@ def safe_num(val, default: float = 0.0) -> float:
     except Exception:
         return default
 
-
 def calc_rsi(series: pd.Series, period: int = 14) -> float:
     s = series.dropna()
     if len(s) < period + 1:
@@ -583,7 +228,6 @@ def calc_rsi(series: pd.Series, period: int = 14) -> float:
     rs = up / down.replace(0, np.nan)
     return safe_num((100.0 - (100.0 / (1.0 + rs))).iloc[-1], 50.0)
 
-
 def calc_return(closes: pd.Series, days: int) -> float:
     s = closes.dropna()
     if len(s) < 2:
@@ -592,6 +236,14 @@ def calc_return(closes: pd.Series, days: int) -> float:
     last = safe_num(s.iloc[-1], 0.0)
     return safe_num(((last - base) / base) * 100.0, 0.0) if base > 0 else 0.0
 
+def make_stock_pills(df_sub: pd.DataFrame) -> str:
+    pills = []
+    for _, r in df_sub.iterrows():
+        qt = urllib.parse.quote(str(r["Ticker"]))
+        cls = "bull-pill" if safe_num(r.get("1D", 0.0)) >= 0 else "bear-pill"
+        icon = "🟢" if safe_num(r.get("1D", 0.0)) >= 0 else "🔴"
+        pills.append(f'<a class="{cls}" href="?focus_stock={qt}" target="_self">{icon} {r["Symbol"]} Chart</a>')
+    return f'<div class="pill-container">{"".join(pills)}</div>'
 
 @st.cache_data(ttl=300, show_spinner=False)
 def load_pulse_indices():
@@ -628,7 +280,6 @@ def load_pulse_indices():
         if k not in res:
             res[k] = v
     return res
-
 
 @st.cache_data(ttl=240, show_spinner=False)
 def load_full_market_data():
@@ -744,11 +395,12 @@ def load_full_market_data():
     stocks_df["Sec_Bull_Turn"] = stocks_df["Sector"].map(lambda s: sec_map.get(s, {}).get("Sec_Bull_Turn", False))
     stocks_df["Sec_Bear_Roll"] = stocks_df["Sector"].map(lambda s: sec_map.get(s, {}).get("Sec_Bear_Roll", False))
     return stocks_df, sectors_df
+
 @st.cache_data(ttl=180, show_spinner=False)
 def run_chartink_15m_scanner(stocks_df: pd.DataFrame):
     if stocks_df.empty:
         return pd.DataFrame(), pd.DataFrame()
-    active_pool = stocks_df[stocks_df["Price"] > 150].sort_values("Vol_Ratio", ascending=False).head(42)
+    active_pool = stocks_df[stocks_df["Price"] > 150].sort_values("Vol_Ratio", ascending=False).head(36)
     pool_tickers = active_pool["Ticker"].tolist()
     daily_map = active_pool.set_index("Ticker").to_dict("index")
     bull_15m, bear_15m = [], []
@@ -798,14 +450,13 @@ def run_chartink_15m_scanner(stocks_df: pd.DataFrame):
 
     return pd.DataFrame(bull_15m), pd.DataFrame(bear_15m)
 
-
 def filter_doji_turnaround_stocks(stocks_df: pd.DataFrame):
     df = stocks_df.copy()
     b_cand = df[(df["Consec_Up"] <= 2) & (df["1D"] >= -0.2) & (df["1D"] <= 3.8) & (df["Vol_Ratio"] >= 1.08)].copy()
     b_cand["Bull_Candle"] = b_cand["Bull_Candle"].fillna("Doji Base")
     b_cand["Score"] = (b_cand["Vol_Ratio"] * 28.0) + np.where(b_cand["Sec_Bull_Turn"], 30.0, 0.0) + ((1.0 - b_cand["Body_Pct"]) * 22.0)
     bull6 = b_cand.sort_values("Score", ascending=False).head(6).copy()
-    bull6["Reason"] = "🔄 " + bull6["Bull_Candle"].astype(str) + " + Vol Buildup"
+    bull6["Reason"] = "🔄 " + bull6["Bull_Candle"].astype(str) + " • " + bull6["Sector"].astype(str)
     bull6["Entry"], bull6["SL"], bull6["Target"] = bull6["Buy_Entry"], bull6["Buy_SL"], bull6["Buy_Target"]
 
     used = set(bull6["Ticker"].tolist())
@@ -813,10 +464,9 @@ def filter_doji_turnaround_stocks(stocks_df: pd.DataFrame):
     br_cand["Bear_Candle"] = br_cand["Bear_Candle"].fillna("Top Stall")
     br_cand["Score"] = (br_cand["Vol_Ratio"] * 28.0) + np.where(br_cand["Sec_Bear_Roll"], 30.0, 0.0) + ((1.0 - br_cand["Body_Pct"]) * 22.0)
     bear6 = br_cand.sort_values("Score", ascending=False).head(6).copy()
-    bear6["Reason"] = "📉 " + bear6["Bear_Candle"].astype(str) + " Rejection"
+    bear6["Reason"] = "📉 " + bear6["Bear_Candle"].astype(str) + " • " + bear6["Sector"].astype(str)
     bear6["Entry"], bear6["SL"], bear6["Target"] = bear6["Short_Entry"], bear6["Short_SL"], bear6["Short_Target"]
     return bull6, bear6
-
 
 def style_colored_table(df: pd.DataFrame, pct_cols: list):
     def color_pct(val):
@@ -825,14 +475,13 @@ def style_colored_table(df: pd.DataFrame, pct_cols: list):
         return "color:#34d399;font-weight:700;" if val > 0 else ("color:#f87171;font-weight:700;" if val < 0 else "color:#94a3b8;")
     return df.style.map(color_pct, subset=[c for c in pct_cols if c in df.columns]).format(precision=2)
 
-
 with st.spinner("⚡ Loading Live Market Intelligence & Intraday Trade Setups..."):
     pulse = load_pulse_indices()
     stocks_df, sectors_df = load_full_market_data()
     bull_15m_df, bear_15m_df = run_chartink_15m_scanner(stocks_df)
 
 if stocks_df.empty or sectors_df.empty:
-    st.error("⚠️ Market data temporarily unavailable. Please reload.")
+    st.error("⚠️ Market data temporarily unavailable. Please click Refresh.")
     st.stop()
 
 # ==============================================================================
@@ -842,17 +491,17 @@ n_d, b_d, v_d, u_d = pulse["NIFTY"], pulse["BANKNIFTY"], pulse["VIX"], pulse["US
 adv_today, dec_today = int((stocks_df["1D"] > 0).sum()), int((stocks_df["1D"] < 0).sum())
 
 if n_d["1D"] >= 0.20 and adv_today >= dec_today:
-    c_txt, c_sty = "🟢 Bullish Market — Track BUY Setups", "background:rgba(16,185,129,0.18);color:#34d399;border:1px solid #10b98166;"
+    c_txt, c_sty = "🟢 Bullish Market — Focus on BUY Setups", "background:rgba(16,185,129,0.18);color:#34d399;border:1px solid #10b98166;"
 elif n_d["1D"] <= -0.20 and dec_today > adv_today:
-    c_txt, c_sty = "🔴 Bearish Market — Track SHORT Setups", "background:rgba(239,68,68,0.18);color:#f87171;border:1px solid #ef444466;"
+    c_txt, c_sty = "🔴 Bearish Market — Focus on SHORT Setups", "background:rgba(239,68,68,0.18);color:#f87171;border:1px solid #ef444466;"
 else:
-    c_txt, c_sty = "⚖️ Sideways Market — Trade Sector Leaders", "background:rgba(251,191,36,0.18);color:#fbbf24;border:1px solid #fbbf2466;"
+    c_txt, c_sty = "⚖️ Rotational Market — Trade Sector Leaders", "background:rgba(251,191,36,0.18);color:#fbbf24;border:1px solid #fbbf2466;"
 
 st.markdown(
     f'<div class="pulse-bar">'
     f'<div class="pulse-item">🇮🇳 Nifty 50: <span style="color:{"#34d399" if n_d["1D"]>=0 else "#f87171"};">{n_d["price"]:,.1f} ({n_d["1D"]:+.2f}%)</span></div>'
     f'<div class="pulse-item">🏛️ Bank Nifty: <span style="color:{"#34d399" if b_d["1D"]>=0 else "#f87171"};">{b_d["price"]:,.1f} ({b_d["1D"]:+.2f}%)</span></div>'
-    f'<div class="pulse-item">⚡ India VIX: <span style="color:#34d399;">{v_d["price"]:.2f}</span></div>'
+    f'<div class="pulse-item">⚡ India VIX: <span style="color:#34d399;">{v_d["price"]:.2f} ({v_d["1D"]:+.2f}%)</span></div>'
     f'<div class="pulse-item">💵 USD/INR: <span style="color:{ACCENT_C};">₹{u_d["price"]:.2f}</span></div>'
     f'<div class="compass-pill" style="{c_sty}">🧭 {c_txt}</div></div>',
     unsafe_allow_html=True
@@ -883,7 +532,7 @@ with fc4:
         st.rerun()
 
 # ==============================================================================
-# 9. UNIFIED INTRADAY TERMINAL RADAR PANELS
+# 9. UNIFIED INTRADAY COMMAND DECK (SIDE-BY-SIDE SPLIT VIEW + SINGLE VIEW)
 # ==============================================================================
 bull_doji6, bear_doji6 = filter_doji_turnaround_stocks(stocks_df)
 
@@ -899,38 +548,49 @@ rc_col1, rc_col2, rc_col3 = st.columns([4.2, 3.8, 2.0])
 with rc_col1:
     radar_strategy = st.radio("Strategy:", ["🔄 Doji Bottom Turnaround", "⚡ 15m Chartink Breakout"], horizontal=True, label_visibility="collapsed")
 with rc_col2:
-    market_day_mode = st.radio("Bias:", ["🟢 Bullish Picks", "🔴 Bearish Picks", "🌗 Both"], horizontal=True, label_visibility="collapsed")
+    market_day_mode = st.radio("Bias:", ["🌗 Both Sides", "🟢 Bullish Only", "🔴 Bearish Only"], horizontal=True, label_visibility="collapsed")
 with rc_col3:
     st.markdown(f'<div style="text-align:right;padding-top:2px;"><a href="{wa_direct_url}" target="_blank" class="wa-share-btn">📲 WhatsApp Signals</a></div>', unsafe_allow_html=True)
 
-def render_radar_panel_html(df_bull: pd.DataFrame, df_bear: pd.DataFrame, mode_str: str) -> str:
-    def make_row_card(r, is_bull: bool):
-        qt = urllib.parse.quote(r["Ticker"])
+def build_deck_box_html(df_sub: pd.DataFrame, is_bull: bool) -> str:
+    cards = []
+    for _, r in df_sub.head(6).iterrows():
+        qt = urllib.parse.quote(str(r["Ticker"]))
         tag_cls = "r-tag-bull" if is_bull else "r-tag-bear"
         tag_txt = f"🟢 BUY • {r['Confidence']}%" if is_bull else f"🔴 SHORT • {r['Confidence']}%"
         c_col = "#34d399" if r["1D"] >= 0 else "#f87171"
-        lbl = "Entry" if is_bull else "Short"
-        return (
-            f'<a href="?focus_stock={qt}" target="_self" class="radar-row-card">'
+        lbl = "Buy" if is_bull else "Short"
+        cards.append(
+            f'<a href="?focus_stock={qt}" target="_self" class="radar-row-card" title="Click to open {r["Symbol"]} live chart & trade setup">'
             f'<div class="r-top"><span class="r-sym">{r["Symbol"]}</span><span class="{tag_cls}">{tag_txt}</span></div>'
             f'<div class="r-mid"><span>₹{r["Price"]:,.1f} <span style="color:{c_col};font-weight:700;">({r["1D"]:+.1f}%)</span></span><span>📊 {r["Vol_Ratio"]:.1f}x Vol</span></div>'
-            f'<div style="font-size:0.69srem;color:{TEXT_SUB};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{r["Reason"]}</div>'
-            f'<div class="r-plan"><span>🎯 {lbl}: ₹{r["Entry"]}</span><span>🛑 SL: ₹{r["SL"]}</span><span>🚀 Tgt: ₹{r["Target"]}</span></div>'
+            f'<div class="r-reason">{r["Reason"]}</div>'
+            f'<div class="r-plan"><span style="color:{ACCENT_C};">🎯 {lbl}: ₹{r["Entry"]}</span><span style="color:#f87171;">🛑 SL: ₹{r["SL"]}</span><span style="color:#34d399;">🚀 Tgt: ₹{r["Target"]}</span></div>'
             f'</a>'
         )
-    bull_cards = [make_row_card(r, True) for _, r in df_bull.head(6).iterrows()]
-    bear_cards = [make_row_card(r, False) for _, r in df_bear.head(6).iterrows()]
-
-    out_html = ""
-    if mode_str in ("🟢 Bullish Picks", "🌗 Both") and bull_cards:
-        out_html += f'<div class="radar-panel-bull"><div class="radar-panel-header"><span style="color:#34d399;font-weight:800;font-size:0.86rem;">🔄 Bullish Intraday Command Deck (Bottom Turnaround & Breakout)</span><span style="font-size:0.72rem;color:{TEXT_SUB};">Tap any card for live chart</span></div><div class="radar-grid">{"".join(bull_cards)}</div></div>'
-    if mode_str in ("🔴 Bearish Picks", "🌗 Both") and bear_cards:
-        out_html += f'<div class="radar-panel-bear"><div class="radar-panel-header"><span style="color:#f87171;font-weight:800;font-size:0.86rem;">📉 Bearish Intraday Command Deck (Top Rejection & Breakdown)</span><span style="font-size:0.72rem;color:{TEXT_SUB};">Tap any card for live chart</span></div><div class="radar-grid">{"".join(bear_cards)}</div></div>'
-    return out_html
+    panel_cls = "radar-panel-bull" if is_bull else "radar-panel-bear"
+    hdr_col = "#34d399" if is_bull else "#f87171"
+    hdr_title = "🔄 Bullish Intraday Command Deck (Turnaround & Breakout)" if is_bull else "📉 Bearish Intraday Command Deck (Top Stall & Breakdown)"
+    return (
+        f'<div class="{panel_cls}">'
+        f'<div class="radar-panel-header"><span style="color:{hdr_col};font-weight:800;font-size:0.84rem;">{hdr_title}</span>'
+        f'<span style="font-size:0.71rem;color:{TEXT_SUB};">Click any stock for chart</span></div>'
+        f'<div class="radar-grid">{"".join(cards)}</div></div>'
+    )
 
 active_b_df = bull_15m_df if "15m" in radar_strategy else bull_doji6
 active_br_df = bear_15m_df if "15m" in radar_strategy else bear_doji6
-st.markdown(render_radar_panel_html(active_b_df, active_br_df, market_day_mode), unsafe_allow_html=True)
+
+if market_day_mode == "🟢 Bullish Only":
+    st.markdown(build_deck_box_html(active_b_df, True), unsafe_allow_html=True)
+elif market_day_mode == "🔴 Bearish Only":
+    st.markdown(build_deck_box_html(active_br_df, False), unsafe_allow_html=True)
+else:
+    d_col1, d_col2 = st.columns(2)
+    with d_col1:
+        st.markdown(build_deck_box_html(active_b_df, True), unsafe_allow_html=True)
+    with d_col2:
+        st.markdown(build_deck_box_html(active_br_df, False), unsafe_allow_html=True)
 
 # ==============================================================================
 # 10. CLICKABLE SECTOR MARQUEE BAR
@@ -943,7 +603,7 @@ bar_items = [
 st.markdown(f'<div class="marquee-wrap"><div class="marquee-track">{"".join(bar_items) * 2}</div></div>', unsafe_allow_html=True)
 
 # ==============================================================================
-# 11. STOCK INSPECTOR & BEGINNER TRADE PLAN PANEL (AUTO-SCROLL)
+# 11. STOCK INSPECTOR, 5-POINT CHECKLIST & SMART CHART (AUTO-SCROLL TARGET)
 # ==============================================================================
 st.markdown('<div id="stock-inspector-anchor"></div>', unsafe_allow_html=True)
 
@@ -960,11 +620,20 @@ def load_single_stock_ohlc(ticker: str):
 if st.session_state.selected_stock != DEFAULT_STOCK and st.session_state.selected_stock in stocks_df["Ticker"].values:
     s_info = stocks_df[stocks_df["Ticker"] == st.session_state.selected_stock].iloc[0]
     sym_clean, p_now, atr_v = s_info["Symbol"], s_info["Price"], s_info["ATR"]
+    is_bear_setup = ("Short" in s_info["Action_Signal"]) or (s_info["1D"] < -0.3 and pd.notna(s_info["Bear_Candle"]))
     safe_qty = max(int(500.0 / max(abs(s_info["Buy_Entry"] - s_info["Buy_SL"]), 1.0)), 1)
+
+    # Beginner 5-Point Safety Checklist
+    chk_trend = s_info["Above_50DMA"]
+    chk_vol = s_info["Vol_Ratio"] >= 1.15
+    chk_rsi = 42.0 <= s_info["RSI"] <= 72.0
+    chk_sec = s_info["Sec_1D"] >= -0.15
+    chk_streak = s_info["Consec_Up"] <= 2
+    passed_cnt = sum([chk_trend, chk_vol, chk_rsi, chk_sec, chk_streak])
 
     single_wa_txt = urllib.parse.quote(
         f"🎯 *AlphaPulse Trade Setup: {sym_clean}* ({s_info['Sector']})\n"
-        f"• Price: ₹{p_now} ({s_info['1D']:+.2f}%) | Signal: {s_info['Action_Signal']}\n"
+        f"• Price: ₹{p_now} ({s_info['1D']:+.2f}%) | Safety Score: {passed_cnt}/5\n"
         f"🟢 Buy Above: ₹{s_info['Buy_Entry']} | SL: ₹{s_info['Buy_SL']} | Target: ₹{s_info['Buy_Target']}\n"
         f"🔴 Short Below: ₹{s_info['Short_Entry']} | SL: ₹{s_info['Short_SL']} | Target: ₹{s_info['Short_Target']}"
     )
@@ -983,11 +652,16 @@ if st.session_state.selected_stock != DEFAULT_STOCK and st.session_state.selecte
 
     lv1, lv2, lv3 = st.columns(3)
     with lv1:
-        st.info(f"🧭 **Verdict:** {s_info['Action_Signal']} ({s_info['Confidence']}% Conf.)\n\n📊 **RSI:** {s_info['RSI']} | **Vol:** {s_info['Vol_Ratio']}x | **Safe Qty (₹500 Risk):** `{safe_qty} Shares`")
+        st.info(
+            f"🛡️ **Beginner Safety Checklist ({passed_cnt}/5 Passed):**\n\n"
+            f"{'✅' if chk_trend else '⚠️'} Above 50-DMA | {'✅' if chk_vol else '⚠️'} Vol ({s_info['Vol_Ratio']}x) | "
+            f"{'✅' if chk_rsi else '⚠️'} Safe RSI ({s_info['RSI']}) | {'✅' if chk_streak else '⚠️'} Not Overextended\n\n"
+            f"📦 **Safe Qty (for ₹500 max risk):** `{safe_qty} Shares`"
+        )
     with lv2:
-        st.success(f"🟢 **Bullish Buy Plan:**\n\n• **Buy Above:** ₹{s_info['Buy_Entry']} | **SL:** ₹{s_info['Buy_SL']} | **Target:** ₹{s_info['Buy_Target']}")
+        st.success(f"🟢 **Bullish Buy Plan:**\n\n• **Buy Above:** ₹{s_info['Buy_Entry']} | **SL:** ₹{s_info['Buy_SL']}\n\n• **Target 1:** ₹{round(s_info['Buy_Entry'] + 1.2*atr_v, 2)} | **Target 2:** ₹{s_info['Buy_Target']}")
     with lv3:
-        st.error(f"🔴 **Bearish Short Plan:**\n\n• **Short Below:** ₹{s_info['Short_Entry']} | **SL:** ₹{s_info['Short_SL']} | **Target:** ₹{s_info['Short_Target']}")
+        st.error(f"🔴 **Bearish Short Plan:**\n\n• **Short Below:** ₹{s_info['Short_Entry']} | **SL:** ₹{s_info['Short_SL']}\n\n• **Target 1:** ₹{round(s_info['Short_Entry'] - 1.2*atr_v, 2)} | **Target 2:** ₹{s_info['Short_Target']}")
 
     ohlc_df = load_single_stock_ohlc(s_info["Ticker"])
     if not ohlc_df.empty and len(ohlc_df) >= 20:
@@ -997,10 +671,16 @@ if st.session_state.selected_stock != DEFAULT_STOCK and st.session_state.selecte
         fig_st.add_trace(go.Candlestick(x=sub_df.index, open=sub_df["Open"], high=sub_df["High"], low=sub_df["Low"], close=sub_df["Close"], name="Price"), row=1, col=1)
         fig_st.add_trace(go.Scatter(x=sub_df.index, y=sub_df["DMA20"], mode="lines", name="20 DMA", line=dict(color="#38bdf8", width=1.5)), row=1, col=1)
         fig_st.add_trace(go.Scatter(x=sub_df.index, y=sub_df["DMA50"], mode="lines", name="50 DMA", line=dict(color="#f59e0b", width=1.5)), row=1, col=1)
-        # Entry, SL, Target horizontal lines on chart for beginner visual clarity
-        fig_st.add_hline(y=s_info["Buy_Entry"], line_dash="dot", line_color="#10b981", annotation_text="Entry", row=1, col=1)
-        fig_st.add_hline(y=s_info["Buy_SL"], line_dash="dash", line_color="#ef4444", annotation_text="SL", row=1, col=1)
-        fig_st.add_hline(y=s_info["Buy_Target"], line_dash="dash", line_color="#34d399", annotation_text="Target", row=1, col=1)
+
+        if is_bear_setup:
+            fig_st.add_hline(y=s_info["Short_Entry"], line_dash="dot", line_color="#f59e0b", annotation_text=f"Short: ₹{s_info['Short_Entry']}", row=1, col=1)
+            fig_st.add_hline(y=s_info["Short_SL"], line_dash="dash", line_color="#ef4444", annotation_text=f"SL: ₹{s_info['Short_SL']}", row=1, col=1)
+            fig_st.add_hline(y=s_info["Short_Target"], line_dash="dash", line_color="#10b981", annotation_text=f"Target: ₹{s_info['Short_Target']}", row=1, col=1)
+        else:
+            fig_st.add_hline(y=s_info["Buy_Entry"], line_dash="dot", line_color="#38bdf8", annotation_text=f"Buy: ₹{s_info['Buy_Entry']}", row=1, col=1)
+            fig_st.add_hline(y=s_info["Buy_SL"], line_dash="dash", line_color="#ef4444", annotation_text=f"SL: ₹{s_info['Buy_SL']}", row=1, col=1)
+            fig_st.add_hline(y=s_info["Buy_Target"], line_dash="dash", line_color="#10b981", annotation_text=f"Target: ₹{s_info['Buy_Target']}", row=1, col=1)
+
         fig_st.add_trace(go.Bar(x=sub_df.index, y=sub_df["Volume"], name="Volume", marker_color=["#10b981" if c >= o else "#ef4444" for c, o in zip(sub_df["Close"], sub_df["Open"])]), row=2, col=1)
         fig_st.update_layout(height=370, template="plotly_dark" if "Clean Light" not in theme_mode else "plotly_white", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=10, r=10, t=20, b=10), xaxis_rangeslider_visible=False)
         st.plotly_chart(fig_st, use_container_width=True)
@@ -1015,9 +695,9 @@ if st.session_state.selected_stock != DEFAULT_STOCK and st.session_state.selecte
     st.markdown("---")
 
 # ==============================================================================
-# 12. 4 SUMMARY KPI CARDS & DRILL-DOWN PANEL
+# 12. 4 SUMMARY KPI CARDS & DRILL-DOWN PANEL (TIMEFRAME-SYNCED)
 # ==============================================================================
-adv_count, dec_count = int((stocks_df["1D"] > 0).sum()), int((stocks_df["1D"] < 0).sum())
+adv_count, dec_count = int((stocks_df[tf_choice] > 0).sum()), int((stocks_df[tf_choice] < 0).sum())
 pct_50dma = round((stocks_df["Above_50DMA"].sum() / max(len(stocks_df), 1)) * 100.0, 1)
 leader_sec, laggard_sec = sectors_df.sort_values(tf_choice, ascending=False).iloc[0], sectors_df.sort_values(tf_choice, ascending=True).iloc[0]
 nifty_tf = n_d.get(tf_choice, n_d["1W"])
@@ -1026,12 +706,14 @@ kc1, kc2, kc3, kc4 = st.columns(4)
 with kc1:
     st.markdown(f'<div class="kpi-card"><div class="kpi-title">Nifty 50 Benchmark ({tf_choice})</div><div class="kpi-val" style="color:{"#34d399" if nifty_tf>=0 else "#f87171"};">{nifty_tf:+.2f}%</div><div class="kpi-sub-up">1W: {n_d["1W"]:+.2f}% | 1Y: {n_d["1Y"]:+.1f}%</div></div>', unsafe_allow_html=True)
     if st.button("📊 Top Gainers & Losers", key="k1", use_container_width=True):
-        st.session_state.kpi_panel, st.session_state.scroll_target = "nifty_movers", "kpi-panel-anchor"
+        st.session_state.kpi_panel = None if st.session_state.kpi_panel == "nifty_movers" else "nifty_movers"
+        st.session_state.scroll_target = "kpi-panel-anchor"
         st.rerun()
 with kc2:
     st.markdown(f'<div class="kpi-card"><div class="kpi-title">Market Breadth ({tf_choice})</div><div class="kpi-val"><span style="color:#34d399;">🟢 {adv_count} Up</span> | <span style="color:#f87171;">🔴 {dec_count} Down</span></div><div class="kpi-sub-up">{pct_50dma}% Above 50-DMA</div></div>', unsafe_allow_html=True)
     if st.button("📈 Advancing vs Declining", key="k2", use_container_width=True):
-        st.session_state.kpi_panel, st.session_state.scroll_target = "breadth_list", "kpi-panel-anchor"
+        st.session_state.kpi_panel = None if st.session_state.kpi_panel == "breadth_list" else "breadth_list"
+        st.session_state.scroll_target = "kpi-panel-anchor"
         st.rerun()
 with kc3:
     st.markdown(f'<div class="kpi-card"><div class="kpi-title">Top Leading Sector ({tf_choice})</div><div class="kpi-val">👑 {leader_sec["Sector"]}</div><div class="kpi-sub-up">▲ {leader_sec[tf_choice]:+.2f}% (Meter: {leader_sec["Meter"]})</div></div>', unsafe_allow_html=True)
@@ -1056,29 +738,37 @@ if st.session_state.kpi_panel is not None:
     if st.session_state.kpi_panel == "nifty_movers":
         mv1, mv2 = st.columns(2)
         with mv1:
-            st.markdown("##### 🚀 Top 12 Gainers")
-            st.dataframe(style_colored_table(stocks_df.sort_values(tf_choice, ascending=False)[["Symbol", "Sector", "Price", "1D", "1W", "Vol_Ratio", "Action_Signal"]].head(12), ["1D", "1W"]), use_container_width=True, hide_index=True)
+            st.markdown(f"##### 🚀 Top 12 Gainers ({tf_choice})")
+            g12 = stocks_df.sort_values(tf_choice, ascending=False).head(12)
+            st.dataframe(style_colored_table(g12[["Symbol", "Sector", "Price", "1D", "1W", "Vol_Ratio", "Action_Signal"]], ["1D", "1W"]), use_container_width=True, hide_index=True)
+            st.markdown(make_stock_pills(g12), unsafe_allow_html=True)
         with mv2:
-            st.markdown("##### 📉 Top 12 Losers")
-            st.dataframe(style_colored_table(stocks_df.sort_values(tf_choice, ascending=True)[["Symbol", "Sector", "Price", "1D", "1W", "Vol_Ratio", "Action_Signal"]].head(12), ["1D", "1W"]), use_container_width=True, hide_index=True)
+            st.markdown(f"##### 📉 Top 12 Losers ({tf_choice})")
+            l12 = stocks_df.sort_values(tf_choice, ascending=True).head(12)
+            st.dataframe(style_colored_table(l12[["Symbol", "Sector", "Price", "1D", "1W", "Vol_Ratio", "Action_Signal"]], ["1D", "1W"]), use_container_width=True, hide_index=True)
+            st.markdown(make_stock_pills(l12), unsafe_allow_html=True)
     elif st.session_state.kpi_panel == "breadth_list":
         br1, br2 = st.columns(2)
         with br1:
             st.markdown("##### 🟢 Strong Advancing Stocks")
-            st.dataframe(style_colored_table(stocks_df[stocks_df[tf_choice] > 0].sort_values("Vol_Ratio", ascending=False)[["Symbol", "Sector", "Price", "1D", "Vol_Ratio", "Action_Signal"]].head(15), ["1D"]), use_container_width=True, hide_index=True)
+            up15 = stocks_df[stocks_df[tf_choice] > 0].sort_values("Vol_Ratio", ascending=False).head(15)
+            st.dataframe(style_colored_table(up15[["Symbol", "Sector", "Price", "1D", "Vol_Ratio", "Action_Signal"]], ["1D"]), use_container_width=True, hide_index=True)
+            st.markdown(make_stock_pills(up15), unsafe_allow_html=True)
         with br2:
             st.markdown("##### 🔴 Declining / Oversold Watchlist")
-            st.dataframe(style_colored_table(stocks_df[stocks_df[tf_choice] < 0].sort_values("Vol_Ratio", ascending=False)[["Symbol", "Sector", "Price", "1D", "Vol_Ratio", "Action_Signal"]].head(15), ["1D"]), use_container_width=True, hide_index=True)
+            dn15 = stocks_df[stocks_df[tf_choice] < 0].sort_values("Vol_Ratio", ascending=False).head(15)
+            st.dataframe(style_colored_table(dn15[["Symbol", "Sector", "Price", "1D", "Vol_Ratio", "Action_Signal"]], ["1D"]), use_container_width=True, hide_index=True)
+            st.markdown(make_stock_pills(dn15), unsafe_allow_html=True)
     else:
         sec_f = st.session_state.selected_sector
         st.markdown(f"#### 🔍 Sector Stocks & Trade Plans: **{sec_f}**")
         sub_s = stocks_df[stocks_df["Sector"] == sec_f].sort_values(tf_choice, ascending=False)
         st.dataframe(style_colored_table(sub_s[["Symbol", "Price", "1D", "1W", "Vol_Ratio", "RSI", "Action_Signal", "Buy_Entry", "Buy_SL", "Buy_Target"]], ["1D", "1W"]), use_container_width=True, hide_index=True)
-        st.markdown(f'<div class="pill-container">{"".join([f"<a class=bull-pill href=?focus_stock={urllib.parse.quote(r.Ticker)} target=_self>📈 {r.Symbol} Chart</a>" for _, r in sub_s.iterrows()])}</div>', unsafe_allow_html=True)
+        st.markdown(make_stock_pills(sub_s), unsafe_allow_html=True)
     st.markdown("---")
 
 # ==============================================================================
-# 13. 4 CONSOLIDATED TABS
+# 13. 4 CONSOLIDATED TABS (WITH CLICKABLE CHART LINKS IN EVERY TAB)
 # ==============================================================================
 tab1, tab2, tab3, tab4 = st.tabs([
     "🧭 1. Sector Gauges & Stocks",
@@ -1117,46 +807,68 @@ with tab1:
         with sec_cols[idx % 2]:
             if show_analog_meter:
                 st.plotly_chart(make_gauge(s_meter, f"🧭 {s_name}", s_ret), use_container_width=True, key=f"g_{s_name}")
-            with st.expander(f"📂 {s_name} ({s_ret:+.2f}%) — {len(s_stocks)} Stocks & Plans", expanded=(len(f_secs) == 1)):
+            with st.expander(f"📂 {s_name} ({s_ret:+.2f}% | {s_row['Zone']}) — {len(s_stocks)} Stocks", expanded=(len(f_secs) == 1)):
                 st.dataframe(style_colored_table(s_stocks[["Symbol", "Price", "1D", "1W", "Vol_Ratio", "RSI", "Action_Signal", "Buy_Entry", "Buy_SL", "Buy_Target"]], ["1D", "1W"]), use_container_width=True, hide_index=True)
-                st.markdown(f'<div class="pill-container">{"".join([f"<a class=bull-pill href=?focus_stock={urllib.parse.quote(r.Ticker)} target=_self>📈 {r.Symbol}</a>" for _, r in s_stocks.iterrows()])}</div>', unsafe_allow_html=True)
+                st.markdown(make_stock_pills(s_stocks), unsafe_allow_html=True)
 
 with tab2:
-    st.markdown("#### ⚡ 1. 15-Minute Chartink Live Breakout Scanner")
+    st.markdown("#### ⚡ 1. 15-Minute Chartink Live Breakout & Breakdown Scanner")
     c1, c2 = st.columns(2)
     with c1:
-        st.markdown("##### 🟢 15m Bullish Breakouts")
+        st.markdown("##### 🟢 15m Bullish Breakouts (`Open≈Low`, `Close > VWAP & Prev High`)")
         st.dataframe(style_colored_table(bull_15m_df[["Symbol", "Sector", "Price", "VWAP", "Vol_Ratio", "RSI", "1D", "Entry", "SL", "Target"]], ["1D"]), use_container_width=True, hide_index=True)
+        st.markdown(make_stock_pills(bull_15m_df), unsafe_allow_html=True)
     with c2:
-        st.markdown("##### 🔴 15m Bearish Breakdowns")
-        st.dataframe(style_colored_table(bear_15m_df[["Symbol", "Sector", "Price", "VWAP", "Vol_Ratio", "RSI", "1D", "Entry", "SL", "Target"]], ["1D"]), use_container_width=True, hide_index=True)
+        st.markdown("##### 🔴 15m Bearish Breakdowns (`Open≈High`, `Close < VWAP & Prev Low`)")
+        b15_disp = bear_15m_df.rename(columns={"Entry": "Short_Below"})
+        st.dataframe(style_colored_table(b15_disp[["Symbol", "Sector", "Price", "VWAP", "Vol_Ratio", "RSI", "1D", "Short_Below", "SL", "Target"]], ["1D"]), use_container_width=True, hide_index=True)
+        st.markdown(make_stock_pills(bear_15m_df), unsafe_allow_html=True)
 
     st.markdown("---")
-    st.markdown("#### 🧮 2. Beginner Position Size & Risk Calculator")
+    st.markdown("#### 🔄 2. Intraday Doji / Hammer Consolidation & Sector Turnaround Scanner")
+    d1, d2 = st.columns(2)
+    with d1:
+        st.markdown("##### 🟢 Bullish Bottom Reversal (Excludes 3-4 Day Overextended Stocks)")
+        b_doji_full = stocks_df[(stocks_df["Consec_Up"] <= 2) & (stocks_df["1D"].between(-0.5, 4.0)) & (stocks_df["Vol_Ratio"] >= 1.05)].sort_values(["Sec_Bull_Turn", "Vol_Ratio"], ascending=[False, False]).head(12)
+        st.dataframe(style_colored_table(b_doji_full[["Symbol", "Sector", "Price", "1D", "Vol_Ratio", "RSI", "Action_Signal", "Buy_Entry", "Buy_SL", "Buy_Target"]], ["1D"]), use_container_width=True, hide_index=True)
+        st.markdown(make_stock_pills(b_doji_full), unsafe_allow_html=True)
+    with d2:
+        st.markdown("##### 🔴 Bearish Top Rejection (Excludes Already Crashed Stocks)")
+        br_doji_full = stocks_df[(stocks_df["Consec_Down"] <= 2) & (stocks_df["1D"].between(-4.0, 0.5)) & (stocks_df["Vol_Ratio"] >= 1.05)].sort_values(["Sec_Bear_Roll", "Vol_Ratio"], ascending=[False, False]).head(12)
+        st.dataframe(style_colored_table(br_doji_full[["Symbol", "Sector", "Price", "1D", "Vol_Ratio", "RSI", "Action_Signal", "Short_Entry", "Short_SL", "Short_Target"]], ["1D"]), use_container_width=True, hide_index=True)
+        st.markdown(make_stock_pills(br_doji_full), unsafe_allow_html=True)
+
+    st.markdown("---")
+    st.markdown("#### 🧮 3. Smart Position Size & Risk Calculator (Auto-Synced with Selected Stock)")
+    def_ent = float(stocks_df[stocks_df["Ticker"] == st.session_state.selected_stock]["Buy_Entry"].iloc[0]) if st.session_state.selected_stock in stocks_df["Ticker"].values else 500.0
+    def_sl = float(stocks_df[stocks_df["Ticker"] == st.session_state.selected_stock]["Buy_SL"].iloc[0]) if st.session_state.selected_stock in stocks_df["Ticker"].values else 490.0
     rc1, rc2, rc3, rc4 = st.columns(4)
     with rc1:
         cap_amt = st.number_input("💰 Total Capital (₹):", min_value=1000.0, value=50000.0, step=5000.0)
     with rc2:
-        risk_pct = st.number_input("⚠️ Safe Risk %:", min_value=0.25, max_value=5.0, value=1.0, step=0.25)
+        risk_pct = st.number_input("⚠️ Safe Risk % per Trade:", min_value=0.25, max_value=5.0, value=1.0, step=0.25)
     with rc3:
-        ent_p = st.number_input("🎯 Entry Price (₹):", min_value=1.0, value=500.0, step=5.0)
+        ent_p = st.number_input("🎯 Entry Price (₹):", min_value=1.0, value=def_ent, step=1.0)
     with rc4:
-        sl_p = st.number_input("🛑 Stop-Loss (₹):", min_value=0.5, value=490.0, step=5.0)
+        sl_p = st.number_input("🛑 Stop-Loss (₹):", min_value=0.5, value=def_sl, step=1.0)
     max_loss = cap_amt * (risk_pct / 100.0)
     diff = abs(ent_p - sl_p)
-    st.success(f"✅ **Max Safe Loss:** ₹{max_loss:,.0f} | 📦 **Quantity to Buy:** `{int(max_loss / diff) if diff > 0 else 0} Shares` | 🎯 **1:2 Target:** `₹{(ent_p + 2*diff if ent_p >= sl_p else ent_p - 2*diff):,.2f}`")
+    st.success(f"✅ **Max Allowed Loss:** ₹{max_loss:,.0f} &nbsp;|&nbsp; 📦 **Safe Quantity to Buy:** `{int(max_loss / diff) if diff > 0 else 0} Shares` &nbsp;|&nbsp; 🎯 **1:2 Target:** `₹{(ent_p + 2*diff if ent_p >= sl_p else ent_p - 2*diff):,.2f}`")
 
 with tab3:
     sw1, sw2 = st.columns(2)
     with sw1:
-        st.markdown("##### 🚀 Safe Trend Pullback Picks (Above 50-DMA + Near 20-DMA)")
-        sp_df = stocks_df[(stocks_df["Above_50DMA"]) & (stocks_df["Dist_20DMA"].between(-3.0, 4.5)) & (stocks_df["RSI"].between(44, 64))].sort_values("Vol_Ratio", ascending=False)
+        st.markdown("##### 🚀 Safe Trend Pullback Picks (Above 50-DMA + Near 20-DMA Support)")
+        sp_df = stocks_df[(stocks_df["Above_50DMA"]) & (stocks_df["Dist_20DMA"].between(-3.0, 4.5)) & (stocks_df["RSI"].between(44, 64))].sort_values("Vol_Ratio", ascending=False).head(15)
         st.dataframe(style_colored_table(sp_df[["Symbol", "Sector", "Price", "1D", "1W", "1M", "Vol_Ratio", "RSI", "Buy_Entry", "Buy_SL", "Buy_Target"]], ["1D", "1W", "1M"]), use_container_width=True, hide_index=True)
+        st.markdown(make_stock_pills(sp_df), unsafe_allow_html=True)
     with sw2:
-        st.markdown("##### 🌱 Value Recovery Picks (Oversold + Turning Up Today)")
-        vr_df = stocks_df[(stocks_df["1M"] < 0) & (stocks_df["1D"] > 0) & (stocks_df["RSI"] <= 50)].sort_values("Vol_Ratio", ascending=False)
+        st.markdown("##### 🌱 Value Recovery Picks (Oversold in 1M + Turning Up Today)")
+        vr_df = stocks_df[(stocks_df["1M"] < 0) & (stocks_df["1D"] > 0) & (stocks_df["RSI"] <= 52)].sort_values("Vol_Ratio", ascending=False).head(15)
         st.dataframe(style_colored_table(vr_df[["Symbol", "Sector", "Price", "1D", "1W", "1M", "Vol_Ratio", "RSI", "Buy_Entry", "Buy_SL", "Buy_Target"]], ["1D", "1W", "1M"]), use_container_width=True, hide_index=True)
-    st.download_button("📥 Download Full 180+ Stocks CSV Report", data=stocks_df.to_csv(index=False).encode("utf-8"), file_name="alphapulse_report.csv", mime="text/csv", use_container_width=True)
+        st.markdown(make_stock_pills(vr_df), unsafe_allow_html=True)
+    st.markdown("---")
+    st.download_button("📥 Download Complete 180+ Stocks Intelligence Report (CSV / Excel)", data=stocks_df.to_csv(index=False).encode("utf-8"), file_name="alphapulse_pro_report.csv", mime="text/csv", use_container_width=True)
 
 with tab4:
     chart_secs = sectors_df.sort_values(tf_choice, ascending=True)
@@ -1166,7 +878,7 @@ with tab4:
     st.dataframe(style_colored_table(sectors_df.sort_values(tf_choice, ascending=False)[["Sector", "Zone", "Meter", "1D", "1W", "1M", "3M", "6M", "1Y", "Avg_Vol", "RSI", "Breadth_50DMA"]], ["1D", "1W", "1M", "3M", "6M", "1Y"]), use_container_width=True, hide_index=True)
 
 # ==============================================================================
-# 14. FLOATING TOP BUTTON & AUTO-SCROLL/AUDIO ENGINE
+# 14. FLOATING ‘🚀 Top’ BUTTON + AUTO-SCROLL & AUDIO ALERT ENGINE
 # ==============================================================================
 st.markdown('<a href="#top-anchor" class="single-top-btn" id="alphapulse-top-btn">🚀 Top</a>', unsafe_allow_html=True)
 
