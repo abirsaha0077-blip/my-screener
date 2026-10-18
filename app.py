@@ -17,7 +17,7 @@ warnings.filterwarnings("ignore")
 # 1. PAGE CONFIGURATION
 # ==============================================================================
 st.set_page_config(
-    page_title="AlphaPulse Pro | Sector Turnaround & AI Intraday Terminal",
+    page_title="AlphaPulse Pro | Nifty 500 Turnaround, AI & Zerodha Terminal",
     page_icon="🧭",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -262,7 +262,6 @@ div.stButton > button:hover p, div.stLinkButton > a:hover p, a[data-testid="stBa
     color:#ffffff !important;
 }}
 
-/* PRIMARY GOLDEN-ORANGE AI VERDICT BUTTON (MATCHING USER SCREENSHOT) */
 button[data-testid="stBaseButton-primary"] {{
     background:linear-gradient(135deg, #f59e0b 0%, #ea580c 100%) !important;
     color:#ffffff !important;
@@ -272,16 +271,42 @@ button[data-testid="stBaseButton-primary"] {{
     font-size:0.82rem !important;
     box-shadow:0 4px 16px rgba(245, 158, 11, 0.45) !important;
 }}
-button[data-testid="stBaseButton-primary"] p {{
-    color:#ffffff !important;
-    font-weight:800 !important;
-}}
+button[data-testid="stBaseButton-primary"] p {{ color:#ffffff !important; font-weight:800 !important; }}
 button[data-testid="stBaseButton-primary"]:hover {{
     background:linear-gradient(135deg, #fbbf24 0%, #f97316 100%) !important;
     transform:translateY(-2px) scale(1.01) !important;
 }}
 
-/* LIVE MARKET SECTOR FOCUS ALERT BANNER */
+/* ZERODHA KITE 1-CLICK ORDER PAD STYLING */
+.kite-order-pad {{
+    background:{BG_CARD};
+    border:1.5px solid #387ed1;
+    border-top:4px solid #ff5722;
+    border-radius:14px;
+    padding:12px 16px;
+    margin:10px 0 12px 0;
+    box-shadow:0 8px 24px rgba(56,126,209,0.18);
+}}
+.kite-ticket-metric {{
+    background:{BG_SUB};
+    border:1px solid {BORDER_C};
+    border-radius:9px;
+    padding:7px 10px;
+    text-align:center;
+}}
+.kite-metric-lbl {{
+    font-size:0.68rem;
+    color:{TEXT_SUB};
+    font-weight:700;
+    display:block;
+}}
+.kite-metric-val {{
+    font-size:0.92rem;
+    font-weight:800;
+    font-family:'JetBrains Mono',monospace !important;
+    color:{TEXT_MAIN};
+}}
+
 .sector-alert-banner {{
     background:linear-gradient(90deg, rgba(245,158,11,0.16) 0%, rgba(16,185,129,0.14) 50%, rgba(15,23,42,0.92) 100%);
     border:1.5px solid #f59e0b;
@@ -307,13 +332,8 @@ a.alert-sec-chip {{
     font-weight:800;
     transition:all 0.18s ease;
 }}
-a.alert-sec-chip:hover {{
-    background:#f59e0b;
-    color:#ffffff !important;
-    transform:translateY(-1px);
-}}
+a.alert-sec-chip:hover {{ background:#f59e0b; color:#ffffff !important; transform:translateY(-1px); }}
 
-/* IN-APP AI DECISION ENGINE BOX */
 .ai-verdict-box {{
     background:{BG_CARD};
     border:2px solid #f59e0b;
@@ -322,13 +342,7 @@ a.alert-sec-chip:hover {{
     margin:10px 0 14px 0;
     box-shadow:0 8px 26px rgba(245,158,11,0.18);
 }}
-.ai-sub-card {{
-    background:{BG_SUB};
-    border:1px solid {BORDER_C};
-    border-radius:10px;
-    padding:10px 12px;
-    height:100%;
-}}
+.ai-sub-card {{ background:{BG_SUB}; border:1px solid {BORDER_C}; border-radius:10px; padding:10px 12px; height:100%; }}
 
 button[data-baseweb="tab"] {{
     background:{BG_CARD} !important;
@@ -444,7 +458,6 @@ def make_stock_pills(df_sub: pd.DataFrame) -> str:
 
 @st.cache_data(ttl=600, show_spinner=False)
 def fetch_live_stock_news_and_sentiment(sym_clean: str):
-    """Fetches real-time Google News RSS headlines for the stock and computes sentiment score."""
     headlines = []
     pos_words = ["surge", "jump", "gain", "win", "order", "profit", "buy", "upgrade", "bullish", "high", "growth", "rally", "beat", "expand", "record", "bonus", "dividend", "turnaround", "strong", "up"]
     neg_words = ["fall", "drop", "loss", "crash", "downgrade", "sell", "weak", "slump", "penalty", "probe", "low", "cut", "miss", "decline", "bearish", "concern", "risk", "debt", "down"]
@@ -483,11 +496,9 @@ def fetch_live_stock_news_and_sentiment(sym_clean: str):
     return headlines, sent_label, sent_score
 
 def generate_ai_stock_verdict(s_info: pd.Series, n_d: dict, v_d: dict, adv_cnt: int, dec_cnt: int):
-    """Combines Chart Technicals + Live News + Market/Sector Condition into an instant AI Trade Decision."""
     sym = s_info["Symbol"]
     headlines, news_label, news_pts = fetch_live_stock_news_and_sentiment(sym)
 
-    # 1. Technical Score (out of 45)
     tech_pts = 0
     tech_notes = []
     if s_info["Above_50DMA"] and s_info["Above_20DMA"]:
@@ -527,7 +538,6 @@ def generate_ai_stock_verdict(s_info: pd.Series, n_d: dict, v_d: dict, adv_cnt: 
         tech_pts -= 4
         tech_notes.append(f"🕯️ Bearish Rejection Pattern: {s_info['Bear_Candle']} near highs.")
 
-    # 2. Market & Sector Condition Score (out of 30)
     mkt_pts = 0
     mkt_notes = []
     if n_d["1D"] >= -0.15 and adv_cnt >= dec_cnt * 0.8:
@@ -876,7 +886,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Live Sector Focus Alert Notification Chips & Toast
 alert_chips_html = []
 for _, a_row in focus_alert_secs.iterrows():
     q_as = urllib.parse.quote(a_row["Sector"])
@@ -1128,7 +1137,7 @@ bar_items = [
 st.markdown(f'<div class="marquee-wrap"><div class="marquee-track">{"".join(bar_items) * 2}</div></div>', unsafe_allow_html=True)
 
 # ==============================================================================
-# 12. STOCK INSPECTOR, CHART & ONE-CLICK AUTOMATIC AI TRADE VERDICT ENGINE
+# 12. STOCK INSPECTOR + AI VERDICT + ZERODHA KITE 1-CLICK ORDER PAD (MIS / CNC)
 # ==============================================================================
 st.markdown('<div id="stock-inspector-anchor"></div>', unsafe_allow_html=True)
 
@@ -1205,7 +1214,6 @@ if st.session_state.selected_stock != DEFAULT_STOCK and st.session_state.selecte
         fig_st.update_layout(height=360, template="plotly_dark" if "Clean Light" not in theme_mode else "plotly_white", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=10, r=10, t=20, b=10), xaxis_rangeslider_visible=False)
         st.plotly_chart(fig_st, use_container_width=True)
 
-    # 4 ACTION BUTTONS BELOW CHART (4TH GOLDEN BUTTON TRIGGERS IN-APP AI DECISION ENGINE)
     l1, l2, l3, l4 = st.columns(4)
     with l1:
         st.link_button(f"📈 TradingView ({sym_clean})", f"https://in.tradingview.com/chart/?symbol=NSE%3A{sym_clean}", use_container_width=True)
@@ -1217,7 +1225,6 @@ if st.session_state.selected_stock != DEFAULT_STOCK and st.session_state.selecte
         if st.button(f"🤖 Ask AI Verdict ({sym_clean})", type="primary", use_container_width=True, help="Click for Instant AI Decision based on Chart + Live News + Market Condition"):
             st.session_state.show_stock_ai_verdict = not st.session_state.show_stock_ai_verdict
 
-    # AUTOMATIC IN-APP AI DECISION ENGINE (CHART + NEWS + MARKET CONDITION)
     if st.session_state.show_stock_ai_verdict:
         with st.spinner(f"🤖 Analyzing {sym_clean} Chart, Sector Rotation & Live News Headlines..."):
             ai_res = generate_ai_stock_verdict(s_info, n_d, v_d, adv_today, dec_today)
@@ -1247,6 +1254,99 @@ if st.session_state.selected_stock != DEFAULT_STOCK and st.session_state.selecte
             f'</div></div>',
             unsafe_allow_html=True
         )
+
+    # --------------------------------------------------------------------------
+    # 12.1 ZERODHA KITE 1-CLICK SMART ORDER PAD (MIS INTRADAY & CNC DELIVERY SWITCH)
+    # --------------------------------------------------------------------------
+    st.markdown(
+        '<div class="kite-order-pad">'
+        '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">'
+        '<span style="font-size:0.92rem;font-weight:800;color:#ff5722;">⚡ Zerodha Kite 1-Click Order Bridge (Option 1 — Instant Execution Pad)</span>'
+        '<span style="font-size:0.73rem;color:#38bdf8;font-weight:700;">Switch between MIS (Intraday 5x) & CNC (Delivery 1x)</span>'
+        '</div></div>',
+        unsafe_allow_html=True
+    )
+
+    zk_c1, zk_c2, zk_c3 = st.columns([3.8, 3.6, 2.6])
+    with zk_c1:
+        kite_product = st.radio(
+            "1. Select Zerodha Product Type:",
+            ["⚡ MIS (Intraday • 5x Leverage)", "💎 CNC (Delivery / Swing • 1x Cash)"],
+            horizontal=True
+        )
+    with zk_c2:
+        kite_order_type = st.radio(
+            "2. Select Order Type:",
+            ["🎯 LIMIT (Entry Price)", "🚀 MARKET (CMP)", "🛑 SL-M (Trigger)"],
+            horizontal=True
+        )
+    with zk_c3:
+        kite_risk_rs = st.number_input("3. Max Risk per Trade (₹):", min_value=100.0, value=500.0, step=100.0)
+
+    is_mis = "MIS" in kite_product
+    prod_code = "MIS" if is_mis else "CNC"
+    ord_code = "LIMIT" if "LIMIT" in kite_order_type else ("MARKET" if "MARKET" in kite_order_type else "SL-M")
+
+    risk_per_share_buy = max(abs(s_info["Buy_Entry"] - s_info["Buy_SL"]), 0.5)
+    kite_qty = max(int(kite_risk_rs / risk_per_share_buy), 1)
+    full_order_val = round(p_now * kite_qty, 2)
+    req_margin = round(full_order_val / 5.0, 2) if is_mis else full_order_val
+    leverage_txt = "5x Intraday Margin (20%)" if is_mis else "1x Delivery Cash (100%)"
+
+    km1, km2, km3, km4, km5 = st.columns(5)
+    with km1:
+        st.markdown(f'<div class="kite-ticket-metric"><span class="kite-metric-lbl">NSE Symbol & Product</span><span class="kite-metric-val" style="color:#ff5722;">{sym_clean} • {prod_code}</span></div>', unsafe_allow_html=True)
+    with km2:
+        st.markdown(f'<div class="kite-ticket-metric"><span class="kite-metric-lbl">Auto Safe Quantity</span><span class="kite-metric-val" style="color:#38bdf8;">{kite_qty} Qty</span></div>', unsafe_allow_html=True)
+    with km3:
+        st.markdown(f'<div class="kite-ticket-metric"><span class="kite-metric-lbl">Buy Entry / SL / Tgt</span><span class="kite-metric-val" style="color:#10b981;">₹{s_info["Buy_Entry"]} / ₹{s_info["Buy_SL"]}</span></div>', unsafe_allow_html=True)
+    with km4:
+        st.markdown(f'<div class="kite-ticket-metric"><span class="kite-metric-lbl">Short Entry / SL</span><span class="kite-metric-val" style="color:#ef4444;">₹{s_info["Short_Entry"]} / ₹{s_info["Short_SL"]}</span></div>', unsafe_allow_html=True)
+    with km5:
+        st.markdown(f'<div class="kite-ticket-metric"><span class="kite-metric-lbl">Est. Margin ({leverage_txt})</span><span class="kite-metric-val" style="color:#f59e0b;">₹{req_margin:,.0f}</span></div>', unsafe_allow_html=True)
+
+    # Interactive HTML/JS 1-Click Zerodha Kite Bridge (Copies Order Ticket & Opens Kite Terminal Popup)
+    components.html(
+        f"""
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;font-family:'Plus Jakarta Sans',sans-serif;">
+            <button id="kite-buy-btn" style="flex:1;min-width:240px;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border:1.5px solid #60a5fa;padding:10px 14px;border-radius:10px;font-weight:800;font-size:13.5px;cursor:pointer;box-shadow:0 4px 12px rgba(37,99,235,0.4);">
+                🟢 1-Click BUY {sym_clean} on Zerodha Kite ({prod_code} • {kite_qty} Qty @ ₹{s_info['Buy_Entry']})
+            </button>
+            <button id="kite-sell-btn" style="flex:1;min-width:240px;background:linear-gradient(135deg,#ea580c,#dc2626);color:#fff;border:1.5px solid #f87171;padding:10px 14px;border-radius:10px;font-weight:800;font-size:13.5px;cursor:pointer;box-shadow:0 4px 12px rgba(220,38,38,0.4);">
+                🔴 1-Click SHORT/SELL {sym_clean} on Zerodha Kite ({prod_code} • {kite_qty} Qty @ ₹{s_info['Short_Entry']})
+            </button>
+        </div>
+        <div id="kite-status-msg" style="font-size:12px;color:#34d399;font-weight:700;margin-top:6px;text-align:center;font-family:'Plus Jakarta Sans',sans-serif;"></div>
+        <script>
+        (function() {{
+            const buyBtn = document.getElementById("kite-buy-btn");
+            const sellBtn = document.getElementById("kite-sell-btn");
+            const msgEl = document.getElementById("kite-status-msg");
+
+            function launchKiteOrder(side, price, sl, tgt) {{
+                const ticketText = side + " NSE:{sym_clean} | Product: {prod_code} | Type: {ord_code} | Qty: {kite_qty} | Price: ₹" + price + " | SL: ₹" + sl + " | Target: ₹" + tgt;
+                if (navigator.clipboard) {{
+                    navigator.clipboard.writeText("{sym_clean}");
+                }}
+                msgEl.innerHTML = "✅ Copied <b>{sym_clean}</b> (" + ticketText + ") & Opening Zerodha Kite Order Window...";
+                window.open("https://kite.zerodha.com/", "ZerodhaKiteOrderWindow", "width=1120,height=740,menubar=no,toolbar=no,location=yes,status=yes");
+            }}
+
+            if (buyBtn) {{
+                buyBtn.addEventListener("click", function() {{
+                    launchKiteOrder("BUY", "{s_info['Buy_Entry']}", "{s_info['Buy_SL']}", "{s_info['Buy_Target']}");
+                }});
+            }}
+            if (sellBtn) {{
+                sellBtn.addEventListener("click", function() {{
+                    launchKiteOrder("SELL/SHORT", "{s_info['Short_Entry']}", "{s_info['Short_SL']}", "{s_info['Short_Target']}");
+                }});
+            }}
+        }})();
+        </script>
+        """,
+        height=76
+    )
     st.markdown("---")
 
 # ==============================================================================
