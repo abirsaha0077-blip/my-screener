@@ -77,7 +77,56 @@ DEFAULT_SECTOR = f"All {len(SECTOR_STOCKS)} Sectors ({len(ALL_TICKERS)} Stocks)"
 DEFAULT_STOCK = "Search or Select Stock..."
 
 # ==============================================================================
-# 3. PERSISTENT SESSION STATE (AUTO-ALERT STAYS ON UNTIL MANUALLY TURNED OFF)
+# 3. SERVER-WIDE INTRADAY NOTIFICATION VAULT (9:15 AM TO 3:30 PM, AUTO-CLEANS)
+# ==============================================================================
+@st.cache_resource
+def get_intraday_notification_vault():
+    """Persists today's notifications across reloads from 9:15 AM to 3:30 PM IST & auto-wipes after market close."""
+    return {"date": "", "items": [], "seen_keys": set()}
+
+def get_ist_now():
+    return datetime.now(timezone(timedelta(hours=5, minutes=30)))
+
+ist_now = get_ist_now()
+today_str = ist_now.strftime("%Y-%m-%d")
+is_mkt_open = (ist_now.weekday() < 5) and (
+    (ist_now.hour == 9 and ist_now.minute >= 15)
+    or (10 <= ist_now.hour <= 14)
+    or (ist_now.hour == 15 and ist_now.minute <= 30)
+)
+is_after_close = (ist_now.hour > 15) or (ist_now.hour == 15 and ist_now.minute > 31)
+
+alert_vault = get_intraday_notification_vault()
+# Reset vault on a new date OR automatically clean once market closes after 3:30 PM IST
+if alert_vault["date"] != today_str or is_after_close:
+    alert_vault["date"] = today_str
+    alert_vault["items"] = []
+    alert_vault["seen_keys"] = set()
+
+def push_intraday_alert(time_str: str, category: str, symbol: str, ticker: str, sector: str, price: float, entry: float, sl: float, target: float, note: str, is_bull: bool = True):
+    if is_after_close:
+        return False
+    u_key = f"{today_str}_{symbol}_{category}_{time_str[:5]}"
+    if u_key not in alert_vault["seen_keys"]:
+        alert_vault["seen_keys"].add(u_key)
+        alert_vault["items"].insert(0, {
+            "time": time_str,
+            "category": category,
+            "symbol": symbol,
+            "ticker": ticker,
+            "sector": sector,
+            "price": round(float(price), 2),
+            "entry": round(float(entry), 2),
+            "sl": round(float(sl), 2),
+            "target": round(float(target), 2),
+            "note": note,
+            "is_bull": is_bull
+        })
+        return True
+    return False
+
+# ==============================================================================
+# 4. SESSION STATE & URL QUERY PARAMETER HANDLER
 # ==============================================================================
 qp = st.query_params
 init_auto = False if qp.get("auto") == "0" else True
@@ -90,13 +139,18 @@ for k, v in [
     ("last_alerted", ""),
     ("show_ai_helper", False),
     ("show_nse_heatmap", False),
+    ("show_alert_drawer", False),
     ("show_stock_ai_verdict", True),
     ("sector_toast_shown", False),
     ("auto_scan_locked", init_auto),
-    ("ai_custom_ticker", "")
+    ("ai_custom_ticker", ""),
+    ("prev_pulse_prices", {})
 ]:
     if k not in st.session_state:
         st.session_state[k] = v
+
+def get_auto_param() -> str:
+    return "1" if st.session_state.auto_scan_locked else "0"
 
 if "nav_action" in qp:
     st.session_state.selected_sector = DEFAULT_SECTOR
@@ -105,7 +159,7 @@ if "nav_action" in qp:
     st.session_state.scroll_target = None
     st.session_state.show_nse_heatmap = False
     st.query_params.clear()
-    st.query_params["auto"] = "1" if st.session_state.auto_scan_locked else "0"
+    st.query_params["auto"] = get_auto_param()
 
 if "focus_stock" in qp:
     clicked_sym = urllib.parse.unquote(qp["focus_stock"]).strip().upper()
@@ -114,7 +168,7 @@ if "focus_stock" in qp:
     st.session_state.show_stock_ai_verdict = True
     st.session_state.scroll_target = "stock-inspector-anchor"
     st.query_params.clear()
-    st.query_params["auto"] = "1" if st.session_state.auto_scan_locked else "0"
+    st.query_params["auto"] = get_auto_param()
 
 if "focus_sec" in qp:
     clicked_sec = urllib.parse.unquote(qp["focus_sec"]).strip()
@@ -123,29 +177,20 @@ if "focus_sec" in qp:
         st.session_state.kpi_panel = "custom_sector"
         st.session_state.scroll_target = "kpi-panel-anchor"
     st.query_params.clear()
-    st.query_params["auto"] = "1" if st.session_state.auto_scan_locked else "0"
-
-def get_auto_param() -> str:
-    return "1" if st.session_state.auto_scan_locked else "0"
+    st.query_params["auto"] = get_auto_param()
 
 # ==============================================================================
-# 4. TOP HEADER BAR WITH PERSISTENT AUTO-ALERT & AI SEARCH
+# 5. TOP HEADER BAR WITH NOTIFICATION LOG DRAWER BUTTON & PERSISTENT AUTO-SCAN
 # ==============================================================================
 st.markdown('<div id="top-anchor"></div>', unsafe_allow_html=True)
 
-ist_now = datetime.now(timezone(timedelta(hours=5, minutes=30)))
-is_mkt_open = (ist_now.weekday() < 5) and (
-    (ist_now.hour == 9 and ist_now.minute >= 15)
-    or (10 <= ist_now.hour <= 14)
-    or (ist_now.hour == 15 and ist_now.minute <= 30)
-)
 mkt_status_html = (
     f'<span style="color:#10b981;font-weight:800;">🟢 LIVE MARKET ({ist_now.strftime("%I:%M:%S %p IST")})</span>'
     if is_mkt_open else
     f'<span style="color:#f59e0b;font-weight:700;">🕒 MARKET CLOSED ({ist_now.strftime("%a %I:%M %p IST")})</span>'
 )
 
-top_c1, top_c2, top_c3, top_c4, top_c5, top_c6 = st.columns([4.5, 1.55, 1.25, 0.9, 0.95, 0.85])
+top_c1, top_c2, top_c3, top_c4, top_c5, top_c6, top_c7 = st.columns([4.1, 1.4, 1.15, 1.2, 0.78, 0.78, 0.59])
 with top_c1:
     st.markdown(
         f'<a href="?nav_action=home&auto={get_auto_param()}" target="_self" class="brand-logo-link" title="Click to Reset All Filters & Return to Home">'
@@ -157,11 +202,13 @@ with top_c1:
 with top_c2:
     theme_mode = st.selectbox("Theme", ["🌙 Pro Dark (Slate)", "🌌 Cyber Neon (Violet)", "☀️ Clean Light (Day)"], index=0, label_visibility="collapsed")
 with top_c3:
-    if st.button("🤖 AI Brief & Search", use_container_width=True, help="Open AI Market Brief & Search Any Stock"):
+    if st.button("🤖 AI Search", use_container_width=True, help="Open AI Market Brief & Search Any Stock"):
         st.session_state.show_ai_helper = not st.session_state.show_ai_helper
 with top_c4:
-    show_analog_meter = st.toggle("🎛️ Meters", value=True)
+    alert_btn_Place = st.empty()
 with top_c5:
+    show_analog_meter = st.toggle("🎛️ Meters", value=True)
+with top_c6:
     def on_auto_toggle():
         st.session_state.auto_scan_locked = st.session_state.auto_toggle_widget
         st.query_params["auto"] = "1" if st.session_state.auto_scan_locked else "0"
@@ -173,13 +220,13 @@ with top_c5:
         on_change=on_auto_toggle,
         help="Persistent Auto-Alert: Stays ON until you manually turn it OFF"
     )
-with top_c6:
-    if st.button("⚡ Sync", use_container_width=True, help="Sync Live Nifty/BankNifty & Stock Ticks Now"):
+with top_c7:
+    if st.button("⚡", use_container_width=True, help="Sync Live Market Data Now"):
         st.cache_data.clear()
         st.rerun()
 
 # ==============================================================================
-# 5. THEME ENGINE & ULTRA-FAST SVG GAUGE CSS
+# 6. THEME ENGINE, REAL-TIME GREEN/RED FLASH ANIMATIONS & MOBILE ALIGNMENT CSS
 # ==============================================================================
 if "Clean Light" in theme_mode:
     BG_MAIN, BG_CARD, BG_SUB, TEXT_MAIN, TEXT_SUB, BORDER_C, ACCENT_C = "#f4f6fb", "#ffffff", "#eef2f8", "#0f172a", "#475569", "#cbd5e1", "#d97706"
@@ -220,28 +267,28 @@ html, body, [data-testid="stAppViewContainer"], .main {{
     color:{TEXT_MAIN} !important;
     scroll-behavior:smooth !important;
 }}
-.block-container {{ padding-top:1.05rem !important; padding-bottom:4.8rem !important; max-width:97% !important; }}
+.block-container {{ padding-top:1.0rem !important; padding-bottom:4.8rem !important; max-width:97% !important; }}
 
 a.brand-logo-link {{ text-decoration:none !important; display:inline-flex; align-items:center; gap:10px; padding:2px 4px; transition:transform 0.2s ease; }}
 a.brand-logo-link:hover {{ transform:translateY(-1px); }}
-.clean-compass-icon {{ font-size:2.2rem; line-height:1; background:transparent !important; border:none !important; padding:0 !important; filter:drop-shadow(0 2px 6px rgba(245,158,11,0.35)); }}
+.clean-compass-icon {{ font-size:2.15rem; line-height:1; background:transparent !important; border:none !important; padding:0 !important; filter:drop-shadow(0 2px 6px rgba(245,158,11,0.35)); }}
 .brand-title-glow {{
-    font-size:1.34rem; font-weight:800; letter-spacing:-0.4px; line-height:1.18;
+    font-size:1.30rem; font-weight:800; letter-spacing:-0.4px; line-height:1.18;
     background:linear-gradient(90deg, #f59e0b 0%, #ef4444 48%, #10b981 100%);
     -webkit-background-clip:text; -webkit-text-fill-color:transparent;
 }}
-.brand-subtitle {{ font-size:0.73rem; font-weight:600; color:{TEXT_SUB} !important; }}
+.brand-subtitle {{ font-size:0.72rem; font-weight:600; color:{TEXT_SUB} !important; }}
 
 [data-testid="stWidgetLabel"] p, [data-testid="stWidgetLabel"] label, .stSelectbox label, .stNumberInput label, .stTextInput label, .stRadio label, [data-testid="stRadio"] label span, [data-testid="stToggle"] label p, [data-testid="stCheckbox"] label p {{
-    color:{TEXT_MAIN} !important; font-weight:700 !important; font-size:0.81rem !important; opacity:1 !important;
+    color:{TEXT_MAIN} !important; font-weight:700 !important; font-size:0.80rem !important; opacity:1 !important;
 }}
 [data-testid="stRadio"] div[role="radiogroup"] {{ background:{BG_CARD}; border:1px solid {BORDER_C}; padding:3px 10px; border-radius:999px; gap:10px !important; }}
 
 div.stButton > button, button[data-testid="stBaseButton-secondary"], div.stDownloadButton > button,
 div.stLinkButton > a, a[data-testid="stBaseLinkButton-secondary"] {{
     background:{BTN_BG} !important; color:{TEXT_MAIN} !important; border:1.5px solid {BTN_BORDER} !important;
-    border-radius:10px !important; font-weight:800 !important; font-size:0.80rem !important;
-    padding:0.42rem 0.85rem !important; box-shadow:{CARD_SHADOW} !important; text-decoration:none !important; transition:all 0.2s ease !important;
+    border-radius:10px !important; font-weight:800 !important; font-size:0.79rem !important;
+    padding:0.42rem 0.80rem !important; box-shadow:{CARD_SHADOW} !important; text-decoration:none !important; transition:all 0.2s ease !important;
 }}
 div.stButton > button p, div.stDownloadButton > button p, div.stLinkButton > a p, a[data-testid="stBaseLinkButton-secondary"] p, a[data-testid="stBaseLinkButton-secondary"] span {{
     color:{TEXT_MAIN} !important; font-weight:800 !important;
@@ -256,41 +303,132 @@ div.stButton > button:hover p, div.stLinkButton > a:hover p, a[data-testid="stBa
 button[data-testid="stBaseButton-primary"] {{
     background:linear-gradient(135deg, #f59e0b 0%, #ea580c 100%) !important; color:#ffffff !important;
     border:1.5px solid #fbbf24 !important; border-radius:10px !important; font-weight:800 !important;
-    font-size:0.82rem !important; box-shadow:0 4px 16px rgba(245, 158, 11, 0.45) !important;
+    font-size:0.81rem !important; box-shadow:0 4px 16px rgba(245, 158, 11, 0.45) !important;
 }}
 button[data-testid="stBaseButton-primary"] p {{ color:#ffffff !important; font-weight:800 !important; }}
 
-/* ZERO-LAG INSTANT SVG ANALOG SPEEDOMETER CARD */
-.svg-gauge-card {{
+/* REAL-TIME LIVE PULSE TICKER CARDS WITH GREEN/RED FLASH ANIMATION */
+@keyframes flashGreenGlow {{
+    0% {{ background-color: rgba(16, 185, 129, 0.50); box-shadow: 0 0 18px rgba(16, 185, 129, 0.75); transform: scale(1.02); }}
+    100% {{ background-color: rgba(16, 185, 129, 0.12); box-shadow: none; transform: scale(1.0); }}
+}}
+@keyframes flashRedGlow {{
+    0% {{ background-color: rgba(239, 68, 68, 0.50); box-shadow: 0 0 18px rgba(239, 68, 68, 0.75); transform: scale(1.02); }}
+    100% {{ background-color: rgba(239, 68, 68, 0.12); box-shadow: none; transform: scale(1.0); }}
+}}
+@keyframes liveDotPulse {{
+    0%, 100% {{ opacity: 1; transform: scale(1); }}
+    50% {{ opacity: 0.35; transform: scale(1.25); }}
+}}
+.live-pulse-bar {{
     background:{BG_CARD};
     border:1px solid {BORDER_C};
     border-radius:12px;
-    padding:10px 14px 6px 14px;
-    margin-bottom:4px;
+    padding:7px 12px;
+    margin:4px 0 8px 0;
     display:flex;
-    align-items:center;
+    flex-wrap:wrap;
     justify-content:space-between;
+    align-items:center;
+    gap:8px;
     box-shadow:{CARD_SHADOW};
 }}
-.svg-gauge-info {{
+.tick-chip-up {{
+    background:rgba(16, 185, 129, 0.12);
+    border:1.5px solid #10b981;
+    border-radius:9px;
+    padding:5px 11px;
+    font-family:'JetBrains Mono',monospace !important;
+    font-size:0.81rem;
+    font-weight:800;
+    color:#10b981;
+    animation: flashGreenGlow 1.6s ease-out;
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+}}
+.tick-chip-down {{
+    background:rgba(239, 68, 68, 0.12);
+    border:1.5px solid #ef4444;
+    border-radius:9px;
+    padding:5px 11px;
+    font-family:'JetBrains Mono',monospace !important;
+    font-size:0.81rem;
+    font-weight:800;
+    color:#ef4444;
+    animation: flashRedGlow 1.6s ease-out;
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+}}
+.live-dot {{
+    width:8px;
+    height:8px;
+    border-radius:50%;
+    background:#10b981;
+    display:inline-block;
+    animation: liveDotPulse 1.2s infinite;
+}}
+
+/* ALL-DAY INTRADAY NOTIFICATION LOG DRAWER (9:15 AM - 3:30 PM) */
+.alert-drawer-box {{
+    background:{BG_CARD};
+    border:2px solid #f59e0b;
+    border-radius:14px;
+    padding:12px 16px;
+    margin:6px 0 12px 0;
+    box-shadow:0 8px 26px rgba(245,158,11,0.22);
+}}
+.alert-timeline-grid {{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(265px, 1fr));
+    gap:8px;
+    max-height:360px;
+    overflow-y:auto;
+    padding:4px 2px;
+}}
+a.alert-log-item {{
+    text-decoration:none !important;
+    background:{BG_SUB};
+    border:1px solid {BORDER_C};
+    border-radius:9px;
+    padding:8px 11px;
+    color:{TEXT_MAIN} !important;
     display:flex;
     flex-direction:column;
     gap:3px;
-    max-width:62%;
+    transition:all 0.16s ease;
 }}
-.svg-gauge-title {{
-    font-size:0.90rem;
-    font-weight:800;
-    color:{TEXT_MAIN};
-    white-space:nowrap;
-    overflow:hidden;
-    text-overflow:ellipsis;
+a.alert-log-item:hover {{
+    border-color:#f59e0b;
+    transform:translateY(-2px);
 }}
-.svg-gauge-sub {{
-    font-size:0.73rem;
-    color:{TEXT_SUB};
-    font-weight:600;
+.al-bull-left {{ border-left:4px solid #10b981 !important; }}
+.al-bear-left {{ border-left:4px solid #ef4444 !important; }}
+
+/* RESPONSIVE FILTER BAR ALIGNMENT (FIXES MOBILE & DESKTOP ROW 3) */
+div[data-testid="stHorizontalBlock"] {{
+    align-items: flex-end !important;
 }}
+@media (max-width: 768px) {{
+    .live-pulse-bar {{
+        display:grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap:6px !important;
+    }}
+    .compass-pill {{
+        grid-column: span 2 !important;
+        text-align:center !important;
+    }}
+}}
+
+.svg-gauge-card {{
+    background:{BG_CARD}; border:1px solid {BORDER_C}; border-radius:12px; padding:10px 14px 6px 14px;
+    margin-bottom:4px; display:flex; align-items:center; justify-content:space-between; box-shadow:{CARD_SHADOW};
+}}
+.svg-gauge-info {{ display:flex; flex-direction:column; gap:3px; max-width:62%; }}
+.svg-gauge-title {{ font-size:0.90rem; font-weight:800; color:{TEXT_MAIN}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
+.svg-gauge-sub {{ font-size:0.73rem; color:{TEXT_SUB}; font-weight:600; }}
 
 .kite-order-pad {{ background:{BG_CARD}; border:1.5px solid #387ed1; border-top:4px solid #ff5722; border-radius:14px; padding:12px 16px; margin:10px 0 12px 0; box-shadow:0 8px 24px rgba(56,126,209,0.18); }}
 .kite-ticket-metric {{ background:{BG_SUB}; border:1px solid {BORDER_C}; border-radius:9px; padding:7px 10px; text-align:center; }}
@@ -327,9 +465,7 @@ a.nse-tile:hover {{ transform:translateY(-2px) scale(1.02); }}
 .nse-tile-name {{ font-size:0.74rem; font-weight:800; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
 .nse-tile-bot {{ display:flex; justify-content:space-between; align-items:baseline; font-family:'JetBrains Mono',monospace !important; }}
 
-.pulse-bar {{ background:{BG_CARD}; border:1px solid {BORDER_C}; border-radius:12px; padding:8px 14px; margin:6px 0 6px 0; display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:8px; box-shadow:{CARD_SHADOW}; }}
-.pulse-item {{ font-size:0.81rem; font-weight:700; color:{TEXT_MAIN}; font-family:'JetBrains Mono',monospace !important; }}
-.compass-pill {{ padding:3px 10px; border-radius:999px; font-size:0.74rem; font-weight:800; }}
+.compass-pill {{ padding:4px 11px; border-radius:999px; font-size:0.74rem; font-weight:800; }}
 .turnaround-hero-box {{ background:{BG_CARD}; border:1.5px solid {BORDER_C}; border-left:5px solid #10b981; border-radius:12px; padding:10px 14px; margin:4px 0 10px 0; box-shadow:{CARD_SHADOW}; }}
 .turnaround-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:8px; margin-top:8px; }}
 a.turn-sec-card {{ text-decoration:none !important; background:{BG_SUB}; border:1px solid #10b98155; border-radius:10px; padding:8px 11px; color:{TEXT_MAIN} !important; display:flex; flex-direction:column; justify-content:space-between; height:84px; transition:all 0.18s ease; }}
@@ -374,7 +510,7 @@ a.single-top-btn {{ text-decoration:none !important; background:linear-gradient(
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 6. ULTRA-FAST VECTORIZED DATA ENGINE + REAL-TIME LIVE NIFTY/BANKNIFTY TICKER
+# 7. ULTRA-FAST DATA ENGINE + 10-SECOND LIVE NIFTY/BANKNIFTY TICK STREAM
 # ==============================================================================
 def safe_num(val, default: float = 0.0) -> float:
     try:
@@ -412,7 +548,6 @@ def make_stock_pills(df_sub: pd.DataFrame) -> str:
     return f'<div class="pill-container">{"".join(pills)}</div>'
 
 def make_svg_speedometer_card(s_row: pd.Series, tf_choice: str) -> str:
-    """Instant-rendering HTML5 SVG Analog Speedometer — replaces 42 slow Plotly charts!"""
     score = int(np.clip(safe_num(s_row["Meter"], 50), 5, 98))
     ret_val = safe_num(s_row[tf_choice], 0.0)
     s_name = s_row["Sector"]
@@ -439,21 +574,21 @@ def make_svg_speedometer_card(s_row: pd.Series, tf_choice: str) -> str:
         f'</div></div>'
     )
 
-@st.cache_data(ttl=25, show_spinner=False)
+@st.cache_data(ttl=8, show_spinner=False)
 def load_pulse_indices():
-    """Fetches REAL-TIME Live Ticks every 25 seconds using 5m intraday candles + daily history."""
+    """Fetches REAL-TIME 1-minute Live Ticks every 8 seconds for Nifty 50, Bank Nifty, VIX & USD/INR."""
     idx_tickers = {"NIFTY": "^NSEI", "BANKNIFTY": "^NSEBANK", "VIX": "^INDIAVIX", "USDINR": "INR=X"}
     res = {}
     try:
         raw_1d = yf.download(list(idx_tickers.values()), period="6mo", interval="1d", progress=False, group_by="ticker", threads=True)
-        raw_5m = yf.download(list(idx_tickers.values()), period="5d", interval="5m", progress=False, group_by="ticker", threads=True)
+        raw_1m = yf.download(list(idx_tickers.values()), period="2d", interval="1m", progress=False, group_by="ticker", threads=True)
         for k, sym in idx_tickers.items():
             try:
                 df_d = raw_1d[sym].dropna(subset=["Close"])
-                df_m = raw_5m[sym].dropna(subset=["Close"]) if sym in raw_5m else pd.DataFrame()
+                df_m = raw_1m[sym].dropna(subset=["Close"]) if sym in raw_1m else pd.DataFrame()
                 if len(df_d) >= 2:
                     live_p = safe_num(df_m["Close"].iloc[-1], safe_num(df_d["Close"].iloc[-1])) if not df_m.empty else safe_num(df_d["Close"].iloc[-1])
-                    # Determine previous trading day's close accurately
+                    prev_tick_1m = safe_num(df_m["Close"].iloc[-2], live_p) if len(df_m) >= 2 else live_p
                     if not df_m.empty:
                         last_day = df_m.index[-1].date()
                         prev_days_df = df_d[df_d.index.date < last_day]
@@ -462,9 +597,12 @@ def load_pulse_indices():
                         prev_c = safe_num(df_d["Close"].iloc[-2], live_p)
 
                     chg_1d = safe_num(((live_p - prev_c) / prev_c) * 100.0, 0.0) if prev_c > 0 else 0.0
+                    pts_1d = round(live_p - prev_c, 2)
                     if live_p > 0:
                         res[k] = {
                             "price": live_p,
+                            "prev_tick": prev_tick_1m,
+                            "pts": pts_1d,
                             "1D": round(chg_1d, 2),
                             "1W": round(calc_return(df_d["Close"], 5), 2),
                             "1M": round(calc_return(df_d["Close"], 21), 2),
@@ -478,19 +616,18 @@ def load_pulse_indices():
         pass
 
     defaults = {
-        "NIFTY": {"price": 23146.2, "1D": 0.65, "1W": 2.78, "1M": 1.2, "3M": 3.4, "6M": 5.1, "1Y": -1.2},
-        "BANKNIFTY": {"price": 55844.0, "1D": 0.06, "1W": 1.95, "1M": 0.8, "3M": 2.5, "6M": 4.0, "1Y": 3.5},
-        "VIX": {"price": 14.02, "1D": -0.04, "1W": -2.1, "1M": -4.0, "3M": 0.0, "6M": 0.0, "1Y": 0.0},
-        "USDINR": {"price": 84.95, "1D": -0.21, "1W": -0.1, "1M": 0.2, "3M": 0.5, "6M": 0.8, "1Y": 1.4},
+        "NIFTY": {"price": 23146.2, "prev_tick": 23140.0, "pts": 148.8, "1D": 0.65, "1W": 2.78, "1M": 1.2, "3M": 3.4, "6M": 5.1, "1Y": -1.2},
+        "BANKNIFTY": {"price": 55844.0, "prev_tick": 55830.0, "pts": 35.0, "1D": 0.06, "1W": 1.95, "1M": 0.8, "3M": 2.5, "6M": 4.0, "1Y": 3.5},
+        "VIX": {"price": 14.02, "prev_tick": 14.05, "pts": -0.04, "1D": -0.04, "1W": -2.1, "1M": -4.0, "3M": 0.0, "6M": 0.0, "1Y": 0.0},
+        "USDINR": {"price": 84.95, "prev_tick": 84.96, "pts": -0.18, "1D": -0.21, "1W": -0.1, "1M": 0.2, "3M": 0.5, "6M": 0.8, "1Y": 1.4},
     }
     for k, v in defaults.items():
         if k not in res:
             res[k] = v
     return res
 
-@st.cache_data(ttl=180, show_spinner=False)
+@st.cache_data(ttl=150, show_spinner=False)
 def load_full_market_data():
-    """Fast 6-month batch download for 420+ stocks with optimized indicator calculation."""
     raw = yf.download(ALL_TICKERS, period="6mo", interval="1d", progress=False, group_by="ticker", threads=True)
     stock_rows = []
     for ticker in ALL_TICKERS:
@@ -528,7 +665,6 @@ def load_full_market_data():
             avg_vol = float(np.mean(v_arr[-21:-1])) if n_len >= 21 else float(np.mean(v_arr))
             vol_ratio = max(round(safe_num(v_arr[-1] / avg_vol, 1.0), 2), 0.1) if avg_vol > 0 else 1.0
 
-            # Fast NumPy RSI(14)
             diffs = np.diff(c_arr[-16:])
             gains = np.mean(np.where(diffs > 0, diffs, 0.0))
             losses = np.mean(np.where(diffs < 0, -diffs, 0.0))
@@ -640,7 +776,6 @@ def load_full_market_data():
 
 @st.cache_data(ttl=60, show_spinner=False)
 def fetch_any_custom_stock_live(query_sym: str, stocks_df: pd.DataFrame):
-    """Fetches live intraday & daily setup for ANY NSE stock typed by user in AI Search."""
     clean_s = query_sym.strip().upper().replace(".NS", "")
     full_tk = f"{clean_s}.NS"
     if not stocks_df.empty and full_tk in stocks_df["Ticker"].values:
@@ -795,6 +930,7 @@ def generate_ai_stock_verdict(s_info: dict, n_d: dict, v_d: dict, adv_cnt: int, 
 
 @st.cache_data(ttl=90, show_spinner=False)
 def run_chartink_15m_scanner(stocks_df: pd.DataFrame):
+    """Scans 15m candles AND backfills today's 9:15 AM - 3:30 PM breakout timestamps into the Alert Vault."""
     if stocks_df.empty:
         return pd.DataFrame(), pd.DataFrame()
     active_pool = stocks_df[stocks_df["Price"] > 150].sort_values("Vol_Ratio", ascending=False).head(32)
@@ -816,34 +952,47 @@ def run_chartink_15m_scanner(stocks_df: pd.DataFrame):
                 v15_ratio = round(safe_num(v15 / vol_sma20, d_info["Vol_Ratio"]), 2) if vol_sma20 > 0 else d_info["Vol_Ratio"]
                 rsi15 = round(calc_rsi(df15["Close"], 14), 1)
 
+                last_ts = df15.index[-1]
+                try:
+                    last_ts_ist = last_ts.tz_convert("Asia/Kolkata") if last_ts.tzinfo else last_ts + timedelta(hours=5, minutes=30)
+                    candle_time_str = last_ts_ist.strftime("%I:%M %p")
+                except Exception:
+                    candle_time_str = ist_now.strftime("%I:%M %p")
+
                 day_slice = df15[df15.index.date == df15.index[-1].date()]
                 vwap15 = safe_num(((day_slice["High"] + day_slice["Low"] + day_slice["Close"]) / 3.0 * day_slice["Volume"]).sum() / day_slice["Volume"].sum(), c15) if (len(day_slice) >= 1 and safe_num(day_slice["Volume"].sum()) > 0) else c15
 
+                sym_clean = tk.replace(".NS", "")
                 if (o15 <= l15 * 1.005 or c15 > o15) and c15 >= d_info["Prev_High"] * 0.996 and v15_ratio >= 1.35 and (56 <= rsi15 <= 78) and c15 > vwap15 and d_info["Prev_Close"] > d_info["Prev_DMA20"]:
+                    ent_v = round(max(c15, h15 * 1.0005), 2)
+                    sl_v = round(min(l15, vwap15 * 0.995), 2)
+                    tgt_v = round(c15 + 1.6 * d_info["ATR"], 2)
                     bull_15m.append({
-                        "Symbol": tk.replace(".NS", ""), "Ticker": tk, "Sector": d_info["Sector"], "Price": round(c15, 2),
+                        "Time": candle_time_str, "Symbol": sym_clean, "Ticker": tk, "Sector": d_info["Sector"], "Price": round(c15, 2),
                         "VWAP": round(vwap15, 2), "Vol_Ratio": v15_ratio, "RSI": rsi15, "1D": d_info["1D"], "Confidence": d_info["Confidence"],
-                        "Reason": "⚡ 15m Open≈Low + Above VWAP & Prev High", "Entry": round(max(c15, h15 * 1.0005), 2),
-                        "SL": round(min(l15, vwap15 * 0.995), 2), "Target": round(c15 + 1.6 * d_info["ATR"], 2),
+                        "Reason": "⚡ 15m Open≈Low + Above VWAP & Prev High", "Entry": ent_v, "SL": sl_v, "Target": tgt_v,
                     })
                 if (o15 >= h15 * 0.995 or c15 < o15) and c15 <= d_info["Prev_Low"] * 1.004 and v15_ratio >= 1.30 and (22 <= rsi15 <= 44) and c15 < vwap15:
+                    ent_s = round(min(c15, l15 * 0.9995), 2)
+                    sl_s = round(max(h15, vwap15 * 1.005), 2)
+                    tgt_s = round(c15 - 1.6 * d_info["ATR"], 2)
                     bear_15m.append({
-                        "Symbol": tk.replace(".NS", ""), "Ticker": tk, "Sector": d_info["Sector"], "Price": round(c15, 2),
+                        "Time": candle_time_str, "Symbol": sym_clean, "Ticker": tk, "Sector": d_info["Sector"], "Price": round(c15, 2),
                         "VWAP": round(vwap15, 2), "Vol_Ratio": v15_ratio, "RSI": rsi15, "1D": d_info["1D"], "Confidence": d_info["Confidence"],
-                        "Reason": "📉 15m Open≈High + Below VWAP & Prev Low", "Entry": round(min(c15, l15 * 0.9995), 2),
-                        "SL": round(max(h15, vwap15 * 1.005), 2), "Target": round(c15 - 1.6 * d_info["ATR"], 2),
+                        "Reason": "📉 15m Open≈High + Below VWAP & Prev Low", "Entry": ent_s, "SL": sl_s, "Target": tgt_s,
                     })
             except Exception:
                 continue
     except Exception:
         pass
 
+    now_t_str = ist_now.strftime("%I:%M %p")
     if not bull_15m:
         for _, r in active_pool[(active_pool["Price"] > active_pool["DMA20"]) & (active_pool["1D"] > 0)].head(6).iterrows():
-            bull_15m.append({"Symbol": r["Symbol"], "Ticker": r["Ticker"], "Sector": r["Sector"], "Price": r["Price"], "VWAP": round(r["Price"] * 0.994, 2), "Vol_Ratio": r["Vol_Ratio"], "RSI": r["RSI"], "1D": r["1D"], "Confidence": r["Confidence"], "Reason": "⚡ Near Prev High Breakout + Above 20-DMA", "Entry": r["Buy_Entry"], "SL": r["Buy_SL"], "Target": r["Buy_Target"]})
+            bull_15m.append({"Time": now_t_str, "Symbol": r["Symbol"], "Ticker": r["Ticker"], "Sector": r["Sector"], "Price": r["Price"], "VWAP": round(r["Price"] * 0.994, 2), "Vol_Ratio": r["Vol_Ratio"], "RSI": r["RSI"], "1D": r["1D"], "Confidence": r["Confidence"], "Reason": "⚡ Near Prev High Breakout + Above 20-DMA", "Entry": r["Buy_Entry"], "SL": r["Buy_SL"], "Target": r["Buy_Target"]})
     if not bear_15m:
         for _, r in active_pool[active_pool["1D"] < 0].head(6).iterrows():
-            bear_15m.append({"Symbol": r["Symbol"], "Ticker": r["Ticker"], "Sector": r["Sector"], "Price": r["Price"], "VWAP": round(r["Price"] * 1.006, 2), "Vol_Ratio": r["Vol_Ratio"], "RSI": r["RSI"], "1D": r["1D"], "Confidence": r["Confidence"], "Reason": "📉 Below Intraday VWAP + Supply Pressure", "Entry": r["Short_Entry"], "SL": r["Short_SL"], "Target": r["Short_Target"]})
+            bear_15m.append({"Time": now_t_str, "Symbol": r["Symbol"], "Ticker": r["Ticker"], "Sector": r["Sector"], "Price": r["Price"], "VWAP": round(r["Price"] * 1.006, 2), "Vol_Ratio": r["Vol_Ratio"], "RSI": r["RSI"], "1D": r["1D"], "Confidence": r["Confidence"], "Reason": "📉 Below Intraday VWAP + Supply Pressure", "Entry": r["Short_Entry"], "SL": r["Short_SL"], "Target": r["Short_Target"]})
 
     return pd.DataFrame(bull_15m), pd.DataFrame(bear_15m)
 
@@ -875,42 +1024,162 @@ def style_colored_table(df: pd.DataFrame, pct_cols: list):
 with st.spinner("⚡ Syncing Live Market Indices & 42 Sectors..."):
     pulse = load_pulse_indices()
     stocks_df, sectors_df = load_full_market_data()
+    bull_15m_df, bear_15m_df = run_chartink_15m_scanner(stocks_df)
 
 if stocks_df.empty or sectors_df.empty:
     st.error("⚠️ Market data temporarily unavailable. Please click Sync.")
     st.stop()
 
 # ==============================================================================
-# 7. REAL-TIME MARKET PULSE RIBBON + LIVE SECTOR FOCUS ALERT BAR
+# 8. POPULATE ALL-DAY NOTIFICATION VAULT (9:15 AM - 3:30 PM) & RENDER TOP BUTTON
+# ==============================================================================
+turnaround_secs = sectors_df.sort_values(["Sec_Bull_Turn", "Turnaround_Score"], ascending=[False, False]).head(8)
+bull_next8, bear_next8 = filter_next_day_intraday_stocks(stocks_df)
+
+if not is_after_close:
+    now_hm = ist_now.strftime("%I:%M %p")
+    # Log Top Turnaround Sector Alerts
+    for _, ts in turnaround_secs.head(3).iterrows():
+        top_s_row = stocks_df[stocks_df["Symbol"] == ts["Top_Pick"]]
+        if not top_s_row.empty:
+            sr = top_s_row.iloc[0]
+            push_intraday_alert(
+                now_hm, "🔄 Sector Turnaround", sr["Symbol"], sr["Ticker"], ts["Sector"],
+                sr["Price"], sr["Buy_Entry"], sr["Buy_SL"], sr["Buy_Target"],
+                f"Sector {ts['Sector']} turning up ({ts['1D']:+.2f}%, Score {ts['Turnaround_Score']})", True
+            )
+    # Log 15m Bullish Breakouts
+    for _, r15 in bull_15m_df.head(5).iterrows():
+        push_intraday_alert(
+            str(r15.get("Time", now_hm)), "🟢 15m Breakout", r15["Symbol"], r15["Ticker"], r15["Sector"],
+            r15["Price"], r15["Entry"], r15["SL"], r15["Target"], r15["Reason"], True
+        )
+    # Log 15m Bearish Breakdowns
+    for _, r15b in bear_15m_df.head(3).iterrows():
+        push_intraday_alert(
+            str(r15b.get("Time", now_hm)), "🔴 15m Breakdown", r15b["Symbol"], r15b["Ticker"], r15b["Sector"],
+            r15b["Price"], r15b["Entry"], r15b["SL"], r15b["Target"], r15b["Reason"], False
+        )
+
+with alert_btn_Place:
+    alert_count = len(alert_vault["items"])
+    if st.button(f"🔔 Alerts ({alert_count})", use_container_width=True, help="Click to Open Today's Full Intraday Notification History (9:15 AM – 3:30 PM)"):
+        st.session_state.show_alert_drawer = not st.session_state.show_alert_drawer
+
+# ==============================================================================
+# 9. REAL-TIME AUTO-UPDATING PULSE BAR (GREEN/RED FLASH EVERY 10 SECONDS)
 # ==============================================================================
 n_d, b_d, v_d, u_d = pulse["NIFTY"], pulse["BANKNIFTY"], pulse["VIX"], pulse["USDINR"]
 adv_today, dec_today = int((stocks_df["1D"] > 0).sum()), int((stocks_df["1D"] < 0).sum())
-turnaround_secs = sectors_df.sort_values(["Sec_Bull_Turn", "Turnaround_Score"], ascending=[False, False]).head(8)
 
+def render_live_flashing_pulse_bar():
+    live_p = load_pulse_indices()
+    prev_map = st.session_state.prev_pulse_prices
+
+    def make_flash_chip(label: str, key: str, prefix: str = ""):
+        d = live_p[key]
+        cur_val = d["price"]
+        last_val = prev_map.get(key, d.get("prev_tick", cur_val))
+        # Tick direction: Up = Green Flash, Down = Red Flash (fallback to 1D change if unchanged)
+        is_up_tick = (cur_val > last_val) if (cur_val != last_val) else (d["1D"] >= 0)
+        prev_map[key] = cur_val
+        cls = "tick-chip-up" if is_up_tick else "tick-chip-down"
+        arr = "▲" if is_up_tick else "▼"
+        return (
+            f'<div class="{cls}" title="Live Real-Time Tick — Flashes Green on Up-Tick & Red on Down-Tick">'
+            f'<span class="live-dot" style="background:{"#10b981" if is_up_tick else "#ef4444"};"></span>'
+            f'<span>{label}: {prefix}{cur_val:,.2f} {arr} ({d["1D"]:+.2f}%)</span>'
+            f'</div>'
+        )
+
+    nd_now = live_p["NIFTY"]
+    if nd_now["1D"] >= 0.20 and adv_today >= dec_today:
+        c_txt, c_sty = "🟢 Bullish Bias — Track BUY Setups", "background:rgba(16,185,129,0.16);color:#10b981;border:1px solid #10b98155;"
+    elif nd_now["1D"] <= -0.20 and dec_today > adv_today:
+        c_txt, c_sty = "🔴 Bearish Bias — Track SHORT Setups", "background:rgba(239,68,68,0.16);color:#ef4444;border:1px solid #ef444455;"
+    else:
+        c_txt, c_sty = "⚖️ Rotational — Track Turnaround Sectors", "background:rgba(245,158,11,0.16);color:#f59e0b;border:1px solid #f59e0b55;"
+
+    st.markdown(
+        f'<div class="live-pulse-bar">'
+        f'{make_flash_chip("🇮🇳 Nifty 50", "NIFTY")}'
+        f'{make_flash_chip("🏛️ Bank Nifty", "BANKNIFTY")}'
+        f'{make_flash_chip("⚡ India VIX", "VIX")}'
+        f'{make_flash_chip("💵 USD/INR", "USDINR", "₹")}'
+        f'<div class="compass-pill" style="{c_sty}">🧭 {c_txt}</div>'
+        f'</div>',
+        unsafe_allow_html=True
+    )
+
+# Use Streamlit Fragment if available so the top ticker updates every 10s WITHOUT reloading the page!
+if hasattr(st, "fragment"):
+    @st.fragment(run_every="10s")
+    def auto_live_pulse_fragment():
+        render_live_flashing_pulse_bar()
+    auto_live_pulse_fragment()
+else:
+    render_live_flashing_pulse_bar()
+
+# ==============================================================================
+# 9.1 ALL-DAY NOTIFICATION CENTER DRAWER (OPENS WHEN USER CLICKS 🔔 Alerts)
+# ==============================================================================
+ap_flag = get_auto_param()
+
+if st.session_state.show_alert_drawer:
+    st.markdown('<div class="alert-drawer-box">', unsafe_allow_html=True)
+    dr_c1, dr_c2, dr_c3 = st.columns([6.5, 2.0, 1.5])
+    with dr_c1:
+        st.markdown(f"#### 🔔 Today's Intraday Notification Log ({today_str} • 9:15 AM – 3:30 PM IST)")
+        st.caption("সারাদিনের সবগুলো অ্যালার্ট এখানে টাইম অনুযায়ী জমা থাকবে। মার্কেট ক্লোজ (3:30 PM) হওয়ার সাথে সাথে এটি অটোমেটিক ক্লিন হয়ে যাবে।")
+    with dr_c2:
+        if st.button("🗑️ Clear Today's Log", use_container_width=True):
+            alert_vault["items"] = []
+            alert_vault["seen_keys"] = set()
+            st.rerun()
+    with dr_c3:
+        if st.button("✖ Close Log", use_container_width=True):
+            st.session_state.show_alert_drawer = False
+            st.rerun()
+
+    if not alert_vault["items"]:
+        st.info("🕒 Market closed or no active intraday notifications in the log right now. Signals from 9:15 AM to 3:30 PM appear here automatically.")
+    else:
+        log_cards_html = []
+        for item in alert_vault["items"]:
+            qt = urllib.parse.quote(str(item["ticker"]))
+            b_cls = "al-bull-left" if item["is_bull"] else "al-bear-left"
+            c_col = "#10b981" if item["is_bull"] else "#ef4444"
+            act_lbl = "Buy" if item["is_bull"] else "Short"
+            log_cards_html.append(
+                f'<a href="?focus_stock={qt}&auto={ap_flag}" target="_self" class="alert-log-item {b_cls}" title="Click to open {item["symbol"]} chart & setup">'
+                f'<div style="display:flex;justify-content:space-between;align-items:center;">'
+                f'<span style="font-size:0.72rem;font-weight:800;color:#f59e0b;font-family:\'JetBrains Mono\',monospace;">🕒 {item["time"]} IST</span>'
+                f'<span style="font-size:0.68rem;font-weight:800;color:{c_col};">{item["category"]}</span>'
+                f'</div>'
+                f'<div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px;">'
+                f'<span style="font-size:0.86rem;font-weight:800;">{item["symbol"]} <span style="font-size:0.70rem;color:{TEXT_SUB};">({item["sector"]})</span></span>'
+                f'<span style="font-size:0.80rem;font-weight:800;color:{c_col};">₹{item["price"]}</span>'
+                f'</div>'
+                f'<div style="font-size:0.70rem;color:{TEXT_SUB};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{item["note"]}</div>'
+                f'<div class="r-plan"><span style="color:#f59e0b;">🎯 {act_lbl}: ₹{item["entry"]}</span><span style="color:#ef4444;">🛑 SL: ₹{item["sl"]}</span><span style="color:#10b981;">🚀 Tgt: ₹{item["target"]}</span></div>'
+                f'</a>'
+            )
+        st.markdown(f'<div class="alert-timeline-grid">{"".join(log_cards_html)}</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ==============================================================================
+# 9.2 LIVE SECTOR FOCUS ALERT BANNER
+# ==============================================================================
 if n_d["1D"] >= 0.20 and adv_today >= dec_today:
-    c_txt, c_sty = "🟢 Bullish Bias — Track Turnaround BUY Setups", "background:rgba(16,185,129,0.16);color:#10b981;border:1px solid #10b98155;"
     focus_alert_secs = sectors_df[(sectors_df["Sec_Bull_Turn"]) | (sectors_df["1D"] > 0.4)].sort_values("Turnaround_Score", ascending=False).head(3)
     alert_regime_msg = "🚨 LIVE SECTOR FOCUS ALERT (Bullish Market) — Priority Focus on:"
 elif n_d["1D"] <= -0.20 and dec_today > adv_today:
-    c_txt, c_sty = "🔴 Bearish Bias — Track Top SHORT Setups", "background:rgba(239,68,68,0.16);color:#ef4444;border:1px solid #ef444455;"
     focus_alert_secs = sectors_df.sort_values("1D", ascending=True).head(3)
     alert_regime_msg = "🚨 LIVE SECTOR FOCUS ALERT (Bearish Pressure) — Defensive / Short Focus on:"
 else:
-    c_txt, c_sty = "⚖️ Rotational Market — Focus on Turnaround Sectors", "background:rgba(245,158,11,0.16);color:#f59e0b;border:1px solid #f59e0b55;"
     focus_alert_secs = turnaround_secs.head(3)
     alert_regime_msg = "🚨 LIVE SECTOR FOCUS ALERT (Rotational Market) — Bottom Turnaround Focus on:"
 
-st.markdown(
-    f'<div class="pulse-bar">'
-    f'<div class="pulse-item">🇮🇳 Nifty 50: <span style="color:{"#10b981" if n_d["1D"]>=0 else "#ef4444"};">{n_d["price"]:,.2f} ({n_d["1D"]:+.2f}%)</span></div>'
-    f'<div class="pulse-item">🏛️ Bank Nifty: <span style="color:{"#10b981" if b_d["1D"]>=0 else "#ef4444"};">{b_d["price"]:,.2f} ({b_d["1D"]:+.2f}%)</span></div>'
-    f'<div class="pulse-item">⚡ India VIX: <span style="color:#10b981;">{v_d["price"]:.2f} ({v_d["1D"]:+.2f}%)</span></div>'
-    f'<div class="pulse-item">💵 USD/INR: <span style="color:#f59e0b;">₹{u_d["price"]:.2f}</span></div>'
-    f'<div class="compass-pill" style="{c_sty}">🧭 {c_txt}</div></div>',
-    unsafe_allow_html=True
-)
-
-ap_flag = get_auto_param()
 alert_chips_html = [
     f'<a href="?focus_sec={urllib.parse.quote(a_row["Sector"])}&auto={ap_flag}" target="_self" class="alert-sec-chip">'
     f'🎯 {a_row["Sector"]} ({a_row["1D"]:+.2f}% • Vol {a_row["Avg_Vol"]}x • Top: {a_row["Top_Pick"]})</a>'
@@ -927,11 +1196,11 @@ st.markdown(
 
 if not st.session_state.sector_toast_shown and not focus_alert_secs.empty:
     top_f_sec = focus_alert_secs.iloc[0]
-    st.toast(f"🚨 Sector Focus: {top_f_sec['Sector']} ({top_f_sec['1D']:+.2f}%, Top Pick: {top_f_sec['Top_Pick']})", icon="🧭")
+    st.toast(f"🚨 Sector Focus: {top_f_sec['Sector']} ({top_f_sec['1D']:+.2f}%) — Saved in 🔔 Alerts ({len(alert_vault['items'])})", icon="🧭")
     st.session_state.sector_toast_shown = True
 
 # ==============================================================================
-# 8. 5-COLUMN FILTER & ACTION BAR
+# 10. 5-COLUMN FILTER & ACTION BAR (PERFECTLY ALIGNED ON MOBILE & DESKTOP)
 # ==============================================================================
 fc1, fc2, fc3, fc4, fc5 = st.columns([1.1, 2.3, 2.5, 2.4, 1.7])
 with fc1:
@@ -958,15 +1227,12 @@ with fc4:
         st.session_state.scroll_target = "stock-inspector-anchor"
         st.rerun()
 with fc5:
-    st.markdown("<div style='padding-top:23px;'></div>", unsafe_allow_html=True)
     if st.button("🗺️ NSE Heatmap & Verdict", use_container_width=True):
         st.session_state.show_nse_heatmap = not st.session_state.show_nse_heatmap
 
 # ==============================================================================
-# 8.1 AI MARKET BRIEF + ANY-STOCK CUSTOM AI SEARCH ENGINE
+# 10.1 AI MARKET BRIEF + ANY-STOCK CUSTOM AI SEARCH ENGINE
 # ==============================================================================
-bull_next8, bear_next8 = filter_next_day_intraday_stocks(stocks_df)
-
 if st.session_state.show_ai_helper:
     top_turn_names = ", ".join([f"{r['Sector']} ({r['1D']:+.1f}%)" for _, r in turnaround_secs.head(4).iterrows()])
     top_bull_syms = ", ".join([f"{r['Symbol']} (₹{r['Price']}, Buy>{r['Entry']}, SL {r['SL']})" for _, r in bull_next8.head(4).iterrows()])
@@ -976,7 +1242,7 @@ if st.session_state.show_ai_helper:
     ai_b1, ai_b2 = st.columns([4.8, 5.2])
     with ai_b1:
         st.info(
-            f"🧭 **Market Regime:** {c_txt}\n\n"
+            f"🧭 **Market Summary:** Nifty {n_d['price']:,.1f} ({n_d['1D']:+.2f}%)\n\n"
             f"🔄 **Top Turnaround Sectors:** {top_turn_names}\n\n"
             f"🟢 **Top Bullish Intraday Picks:** {top_bull_syms}\n\n"
             f"🔴 **Top Bearish Intraday Picks:** {top_bear_syms}"
@@ -989,7 +1255,7 @@ if st.session_state.show_ai_helper:
         st.markdown("##### 🔍 Search Any NSE Stock for Instant AI Entry, SL & Target")
         s_in1, s_in2, s_in3 = st.columns([5.2, 2.6, 2.2])
         with s_in1:
-            custom_q = st.text_input("Type ANY NSE Symbol (e.g., HAL, IREDA, SBIN, VERTOZ, TCS):", value=st.session_state.ai_custom_ticker, label_visibility="collapsed", placeholder="Type Stock Symbol (e.g. IREDA, SBIN, HAL)...")
+            custom_q = st.text_input("Type ANY NSE Symbol:", value=st.session_state.ai_custom_ticker, label_visibility="collapsed", placeholder="Type Stock Symbol (e.g. IREDA, SBIN, HAL)...")
         with s_in2:
             analyze_btn = st.button("🤖 AI Trade Plan", type="primary", use_container_width=True)
         with s_in3:
@@ -1006,7 +1272,7 @@ if st.session_state.show_ai_helper:
         if st.session_state.ai_custom_ticker:
             c_data = fetch_any_custom_stock_live(st.session_state.ai_custom_ticker, stocks_df)
             if c_data is None:
-                st.warning(f"⚠️ Could not find NSE symbol `{st.session_state.ai_custom_ticker}`. Please check the NSE ticker spelling.")
+                st.warning(f"⚠️ Could not find NSE symbol `{st.session_state.ai_custom_ticker}`. Please check spelling.")
             else:
                 c_ai = generate_ai_stock_verdict(c_data, n_d, v_d, adv_today, dec_today)
                 st.markdown(
@@ -1024,7 +1290,7 @@ if st.session_state.show_ai_helper:
                 )
 
 # ==============================================================================
-# 8.2 NSE SECTORAL HEATMAP & BULLISH / BEARISH SECTOR RECOMMENDATION PANEL
+# 10.2 NSE SECTORAL HEATMAP & BULLISH / BEARISH SECTOR RECOMMENDATION PANEL
 # ==============================================================================
 if st.session_state.show_nse_heatmap:
     bull_secs_df = sectors_df[(sectors_df[tf_choice] > 0.25) & (sectors_df["RSI"] >= 50)].sort_values(tf_choice, ascending=False)
@@ -1073,7 +1339,7 @@ if st.session_state.show_nse_heatmap:
     st.markdown(f'<div class="nse-heatmap-container"><div class="nse-heatmap-grid">{"".join(heatmap_tiles)}</div></div>', unsafe_allow_html=True)
 
 # ==============================================================================
-# 9. PRIORITY 1 (HERO FOCUS): SECTOR TURNAROUND RADAR
+# 11. PRIORITY 1 (HERO FOCUS): SECTOR TURNAROUND RADAR
 # ==============================================================================
 turn_cards = []
 for _, ts in turnaround_secs.iterrows():
@@ -1106,7 +1372,7 @@ st.markdown(
 )
 
 # ==============================================================================
-# 10. PRIORITY 2 (HIDDEN BY DEFAULT): NEXT-DAY INTRADAY WATCHLIST + REASONS
+# 12. PRIORITY 2 (HIDDEN BY DEFAULT): NEXT-DAY INTRADAY WATCHLIST + REASONS
 # ==============================================================================
 wa_lines = ["🧭 *AlphaPulse Pro — Next-Day Intraday Watchlist*", "🟢 *Bullish Turnaround Stocks:*"]
 for _, r in bull_next8.head(4).iterrows():
@@ -1156,7 +1422,7 @@ with st.expander("🎯 PRIORITY 2 — Next-Day Intraday Watchlist (Bullish Turna
             st.markdown(build_nextday_box(bear_next8.head(6), False), unsafe_allow_html=True)
 
 # ==============================================================================
-# 11. CLICKABLE 42-SECTOR MARQUEE BAR
+# 13. CLICKABLE 42-SECTOR MARQUEE BAR
 # ==============================================================================
 bar_items = [
     f'<a class="{"sec-pill-up" if sr[tf_choice]>=0 else "sec-pill-down"}" href="?focus_sec={urllib.parse.quote(sr["Sector"])}&auto={ap_flag}" target="_self">'
@@ -1166,7 +1432,7 @@ bar_items = [
 st.markdown(f'<div class="marquee-wrap"><div class="marquee-track">{"".join(bar_items) * 2}</div></div>', unsafe_allow_html=True)
 
 # ==============================================================================
-# 12. STOCK INSPECTOR + AI VERDICT + ZERODHA KITE 1-CLICK ORDER PAD
+# 14. STOCK INSPECTOR + AI VERDICT + ZERODHA KITE 1-CLICK ORDER PAD
 # ==============================================================================
 st.markdown('<div id="stock-inspector-anchor"></div>', unsafe_allow_html=True)
 
@@ -1302,7 +1568,6 @@ if st.session_state.selected_stock != DEFAULT_STOCK:
 
         is_mis = "MIS" in kite_product
         prod_code = "MIS" if is_mis else "CNC"
-        ord_code = "LIMIT" if "LIMIT" in kite_order_type else ("MARKET" if "MARKET" in kite_order_type else "SL-M")
         risk_per_share_buy = max(abs(s_info["Buy_Entry"] - s_info["Buy_SL"]), 0.5)
         kite_qty = max(int(kite_risk_rs / risk_per_share_buy), 1)
         full_order_val = round(p_now * kite_qty, 2)
@@ -1351,7 +1616,7 @@ if st.session_state.selected_stock != DEFAULT_STOCK:
         st.markdown("---")
 
 # ==============================================================================
-# 13. 4 SUMMARY KPI CARDS & DRILL-DOWN PANEL
+# 15. 4 SUMMARY KPI CARDS & DRILL-DOWN PANEL
 # ==============================================================================
 adv_count, dec_count = int((stocks_df[tf_choice] > 0).sum()), int((stocks_df[tf_choice] < 0).sum())
 pct_50dma = round((stocks_df["Above_50DMA"].sum() / max(len(stocks_df), 1)) * 100.0, 1)
@@ -1425,7 +1690,7 @@ if st.session_state.kpi_panel is not None:
     st.markdown("---")
 
 # ==============================================================================
-# 14. 4 ULTRA-FAST CONSOLIDATED TABS (ZERO-LAG SVG GAUGES IN TAB 1)
+# 16. 4 ULTRA-FAST CONSOLIDATED TABS
 # ==============================================================================
 live_tab_badge = "🟢 LIVE NOW" if is_mkt_open else "⏸️ Standby"
 tab1, tab2, tab3, tab4 = st.tabs([
@@ -1479,19 +1744,16 @@ with tab2:
         force_test_scan = st.checkbox("🔓 Preview Last Session's 15-Minute Scan Results", value=False)
 
     if is_mkt_open or force_test_scan:
-        bull_15m_df, bear_15m_df = run_chartink_15m_scanner(stocks_df)
         c1, c2 = st.columns(2)
         with c1:
             st.markdown('<div class="aligned-sec-hdr">🟢 15m Bullish Breakouts (Above VWAP & Prev High)</div>', unsafe_allow_html=True)
-            st.dataframe(style_colored_table(bull_15m_df[["Symbol", "Sector", "Price", "VWAP", "Vol_Ratio", "RSI", "1D", "Entry", "SL", "Target"]], ["1D"]), use_container_width=True, hide_index=True)
+            st.dataframe(style_colored_table(bull_15m_df[["Time", "Symbol", "Sector", "Price", "VWAP", "Vol_Ratio", "RSI", "1D", "Entry", "SL", "Target"]], ["1D"]), use_container_width=True, hide_index=True)
             st.markdown(make_stock_pills(bull_15m_df), unsafe_allow_html=True)
         with c2:
             st.markdown('<div class="aligned-sec-hdr">🔴 15m Bearish Breakdowns (Below VWAP & Prev Low)</div>', unsafe_allow_html=True)
             b15_disp = bear_15m_df.rename(columns={"Entry": "Short_Below"})
-            st.dataframe(style_colored_table(b15_disp[["Symbol", "Sector", "Price", "VWAP", "Vol_Ratio", "RSI", "1D", "Short_Below", "SL", "Target"]], ["1D"]), use_container_width=True, hide_index=True)
+            st.dataframe(style_colored_table(b15_disp[["Time", "Symbol", "Sector", "Price", "VWAP", "Vol_Ratio", "RSI", "1D", "Short_Below", "SL", "Target"]], ["1D"]), use_container_width=True, hide_index=True)
             st.markdown(make_stock_pills(bear_15m_df), unsafe_allow_html=True)
-    else:
-        bull_15m_df = pd.DataFrame()
 
     st.markdown("---")
     st.markdown('<div class="aligned-sec-hdr">🧮 Smart Intraday Position Size & Risk Calculator</div>', unsafe_allow_html=True)
@@ -1533,7 +1795,7 @@ with tab4:
     st.dataframe(style_colored_table(sectors_df.sort_values("Turnaround_Score", ascending=False)[["Sector", "Zone", "Turnaround_Score", "Meter", "1D", "1W", "1M", "3M", "6M", "1Y", "Avg_Vol", "RSI", "Breadth_20DMA", "Breadth_50DMA", "Top_Pick"]], ["1D", "1W", "1M", "3M", "6M", "1Y"]), use_container_width=True, hide_index=True)
 
 # ==============================================================================
-# 15. FLOATING ‘🚀 Top’ BUTTON & PERSISTENT AUTO-SCAN ENGINE
+# 17. FLOATING ‘🚀 Top’ BUTTON & PERSISTENT AUTO-SCAN ENGINE
 # ==============================================================================
 st.markdown(
     '<div class="floating-right-dock">'
@@ -1549,7 +1811,6 @@ should_ring = "true" if (st.session_state.auto_scan_locked and is_mkt_open and t
 if st.session_state.auto_scan_locked and is_mkt_open and top_syms:
     st.session_state.last_alerted = top_syms
 
-# Preserves ?auto=1 on auto-refresh so the toggle NEVER turns off automatically
 reload_js = """
 setTimeout(function(){
     const url = new URL(window.parent.location.href);
