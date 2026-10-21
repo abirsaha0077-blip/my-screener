@@ -8,8 +8,6 @@ from plotly.subplots import make_subplots
 from datetime import datetime, timezone, timedelta
 import urllib.parse
 import urllib.request
-import json
-import re
 import xml.etree.ElementTree as ET
 import warnings
 
@@ -19,7 +17,7 @@ warnings.filterwarnings("ignore")
 # 1. PAGE CONFIGURATION
 # ==============================================================================
 st.set_page_config(
-    page_title="AlphaPulse Pro | Super Swing, Sector & AI Chat Terminal",
+    page_title="AlphaPulse Pro | Sector Turnaround & Intraday Terminal",
     page_icon="🧭",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -137,14 +135,8 @@ for k, v in [
     ("show_alert_drawer", False),
     ("show_stock_ai_verdict", True),
     ("auto_scan_locked", init_auto),
-    ("kite_api_key", ""),
-    ("gemini_api_key", ""),
-    ("ai_chat_messages", [
-        {
-            "role": "assistant",
-            "content": "হ্যালো বন্ধু! 👋 আমি তোমার **AlphaPulse Live AI Assistant**। তুমি আমাকে যেকোনো শেয়ারের নাম লিখে (যেমন: `POLYCAB`, `SBIN`, `IREDA`, `HAL`), আজকের খবর, ইন্ট্রাডে বা সুইং ট্রেডিং পজিশন (`Entry`, `SL`, `Target`) কিংবা কোন সেক্টর ভালো চলছে—যেকোনো প্রশ্ন বাংলায় বা ইংরেজিতে করতে পারো!"
-        }
-    ])
+    ("ai_custom_ticker", ""),
+    ("kite_api_key", "")
 ]:
     if k not in st.session_state:
         st.session_state[k] = v
@@ -179,7 +171,7 @@ if "focus_sec" in qp:
     st.query_params["auto"] = get_auto_param()
 
 # ==============================================================================
-# 5. CRASH-PROOF DATA ENGINE + COMBINED CHARTINK & SCREENER SWING ENGINE
+# 5. CRASH-PROOF DATA ENGINE (DEDUPLICATES COLUMNS TO PREVENT TYPEERROR)
 # ==============================================================================
 def safe_num(val, default: float = 0.0) -> float:
     try:
@@ -213,16 +205,17 @@ def calc_return(closes: pd.Series, days: int) -> float:
         return 0.0
 
 def render_safe_table(df: pd.DataFrame, pct_cols: list, height: int = None):
-    """100% Crash-Proof Table Renderer: Never throws Pandas Styler or KeyError."""
+    """100% Crash-Proof Table Renderer: Removes duplicate columns & safely colors % columns."""
     if df is None or df.empty:
-        st.info("No matching records found for this filter right now.")
+        st.info("No matching records found right now.")
         return
-    clean_df = df.copy()
+    # Remove any duplicate column names (fixes TypeError when tf_choice == '1D')
+    clean_df = df.loc[:, ~df.columns.duplicated()].copy()
     num_cols = clean_df.select_dtypes(include=[np.number]).columns.tolist()
     for nc in num_cols:
         clean_df[nc] = pd.to_numeric(clean_df[nc], errors="coerce").fillna(0.0).round(2)
     try:
-        valid_cols = [c for c in pct_cols if c in clean_df.columns]
+        valid_cols = list(dict.fromkeys([c for c in pct_cols if c in clean_df.columns]))
 
         def color_pct(val):
             try:
@@ -247,80 +240,6 @@ def render_safe_table(df: pd.DataFrame, pct_cols: list, height: int = None):
         else:
             st.dataframe(clean_df, use_container_width=True, hide_index=True)
 
-def calculate_combined_swing_metrics(c_arr, h_arr, l_arr, r_1m, r_3m, r_1y, dma20, dma50, rsi_val, vol_ratio):
-    """
-    Combines User's Chartink (5W Tight Base <= 15% + 20W High Breakout + >20SMA + RSI>60)
-    AND Screener.in (1Y Return < 15% + 3M Return > 15% + Price > 50 DMA) Swing Scanners.
-    """
-    n_len = len(c_arr)
-    c_now = float(c_arr[-1])
-
-    # 1. Chartink 5-Week (25 Trading Days) Tight Consolidation Range
-    if n_len >= 26:
-        high_5w = float(np.max(h_arr[-26:-1]))
-        low_5w = float(np.min(l_arr[-26:-1]))
-    else:
-        high_5w = float(np.max(h_arr[:-1])) if n_len > 1 else c_now
-        low_5w = float(np.min(l_arr[:-1])) if n_len > 1 else c_now
-
-    tight_ratio = (high_5w / low_5w) if low_5w > 0 else 2.0
-    range_5w_pct = round((tight_ratio - 1.0) * 100.0, 1)
-    is_tight_base = tight_ratio <= 1.18  # Within 15-18% 5-week range
-
-    # 2. Chartink 20-Week (100 Trading Days) High Breakout
-    if n_len >= 101:
-        prev_20w_high = float(np.max(h_arr[-101:-1]))
-    else:
-        prev_20w_high = float(np.max(h_arr[:-1])) if n_len > 1 else c_now
-
-    dist_20w_high_pct = round(((c_now - prev_20w_high) / prev_20w_high) * 100.0, 2) if prev_20w_high > 0 else -10.0
-    is_20w_breakout = c_now >= (prev_20w_high * 0.975)
-
-    chartink_swing_pass = bool(
-        is_tight_base
-        and is_20w_breakout
-        and (c_now > dma20)
-        and (rsi_val >= 56.0)
-        and (vol_ratio >= 0.95)
-    )
-
-    # 3. Screener.in Bottom-Out Turnaround (1Y Return < 15% AND 3M Return > 15% AND Price > 50 DMA)
-    screener_turnaround_pass = bool(
-        (r_1y < 16.0)
-        and (r_3m >= 12.0)
-        and (c_now > dma50)
-    )
-
-    # 4. Combined Super Swing Score & Tag
-    if chartink_swing_pass and screener_turnaround_pass:
-        swing_tag = "🔥 Dual Super Swing (20W Breakout + 3M Turnaround)"
-        swing_score = 96
-    elif chartink_swing_pass:
-        swing_tag = "🚀 Chartink 20W Tight-Base Breakout"
-        swing_score = 89
-    elif screener_turnaround_pass:
-        swing_tag = "🔄 Screener Bottom Turnaround (1Y<15%, 3M>12%)"
-        swing_score = 85
-    elif (c_now > dma50) and (c_now > dma20) and is_tight_base and (rsi_val >= 52):
-        swing_tag = "💎 VCP Tight Base (>20 & 50 DMA)"
-        swing_score = 76
-    elif (r_1y < 15.0) and (r_3m >= 6.0 or r_1m >= 5.0) and (c_now > dma50):
-        swing_tag = "🌱 Early Bottom Recovery (>50 DMA)"
-        swing_score = 72
-    else:
-        swing_tag = "⚖️ Normal"
-        swing_score = 40
-
-    return {
-        "Range_5W_Pct": range_5w_pct,
-        "Prev_20W_High": round(prev_20w_high, 2),
-        "Dist_20W_High": dist_20w_high_pct,
-        "Chartink_Swing": chartink_swing_pass,
-        "Screener_Swing": screener_turnaround_pass,
-        "Swing_Tag": swing_tag,
-        "Swing_Score": swing_score
-    }
-
 @st.cache_data(ttl=45, show_spinner=False)
 def load_pulse_indices():
     idx_tickers = {"NIFTY": "^NSEI", "BANKNIFTY": "^NSEBANK", "VIX": "^INDIAVIX", "USDINR": "INR=X"}
@@ -328,7 +247,7 @@ def load_pulse_indices():
     for k, sym in idx_tickers.items():
         try:
             tk_obj = yf.Ticker(sym)
-            df_d = tk_obj.history(period="1y", interval="1d")
+            df_d = tk_obj.history(period="6mo", interval="1d")
             if df_d is not None and not df_d.empty:
                 df_d = df_d.dropna(subset=["Close"])
                 if len(df_d) >= 2:
@@ -353,8 +272,8 @@ def load_pulse_indices():
                             "1W": round(calc_return(df_d["Close"], 5), 2),
                             "1M": round(calc_return(df_d["Close"], 21), 2),
                             "3M": round(calc_return(df_d["Close"], 63), 2),
-                            "6M": round(calc_return(df_d["Close"], 126), 2),
-                            "1Y": round(calc_return(df_d["Close"], 250), 2),
+                            "6M": round(calc_return(df_d["Close"], 120), 2),
+                            "1Y": round(calc_return(df_d["Close"], 120), 2),
                         }
         except Exception:
             pass
@@ -372,8 +291,7 @@ def load_pulse_indices():
 
 @st.cache_data(ttl=300, show_spinner=False)
 def load_full_market_data():
-    """Downloads 1-Year history so 20-Week High (100d) & 1-Year Return (250d) are 100% accurate."""
-    raw = yf.download(ALL_TICKERS, period="1y", interval="1d", progress=False, group_by="ticker", threads=True)
+    raw = yf.download(ALL_TICKERS, period="6mo", interval="1d", progress=False, group_by="ticker", threads=True)
     stock_rows = []
     for ticker in ALL_TICKERS:
         try:
@@ -381,7 +299,7 @@ def load_full_market_data():
             if df is None or df.empty:
                 continue
             df = df.dropna(subset=["Close", "Open", "High", "Low"])
-            if len(df) < 25:
+            if len(df) < 22:
                 continue
 
             c_arr = df["Close"].to_numpy(dtype=float)
@@ -401,8 +319,7 @@ def load_full_market_data():
             r_1w = ((c_now - c_arr[max(0, n_len - 6)]) / c_arr[max(0, n_len - 6)]) * 100.0
             r_1m = ((c_now - c_arr[max(0, n_len - 22)]) / c_arr[max(0, n_len - 22)]) * 100.0
             r_3m = ((c_now - c_arr[max(0, n_len - 64)]) / c_arr[max(0, n_len - 64)]) * 100.0
-            r_6m = ((c_now - c_arr[max(0, n_len - 126)]) / c_arr[max(0, n_len - 126)]) * 100.0
-            r_1y = ((c_now - c_arr[0]) / c_arr[0]) * 100.0
+            r_6m = ((c_now - c_arr[0]) / c_arr[0]) * 100.0
 
             dma20 = float(np.mean(c_arr[-20:]))
             prev_dma20 = float(np.mean(c_arr[-21:-1])) if n_len >= 21 else dma20
@@ -437,17 +354,12 @@ def load_full_market_data():
             atr_clean = round(max(float(np.mean(h_arr[-14:] - l_arr[-14:])), c_now * 0.012), 2)
             dist_20 = round(((c_now - dma20) / dma20) * 100.0, 2) if dma20 > 0 else 0.0
 
-            # Combined Swing Metrics (Chartink + Screener.in)
-            sw_res = calculate_combined_swing_metrics(c_arr, h_arr, l_arr, r_1m, r_3m, r_1y, dma20, dma50, rsi_val, vol_ratio)
-
-            if sw_res["Swing_Score"] >= 85:
-                action_sig = sw_res["Swing_Tag"]
-            elif rsi_val >= 75 or consec_up >= 4:
+            if rsi_val >= 75 or consec_up >= 4:
                 action_sig = "⚠️ Overbought"
             elif bull_candle and consec_up <= 2 and vol_ratio >= 1.15:
                 action_sig = "🟢 Turnaround Buy"
             elif c_now >= dma50 and -2.5 <= dist_20 <= 3.5 and 45 <= rsi_val <= 65:
-                action_sig = "💎 Swing Buy"
+                action_sig = "💎 Safe Swing Buy"
             elif bear_candle and consec_down <= 2 and vol_ratio >= 1.15:
                 action_sig = "🔴 Top Short"
             else:
@@ -458,14 +370,11 @@ def load_full_market_data():
             stock_rows.append({
                 "Ticker": ticker, "Symbol": ticker.replace(".NS", ""), "Sector": TICKER_TO_SECTOR.get(ticker, "Others"),
                 "Price": round(c_now, 2), "1D": round(r_1d, 2), "1W": round(r_1w, 2), "1M": round(r_1m, 2),
-                "3M": round(r_3m, 2), "6M": round(r_6m, 2), "1Y": round(r_1y, 2),
+                "3M": round(r_3m, 2), "6M": round(r_6m, 2), "1Y": round(r_6m, 2),
                 "Vol_Ratio": vol_ratio, "RSI": rsi_val, "DMA20": round(dma20, 2), "DMA50": round(dma50, 2),
                 "Above_20DMA": bool(c_now >= dma20), "Above_50DMA": bool(c_now >= dma50), "Dist_20DMA": dist_20,
                 "Consec_Up": int(consec_up), "Consec_Down": int(consec_down),
                 "Bull_Candle": bull_candle, "Bear_Candle": bear_candle, "Action_Signal": action_sig, "Confidence": conf_score,
-                "Range_5W_Pct": sw_res["Range_5W_Pct"], "Prev_20W_High": sw_res["Prev_20W_High"],
-                "Dist_20W_High": sw_res["Dist_20W_High"], "Chartink_Swing": sw_res["Chartink_Swing"],
-                "Screener_Swing": sw_res["Screener_Swing"], "Swing_Tag": sw_res["Swing_Tag"], "Swing_Score": sw_res["Swing_Score"],
                 "Body_Pct": round(body_pct, 2), "Lower_Wick": round(lower_wick, 2), "Upper_Wick": round(upper_wick, 2),
                 "ATR": atr_clean, "Day_High": round(h_now, 2), "Day_Low": round(l_now, 2),
                 "Prev_High": round(prev_high, 2), "Prev_Low": round(prev_low, 2), "Prev_Close": round(prev_close, 2), "Prev_DMA20": round(prev_dma20, 2),
@@ -636,42 +545,30 @@ def fetch_any_custom_stock_live(query_sym: str, stocks_df: pd.DataFrame):
     if not stocks_df.empty and full_tk in stocks_df["Ticker"].values:
         return stocks_df[stocks_df["Ticker"] == full_tk].iloc[0].to_dict()
     try:
-        df = yf.download(full_tk, period="1y", interval="1d", progress=False)
+        df = yf.download(full_tk, period="6mo", interval="1d", progress=False)
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = [c[0] for c in df.columns]
         df = df.dropna(subset=["Close", "Open", "High", "Low"])
         if len(df) < 15:
             return None
-        c_arr = df["Close"].to_numpy(dtype=float)
-        h_arr = df["High"].to_numpy(dtype=float)
-        l_arr = df["Low"].to_numpy(dtype=float)
-        c_now = float(c_arr[-1])
-        h_now, l_now = float(h_arr[-1]), float(l_arr[-1])
-        prev_c = float(c_arr[-2])
-        n_len = len(c_arr)
+        c_now = float(df["Close"].iloc[-1])
+        h_now, l_now = float(df["High"].iloc[-1]), float(df["Low"].iloc[-1])
+        prev_c = float(df["Close"].iloc[-2])
         r_1d = round(((c_now - prev_c) / prev_c) * 100.0, 2)
-        r_1w = round(((c_now - c_arr[max(0, n_len - 6)]) / c_arr[max(0, n_len - 6)]) * 100.0, 2)
-        r_1m = round(((c_now - c_arr[max(0, n_len - 22)]) / c_arr[max(0, n_len - 22)]) * 100.0, 2)
-        r_3m = round(((c_now - c_arr[max(0, n_len - 64)]) / c_arr[max(0, n_len - 64)]) * 100.0, 2)
-        r_1y = round(((c_now - c_arr[0]) / c_arr[0]) * 100.0, 2)
-        dma20 = round(float(np.mean(c_arr[-20:])), 2)
-        dma50 = round(float(np.mean(c_arr[-50:])), 2) if n_len >= 50 else dma20
+        dma20 = round(float(df["Close"].tail(20).mean()), 2)
+        dma50 = round(float(df["Close"].tail(50).mean()), 2)
         avg_v = float(df["Volume"].iloc[-21:-1].mean()) if len(df) >= 21 else float(df["Volume"].mean())
         vol_r = round(float(df["Volume"].iloc[-1]) / avg_v, 2) if avg_v > 0 else 1.0
         rsi_v = round(calc_rsi(df["Close"], 14), 1)
         atr_v = round(max(float((df["High"].tail(14) - df["Low"].tail(14)).mean()), c_now * 0.015), 2)
-        sw_res = calculate_combined_swing_metrics(c_arr, h_arr, l_arr, r_1m, r_3m, r_1y, dma20, dma50, rsi_v, vol_r)
         return {
             "Ticker": full_tk, "Symbol": clean_s, "Sector": TICKER_TO_SECTOR.get(full_tk, "NSE Custom Stock"),
-            "Price": round(c_now, 2), "1D": r_1d, "1W": r_1w, "1M": r_1m, "3M": r_3m, "1Y": r_1y,
-            "RS_vs_Nifty": r_1d, "Vol_Ratio": vol_r, "RSI": rsi_v,
+            "Price": round(c_now, 2), "1D": r_1d, "RS_vs_Nifty": r_1d, "Vol_Ratio": vol_r, "RSI": rsi_v,
             "DMA20": dma20, "DMA50": dma50, "Above_20DMA": c_now >= dma20, "Above_50DMA": c_now >= dma50,
             "Consec_Up": 1, "Bull_Candle": "Live Custom Scan", "Bear_Candle": None,
             "Sec_1D": r_1d, "Sec_Peer_Up_Pct": 65.0, "Sec_Bull_Turn": r_1d > 0, "ATR": atr_v,
-            "Range_5W_Pct": sw_res["Range_5W_Pct"], "Prev_20W_High": sw_res["Prev_20W_High"],
-            "Dist_20W_High": sw_res["Dist_20W_High"], "Swing_Tag": sw_res["Swing_Tag"], "Swing_Score": sw_res["Swing_Score"],
-            "Action_Signal": sw_res["Swing_Tag"] if sw_res["Swing_Score"] >= 75 else ("🟢 Bullish Setup" if c_now >= dma20 else "⚖️ Watch"),
-            "Confidence": max(75, sw_res["Swing_Score"]) if c_now >= dma20 else 58,
+            "Action_Signal": "🟢 Bullish Setup" if (c_now >= dma20 and rsi_v >= 50) else "⚖️ Watch / Support",
+            "Confidence": 78 if c_now >= dma20 else 58,
             "Buy_Entry": round(max(c_now, h_now * 0.998), 2),
             "Buy_SL": round(min(l_now, c_now - 1.2 * atr_v), 2),
             "Buy_Target": round(c_now + 1.8 * atr_v, 2),
@@ -744,7 +641,7 @@ def generate_ai_stock_verdict(s_info: dict, n_d: dict, v_d: dict, adv_cnt: int, 
         tech_notes.append(f"🔥 High Volume Breakout ({s_info['Vol_Ratio']}x vs 20-day avg).")
     else:
         tech_pts += 5
-        tech_notes.append(f"📊 Volume Ratio: {s_info['Vol_Ratio']}x | 5W Range: {s_info.get('Range_5W_Pct', 15)}% | Swing: {s_info.get('Swing_Tag', 'Normal')}.")
+        tech_notes.append(f"📊 Volume Ratio is {s_info['Vol_Ratio']}x | RS vs Nifty: {s_info.get('RS_vs_Nifty', 0):+.2f}%.")
 
     mkt_pts, mkt_notes = 0, []
     peer_pct = s_info.get("Sec_Peer_Up_Pct", 50.0)
@@ -769,7 +666,7 @@ def generate_ai_stock_verdict(s_info: dict, n_d: dict, v_d: dict, adv_cnt: int, 
         verdict_badge = f"🟢 AI VERDICT ({sym}): YES — STRONG BUY SETUP (বুলিশ ট্রেড নেওয়া যেতে পারে)"
         verdict_color = "#10b981"
         bangla_summary = (
-            f"✅ **AI পজিশন গাইড ({sym}):** সেক্টর মুভমেন্ট, পিয়ার স্টক সমর্থন ({peer_pct:.0f}% Up) এবং চার্ট অনুযায়ী শেয়ারটি শক্তিশালী অবস্থানে আছে ({s_info.get('Swing_Tag', '')})। "
+            f"✅ **AI পজিশন গাইড ({sym}):** সেক্টর মুভমেন্ট, পিয়ার স্টক সমর্থন ({peer_pct:.0f}% Up) এবং চার্ট অনুযায়ী শেয়ারটি শক্তিশালী অবস্থানে আছে। "
             f"**ইন্ট্রাডে বা সুইং বাই পজিশন:** দাম **₹{s_info['Buy_Entry']}**-এর ওপরে থাকলে এন্ট্রি নিন | "
             f"**স্টপ-লস (SL):** ₹{s_info['Buy_SL']} | **টার্গেট ১:** ₹{round(s_info['Buy_Entry'] + 1.2*s_info['ATR'], 2)} | **টার্গেট ২:** ₹{s_info['Buy_Target']} | **নিরাপদ শেয়ার সংখ্যা (₹500 ঝুঁকিতে):** `{safe_q} টি`।"
         )
@@ -796,96 +693,6 @@ def generate_ai_stock_verdict(s_info: dict, n_d: dict, v_d: dict, adv_cnt: int, 
         "news_label": news_label, "headlines": headlines
     }
 
-def generate_conversational_ai_reply(user_msg: str, stocks_df: pd.DataFrame, sectors_df: pd.DataFrame, n_d: dict, b_d: dict, v_d: dict, adv_cnt: int, dec_cnt: int, gemini_key: str = "") -> str:
-    """
-    Lightweight Conversational AI Engine:
-    1. Detects any stock symbol or market/sector/swing question in user's message.
-    2. Fetches live technicals, swing metrics & Google News RSS.
-    3. If user provided an optional Gemini API Key, calls Gemini 2.5 Flash with live market context;
-       otherwise returns an instant, rich conversational Bangla response!
-    """
-    msg_up = user_msg.upper()
-    words = re.findall(r"[A-Z0-9&\-]{2,15}", msg_up)
-    stop_words = {"THE", "AND", "FOR", "BUY", "SELL", "WHAT", "HOW", "ABOUT", "NEWS", "STOCK", "SHARE", "PRICE", "TARGET", "SL", "ENTRY", "INTRADAY", "SWING", "TODAY", "MARKET", "NIFTY", "SECTOR", "GOOD", "BEST", "KEMON", "KI", "KOTO", "AJKE"}
-
-    matched_stock = None
-    # First check against our 415+ tracked symbols
-    known_syms = set(stocks_df["Symbol"].tolist())
-    for w in words:
-        if w in known_syms:
-            matched_stock = fetch_any_custom_stock_live(w, stocks_df)
-            break
-
-    # If not in known symbols, check if user typed a valid NSE ticker in English letters
-    if matched_stock is None:
-        for w in words:
-            if w not in stop_words and len(w) >= 3:
-                try_stk = fetch_any_custom_stock_live(w, stocks_df)
-                if try_stk is not None:
-                    matched_stock = try_stk
-                    break
-
-    top_secs = sectors_df.sort_values("1D", ascending=False).head(4)
-    top_swing = stocks_df.sort_values(["Swing_Score", "1D"], ascending=[False, False]).head(5)
-
-    # Optional Gemini LLM API call with live market context if user entered a free key
-    if gemini_key.strip():
-        try:
-            ctx_str = f"Live Market: Nifty {n_d['price']} ({n_d['1D']:+.2f}%), BankNifty {b_d['price']} ({b_d['1D']:+.2f}%), VIX {v_d['price']}, Breadth {adv_cnt} Up / {dec_cnt} Down.\n"
-            ctx_str += "Top Sectors Today: " + ", ".join([f"{r['Sector']} ({r['1D']:+.2f}%)" for _, r in top_secs.iterrows()]) + ".\n"
-            ctx_str += "Top Super Swing Stocks: " + ", ".join([f"{r['Symbol']} (₹{r['Price']}, {r['Swing_Tag']})" for _, r in top_swing.iterrows()]) + ".\n"
-            if matched_stock:
-                ai_v = generate_ai_stock_verdict(matched_stock, n_d, v_d, adv_cnt, dec_cnt)
-                ctx_str += f"Stock Data for {matched_stock['Symbol']}: Price ₹{matched_stock['Price']} (1D: {matched_stock['1D']:+.2f}%, 3M: {matched_stock.get('3M',0):+.1f}%, 1Y: {matched_stock.get('1Y',0):+.1f}%), RSI {matched_stock['RSI']}, Vol {matched_stock['Vol_Ratio']}x, 20DMA ₹{matched_stock['DMA20']}, 50DMA ₹{matched_stock['DMA50']}, Swing: {matched_stock.get('Swing_Tag','')}, Buy Above ₹{matched_stock['Buy_Entry']}, SL ₹{matched_stock['Buy_SL']}, Target ₹{matched_stock['Buy_Target']}. News: {ai_v['headlines'][:2]}"
-
-            api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_key.strip()}"
-            payload = {
-                "contents": [{"parts": [{"text": f"You are a friendly expert Indian stock market assistant talking in Bangla. Use this live market data:\n{ctx_str}\n\nUser Question: {user_msg}"}]}]
-            }
-            req = urllib.request.Request(api_url, data=json.dumps(payload).encode("utf-8"), headers={"Content-Type": "application/json"})
-            with urllib.request.urlopen(req, timeout=8) as resp:
-                res_json = json.loads(resp.read().decode("utf-8"))
-                llm_txt = res_json["candidates"][0]["content"]["parts"][0]["text"]
-                return llm_txt
-        except Exception:
-            pass
-
-    # Built-in Instant Conversational Reply (Works 100% Free without any API key!)
-    if matched_stock is not None:
-        ai_v = generate_ai_stock_verdict(matched_stock, n_d, v_d, adv_cnt, dec_cnt)
-        hl_txt = "\n".join([f"• 📰 *{h[0]}* ({h[1]})" for h in ai_v["headlines"][:3]]) if ai_v["headlines"] else "• 📰 গত ২৪ ঘণ্টায় বড় কোনো ব্রেকিং নিউজ নেই, শেয়ারটি টেকনিক্যাল ও সেক্টর ফ্লো অনুযায়ী চলছে।"
-        return (
-            f"### 🎯 **{matched_stock['Symbol']}** (`{matched_stock['Sector']}`) — লাইভ AI বিশ্লেষণ\n"
-            f"* **বর্তমান দাম:** `₹{matched_stock['Price']}` (**1D:** `{matched_stock['1D']:+.2f}%` | **3M:** `{matched_stock.get('3M', 0):+.1f}%` | **1Y:** `{matched_stock.get('1Y', 0):+.1f}%`)\n"
-            f"* **টেকনিক্যাল ও সুইং স্ট্যাটাস:** `{matched_stock.get('Swing_Tag', matched_stock['Action_Signal'])}` | **RSI:** `{matched_stock['RSI']}` | **Volume:** `{matched_stock['Vol_Ratio']}x` | **20-DMA:** `₹{matched_stock['DMA20']}` | **50-DMA:** `₹{matched_stock['DMA50']}`\n"
-            f"* **{ai_v['badge']} (Score: {ai_v['score']}/100)**\n\n"
-            f"{ai_v['bangla']}\n\n"
-            f"**📰 সর্বশেষ মার্কেট নিউজ ({ai_v['news_label']}):**\n{hl_txt}"
-        )
-
-    msg_low = user_msg.lower()
-    if any(k in msg_low for k in ["swing", "সুইং", "পজিশনাল", "ব্রেকআউট", "টার্ন", "turnaround", "কিনব", "সেরা"]):
-        sw_list = "\n".join([
-            f"• **{r['Symbol']}** (`{r['Sector']}`) — দাম: `₹{r['Price']}` ({r['1D']:+.2f}%) | **{r['Swing_Tag']}** | 🎯 Buy: `₹{r['Buy_Entry']}` | 🛑 SL: `₹{r['Buy_SL']}` | 🚀 Target: `₹{r['Buy_Target']}`"
-            for _, r in top_swing.iterrows()
-        ])
-        return (
-            f"### 💎 তোমার Chartink + Screener লজিক অনুযায়ী আজকের সেরা ৫টি Super Swing শেয়ার:\n"
-            f"{sw_list}\n\n"
-            f"💡 *যেকোনো নির্দিষ্ট শেয়ারের বিস্তারিত জানতে শুধু শেয়ারটির নাম লিখে (যেমন: `POLYCAB` বা `HAL`) মেসেজ দাও!*"
-        )
-
-    sec_list_txt = "\n".join([
-        f"• **{r['Sector']}** — আজকের রিটার্ন: `{r['1D']:+.2f}%` | 🤝 Peer Sync: `{r['Up_Count']}/{r['Count']} Up ({r['Peer_Up_Pct']:.0f}%)` | ⭐ টপ শেয়ার: **{r['Top_Pick']}**"
-        for _, r in top_secs.iterrows()
-    ])
-    return (
-        f"### 🧭 আজকের লাইভ মার্কেট ও সেক্টর আপডেট:\n"
-        f"* **Nifty 50:** `{n_d['price']:,.2f}` (`{n_d['1D']:+.2f}%`) | **Bank Nifty:** `{b_d['price']:,.2f}` (`{b_d['1D']:+.2f}%`) | **Market Breadth:** `🟢 {adv_cnt} Up` বনাম `🔴 {dec_cnt} Down`\n\n"
-        f"**🚀 আজকের সবচেয়ে শক্তিশালী সেক্টর:**\n{sec_list_txt}\n\n"
-        f"👉 *তুমি যেকোনো শেয়ারের নাম (যেমন: `SBIN`, `IREDA`, `TATAMOTORS`, `ULTRACEMCO`) লিখে মেসেজ করলেই আমি সাথে সাথে তার চার্ট, লাইভ নিউজ, এন্ট্রি, স্টপ-লস ও টার্গেট বলে দেব!*"
-    )
-
 def filter_next_day_intraday_stocks(stocks_df: pd.DataFrame):
     df = stocks_df.copy()
     b_cand = df[(df["Consec_Up"] <= 2) & (df["1D"] >= 0.0) & (df["1D"] <= 4.5) & (df["Vol_Ratio"] >= 1.05)].copy()
@@ -909,7 +716,7 @@ def filter_next_day_intraday_stocks(stocks_df: pd.DataFrame):
 # ==============================================================================
 # 6. LOAD CACHED DATA FIRST
 # ==============================================================================
-with st.spinner("⚡ Loading Market Intelligence & Combined Super Swing Engine..."):
+with st.spinner("⚡ Loading Market Intelligence..."):
     pulse = load_pulse_indices()
     base_stocks_df, base_sectors_df = load_full_market_data()
 
@@ -954,7 +761,7 @@ mkt_status_html = (
     f'<span style="color:#f59e0b;font-weight:700;">🕒 MARKET CLOSED ({ist_now.strftime("%a %I:%M %p IST")})</span>'
 )
 
-top_c1, top_c2, top_c3, top_c4, top_c5, top_c6 = st.columns([4.4, 1.5, 1.3, 1.25, 0.9, 0.65])
+top_c1, top_c2, top_c3, top_c4, top_c5, top_c6 = st.columns([4.5, 1.5, 1.2, 1.25, 0.9, 0.65])
 with top_c1:
     st.markdown(
         f'<a href="?nav_action=home&auto={get_auto_param()}" target="_self" class="brand-logo-link" title="Click to Reset All Filters & Return to Home">'
@@ -966,9 +773,8 @@ with top_c1:
 with top_c2:
     theme_mode = st.selectbox("Theme", ["🌙 Pro Dark (Slate)", "🌌 Cyber Neon (Violet)", "☀️ Clean Light (Day)"], index=0, label_visibility="collapsed")
 with top_c3:
-    if st.button("🤖 AI Live Chat", type="primary" if st.session_state.show_ai_helper else "secondary", use_container_width=True, help="Open Interactive AI Chat Box"):
+    if st.button("🤖 AI Search", use_container_width=True, help="Open AI Market Brief & Search Any Stock"):
         st.session_state.show_ai_helper = not st.session_state.show_ai_helper
-        st.rerun()
 with top_c4:
     alert_count = len(alert_vault["items"])
     if st.button(f"🔔 Alerts ({alert_count})", use_container_width=True, help="3-Layer Confirmed Intraday Alerts (9:15 AM – 3:30 PM)"):
@@ -1321,7 +1127,7 @@ with fc5:
         st.session_state.show_nse_heatmap = not st.session_state.show_nse_heatmap
 
 # ==============================================================================
-# 10.1 INTERACTIVE AI LIVE CHAT BOX (CHAT LIKE TALKING TO A FRIEND!)
+# 10.1 RESTORED CLEAN AI MARKET BRIEF + ANY-STOCK CUSTOM AI SEARCH ENGINE
 # ==============================================================================
 sectors_df["Is_Green_TF"] = sectors_df[tf_choice] >= 0
 turnaround_secs = sectors_df.sort_values(
@@ -1330,54 +1136,60 @@ turnaround_secs = sectors_df.sort_values(
 ).head(8)
 
 if st.session_state.show_ai_helper:
-    st.markdown('<div class="ai-verdict-box">', unsafe_allow_html=True)
-    ch_top1, ch_top2, ch_top3, ch_top4 = st.columns([5.2, 2.3, 1.3, 1.2])
-    with ch_top1:
-        st.markdown("#### 💬 AlphaPulse Live AI Chat — যেকোনো শেয়ার, নিউজ বা স্ট্র্যাটেজি নিয়ে সরাসরি চ্যাট করো")
-    with ch_top2:
-        st.session_state.gemini_api_key = st.text_input(
-            "Gemini API Key (Optional):",
-            value=st.session_state.gemini_api_key,
-            placeholder="Optional Gemini Key (Works Free Without Key too!)",
-            label_visibility="collapsed",
-            type="password"
+    top_turn_names = ", ".join([f"{r['Sector']} ({r[tf_choice]:+.2f}%)" for _, r in turnaround_secs.head(4).iterrows()])
+    top_bull_syms = ", ".join([f"{r['Symbol']} (₹{r['Price']}, Buy>{r['Entry']}, SL {r['SL']})" for _, r in bull_next8.head(4).iterrows()])
+    top_bear_syms = ", ".join([f"{r['Symbol']} (₹{r['Price']}, Short<{r['Entry']}, SL {r['SL']})" for _, r in bear_next8.head(3).iterrows()])
+
+    st.markdown('<div class="aligned-sec-hdr">🤖 AI Live Market Brief & Custom Stock Trade Finder</div>', unsafe_allow_html=True)
+    ai_b1, ai_b2 = st.columns([4.8, 5.2])
+    with ai_b1:
+        st.info(
+            f"🧭 **Market Summary:** Nifty {n_d['price']:,.2f} ({n_d['1D']:+.2f}%) | Bank Nifty {b_d['price']:,.2f} ({b_d['1D']:+.2f}%)\n\n"
+            f"🟢 **Top Performing Sectors ({tf_choice}):** {top_turn_names}\n\n"
+            f"🚀 **Top Bullish Intraday Picks:** {top_bull_syms}\n\n"
+            f"🔻 **Top Bearish Intraday Picks:** {top_bear_syms}"
         )
-    with ch_top3:
-        if st.button("🗑️ Clear Chat", use_container_width=True):
-            st.session_state.ai_chat_messages = [st.session_state.ai_chat_messages[0]]
-            st.rerun()
-    with ch_top4:
-        if st.button("✖ Close Chat", use_container_width=True):
+        if st.button("✖ Close AI Panel"):
             st.session_state.show_ai_helper = False
             st.rerun()
 
-    # Render Chat Conversation History inside a clean scrollable container
-    chat_box = st.container(height=310)
-    with chat_box:
-        for msg in st.session_state.ai_chat_messages:
-            with st.chat_message(msg["role"]):
-                st.markdown(msg["content"])
+    with ai_b2:
+        st.markdown("##### 🔍 Search Any NSE Stock for Instant AI Entry, SL & Target")
+        s_in1, s_in2, s_in3 = st.columns([5.2, 2.6, 2.2])
+        with s_in1:
+            custom_q = st.text_input("Type ANY NSE Symbol:", value=st.session_state.ai_custom_ticker, label_visibility="collapsed", placeholder="Type Stock Symbol (e.g. IREDA, SBIN, HAL)...")
+        with s_in2:
+            analyze_btn = st.button("🤖 AI Trade Plan", type="primary", use_container_width=True)
+        with s_in3:
+            open_chart_btn = st.button("📈 Open Chart", use_container_width=True)
 
-    # Interactive Chat Input Form
-    with st.form("ai_live_chat_form", clear_on_submit=True):
-        in_c1, in_c2 = st.columns([8.2, 1.8])
-        with in_c1:
-            user_chat_q = st.text_input(
-                "Ask AI:",
-                placeholder="এখানে লেখো... (যেমন: POLYCAB এর খবর কি? / SBIN কোথায় কিনব? / আজকের সেরা সুইং শেয়ার কোনগুলো?)",
-                label_visibility="collapsed"
-            )
-        with in_c2:
-            send_chat = st.form_submit_button("🚀 Send Message", type="primary", use_container_width=True)
-
-        if send_chat and user_chat_q.strip():
-            st.session_state.ai_chat_messages.append({"role": "user", "content": user_chat_q.strip()})
-            bot_ans = generate_conversational_ai_reply(
-                user_chat_q.strip(), stocks_df, sectors_df, n_d, b_d, v_d, adv_today, dec_today, st.session_state.gemini_api_key
-            )
-            st.session_state.ai_chat_messages.append({"role": "assistant", "content": bot_ans})
+        if analyze_btn and custom_q.strip():
+            st.session_state.ai_custom_ticker = custom_q.strip().upper()
+        if open_chart_btn and custom_q.strip():
+            st.session_state.ai_custom_ticker = custom_q.strip().upper()
+            st.session_state.selected_stock = custom_q.strip().upper().replace(".NS", "") + ".NS"
+            st.session_state.scroll_target = "stock-inspector-anchor"
             st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
+
+        if st.session_state.ai_custom_ticker:
+            c_data = fetch_any_custom_stock_live(st.session_state.ai_custom_ticker, stocks_df)
+            if c_data is None:
+                st.warning(f"⚠️ Could not find NSE symbol `{st.session_state.ai_custom_ticker}`. Please check spelling.")
+            else:
+                c_ai = generate_ai_stock_verdict(c_data, n_d, v_d, adv_today, dec_today)
+                st.markdown(
+                    f'<div class="ai-verdict-box" style="margin-top:4px;padding:10px 14px;">'
+                    f'<div style="display:flex;justify-content:space-between;align-items:center;">'
+                    f'<span style="font-weight:800;font-size:0.88rem;color:{c_ai["color"]};">{c_ai["badge"]}</span>'
+                    f'<span style="font-weight:800;font-size:0.76rem;color:{c_ai["color"]};">Score: {c_ai["score"]}/100</span>'
+                    f'</div>'
+                    f'<div style="font-size:0.78rem;margin:6px 0;color:{TEXT_MAIN};">{c_ai["bangla"]}</div>'
+                    f'<div class="r-plan">'
+                    f'<span style="color:#10b981;">🟢 Buy Above: ₹{c_data["Buy_Entry"]} | SL: ₹{c_data["Buy_SL"]} | Tgt: ₹{c_data["Buy_Target"]}</span>'
+                    f'<span style="color:#ef4444;">🔴 Short Below: ₹{c_data["Short_Entry"]} | SL: ₹{c_data["Short_SL"]}</span>'
+                    f'</div></div>',
+                    unsafe_allow_html=True
+                )
 
 # ==============================================================================
 # 10.2 NSE SECTORAL HEATMAP & BULLISH / BEARISH SECTOR RECOMMENDATION PANEL
@@ -1551,7 +1363,7 @@ if st.session_state.selected_stock != DEFAULT_STOCK:
         st.markdown("---")
         sp1, sp2, sp3 = st.columns([6.2, 2.0, 1.8])
         with sp1:
-            st.markdown(f"#### 🎯 Stock Inspector: **{sym_clean}** (`{s_info['Sector']}`) — ₹{p_now:,.2f} ({s_info['1D']:+.2f}% | {s_info.get('Swing_Tag', s_info['Action_Signal'])})")
+            st.markdown(f"#### 🎯 Stock Inspector: **{sym_clean}** (`{s_info['Sector']}`) — ₹{p_now:,.2f} ({s_info['1D']:+.2f}% | ⚡ RS: {s_info.get('RS_vs_Nifty', 0):+.2f}%)")
         with sp2:
             st.markdown(f'<a href="https://api.whatsapp.com/send?text={single_wa_txt}" target="_blank" class="wa-share-btn">📲 WhatsApp Setup</a>', unsafe_allow_html=True)
         with sp3:
@@ -1565,7 +1377,7 @@ if st.session_state.selected_stock != DEFAULT_STOCK:
             st.info(
                 f"🛡️ **Safety Checklist ({passed_cnt}/5 Passed):**\n\n"
                 f"{'✅' if chk_trend else '⚠️'} >50-DMA | {'✅' if chk_vol else '⚠️'} Vol ({s_info['Vol_Ratio']}x) | "
-                f"{'✅' if chk_rsi else '⚠️'} RSI ({s_info['RSI']}) | 5W Range: `{s_info.get('Range_5W_Pct', 15)}%`\n\n"
+                f"{'✅' if chk_rsi else '⚠️'} RSI ({s_info['RSI']}) | {'✅' if chk_streak else '⚠️'} Fresh Base\n\n"
                 f"📦 **Safe Qty (₹500 Risk):** `{safe_qty} Shares`"
             )
         with lv2:
@@ -1730,13 +1542,13 @@ if st.session_state.selected_stock != DEFAULT_STOCK:
         st.markdown("---")
 
 # ==============================================================================
-# 14. 4 ULTRA-FAST CONSOLIDATED TABS (WITH COMBINED SUPER SWING RADAR IN TAB 3)
+# 14. 4 ULTRA-FAST CONSOLIDATED TABS (SPEEDOMETERS EXPANDED BY DEFAULT + PREVIOUS SWING LOGIC)
 # ==============================================================================
 live_tab_badge = f"🟢 {len(bull_15m_df) + len(bear_15m_df)} Active" if is_mkt_open else "⏸️ Standby"
 tab1, tab2, tab3, tab4 = st.tabs([
     f"🔄 1. {len(SECTOR_STOCKS)} Sector Viewer & Gauges",
     f"⚡ 2. 3-Layer Live Intraday Finder ({live_tab_badge})",
-    "💎 3. Super Swing Radar (Chartink + Screener)",
+    "💎 3. Swing & Positional Radar",
     f"📋 4. All {len(SECTOR_STOCKS)} Sectors Matrix"
 ])
 
@@ -1786,7 +1598,7 @@ with tab1:
         else:
             st.markdown(
                 '<div class="master-viewer-bar">'
-                '<span>👈 <b>Master Sector Stock Viewer:</b> বাম পাশের ড্রপডাউন বা উপরের যেকোনো সেক্টর কার্ডে ক্লিক করলে শেয়ার লিস্ট খুলবে</span>'
+                '<span>👈 <b>Master Sector Stock Viewer:</b> বাম পাশের ড্রপডাউন বা নিচের যেকোনো সেক্টর কার্ডে ক্লিক করলে শেয়ার লিস্ট খুলবে</span>'
                 '</div>',
                 unsafe_allow_html=True
             )
@@ -1794,12 +1606,13 @@ with tab1:
     if st.session_state.inspect_sector != EMPTY_VIEWER:
         active_sec_stocks = stocks_df[stocks_df["Sector"] == st.session_state.inspect_sector].sort_values(tf_choice, ascending=False)
         render_safe_table(
-            active_sec_stocks[["Symbol", "Price", "1D", "RS_vs_Nifty", "1W", "1M", "3M", "1Y", "Vol_Ratio", "RSI", "Swing_Tag", "Buy_Entry", "Buy_SL", "Buy_Target"]],
-            ["1D", "RS_vs_Nifty", "1W", "1M", "3M", "1Y"]
+            active_sec_stocks[["Symbol", "Price", "1D", "RS_vs_Nifty", "1W", "1M", "Vol_Ratio", "RSI", "Action_Signal", "Buy_Entry", "Buy_SL", "Buy_Target"]],
+            ["1D", "RS_vs_Nifty", "1W", "1M"]
         )
         st.markdown(make_stock_pills(active_sec_stocks, tf_choice), unsafe_allow_html=True)
 
-    with st.expander(f"🎛️ View All {len(f_secs)} Sectors Speedometers & Sequence Cards (Sorted: Green Top ➔ Down in {tf_choice}) — Click to Open", expanded=False):
+    # KEPT EXPANDED=TRUE SO SPEEDOMETERS ALWAYS STAY VISIBLE LIKE SCREENSHOT 1!
+    with st.expander(f"🎛️ View All {len(f_secs)} Sectors Speedometers & Sequence Cards (Sorted: Green Top ➔ Down in {tf_choice})", expanded=True):
         gauge_cards_html = "".join([make_svg_speedometer_card(s_row, tf_choice) for _, s_row in f_secs.iterrows()])
         st.markdown(f'<div class="sector-grid-wrap">{gauge_cards_html}</div>', unsafe_allow_html=True)
 
@@ -1849,54 +1662,39 @@ with tab2:
     st.success(f"✅ **Max Safe Loss:** ₹{max_loss:,.0f} &nbsp;|&nbsp; 📦 **Safe Quantity:** `{int(max_loss / diff) if diff > 0 else 0} Shares` &nbsp;|&nbsp; 🎯 **1:2 Target:** `₹{(ent_p + 2*diff if ent_p >= sl_p else ent_p - 2*diff):,.2f}`")
 
 # ==============================================================================
-# TAB 3: SUPER-ACCURATE COMBINED SWING SCANNER (CHARTINK + SCREENER.IN LOGIC)
+# TAB 3: RESTORED PROVEN SWING LOGIC (PULLBACK TO 20-DMA + OVERSOLD 1M RECOVERY)
 # ==============================================================================
 with tab3:
-    st.markdown(
-        '<div class="aligned-sec-hdr">'
-        '💎 Combined Super Swing Scanner — Engine 1: Chartink (5W Tight Range <=18% + 20W High Breakout + >20SMA + RSI>=56) | '
-        'Engine 2: Screener.in (1Y < 16% + 3M >= 12% + Price > 50-DMA)'
-        '</div>',
-        unsafe_allow_html=True
-    )
     sw1, sw2 = st.columns(2)
     with sw1:
-        st.markdown('<div class="aligned-sec-hdr">🚀 1. Chartink Tight-Base & 20-Week Breakout Picks</div>', unsafe_allow_html=True)
-        chartink_df = stocks_df[stocks_df["Chartink_Swing"]].sort_values(["Swing_Score", "1D", "Vol_Ratio"], ascending=[False, False, False])
-        if chartink_df.empty:
-            chartink_df = stocks_df[
-                (stocks_df["Above_20DMA"]) & (stocks_df["Range_5W_Pct"] <= 20.0) & (stocks_df["RSI"] >= 54.0)
-            ].sort_values(["Dist_20W_High", "1D"], ascending=[False, False]).head(18)
+        st.markdown('<div class="aligned-sec-hdr">🚀 Safe Trend Pullback Picks (>50-DMA & Near 20-DMA Support)</div>', unsafe_allow_html=True)
+        sp_df = stocks_df[(stocks_df["Above_50DMA"]) & (stocks_df["Dist_20DMA"].between(-3.0, 4.5)) & (stocks_df["RSI"].between(44, 64))].sort_values([tf_choice, "Vol_Ratio"], ascending=[False, False]).head(18)
         render_safe_table(
-            chartink_df[["Symbol", "Sector", "Price", "1D", "Range_5W_Pct", "Prev_20W_High", "Dist_20W_High", "RSI", "Vol_Ratio", "Swing_Tag", "Buy_Entry", "Buy_SL", "Buy_Target"]],
-            ["1D", "Dist_20W_High"],
+            sp_df[["Symbol", "Sector", "Price", "1D", "RS_vs_Nifty", "1W", "Vol_Ratio", "RSI", "Buy_Entry", "Buy_SL", "Buy_Target"]],
+            ["1D", "RS_vs_Nifty", "1W"],
             height=420
         )
-        st.markdown(make_stock_pills(chartink_df, "1D"), unsafe_allow_html=True)
-
+        st.markdown(make_stock_pills(sp_df, tf_choice), unsafe_allow_html=True)
     with sw2:
-        st.markdown('<div class="aligned-sec-hdr">🔄 2. Screener.in Bottom-Out Turnaround Picks (1Y < 16% & 3M >= 12% + >50DMA)</div>', unsafe_allow_html=True)
-        screener_df = stocks_df[stocks_df["Screener_Swing"]].sort_values(["3M", "1D", "Vol_Ratio"], ascending=[False, False, False])
-        if screener_df.empty:
-            screener_df = stocks_df[
-                (stocks_df["1Y"] < 18.0) & (stocks_df["3M"] >= 6.0) & (stocks_df["Above_50DMA"])
-            ].sort_values(["3M", "1D"], ascending=[False, False]).head(18)
+        st.markdown('<div class="aligned-sec-hdr">🌱 Bottom Turnaround Value Picks (Oversold Recovery Today)</div>', unsafe_allow_html=True)
+        vr_df = stocks_df[(stocks_df["1M"] < 0) & (stocks_df["1D"] > 0) & (stocks_df["RSI"] <= 55)].sort_values(["1D", "Vol_Ratio"], ascending=[False, False]).head(18)
         render_safe_table(
-            screener_df[["Symbol", "Sector", "Price", "1D", "3M", "1Y", "DMA50", "RSI", "Vol_Ratio", "Swing_Tag", "Buy_Entry", "Buy_SL", "Buy_Target"]],
-            ["1D", "3M", "1Y"],
+            vr_df[["Symbol", "Sector", "Price", "1D", "RS_vs_Nifty", "1M", "Vol_Ratio", "RSI", "Buy_Entry", "Buy_SL", "Buy_Target"]],
+            ["1D", "RS_vs_Nifty", "1M"],
             height=420
         )
-        st.markdown(make_stock_pills(screener_df, "3M"), unsafe_allow_html=True)
-
+        st.markdown(make_stock_pills(vr_df, "1D"), unsafe_allow_html=True)
     st.markdown("---")
-    st.download_button(f"📥 Download Complete {len(ALL_TICKERS)}+ Nifty 500 Stocks Report (CSV / Excel)", data=stocks_df.sort_values("Swing_Score", ascending=False).to_csv(index=False).encode("utf-8"), file_name="alphapulse_super_swing_report.csv", mime="text/csv", use_container_width=True)
+    st.download_button(f"📥 Download Complete {len(ALL_TICKERS)}+ Nifty 500 Stocks Report (CSV / Excel)", data=stocks_df.sort_values(tf_choice, ascending=False).to_csv(index=False).encode("utf-8"), file_name="alphapulse_nifty500_report.csv", mime="text/csv", use_container_width=True)
 
 with tab4:
     chart_secs = sectors_df.sort_values(tf_choice, ascending=True)
     fig_b = go.Figure(go.Bar(x=chart_secs[tf_choice], y=chart_secs["Sector"], orientation="h", marker_color=["#10b981" if v >= 0 else "#ef4444" for v in chart_secs[tf_choice]], text=[f"{v:+.2f}%" for v in chart_secs[tf_choice]], textposition="outside"))
     fig_b.update_layout(height=860, template="plotly_dark" if "Clean Light" not in theme_mode else "plotly_white", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=10, r=40, t=15, b=10), font=dict(color=TEXT_MAIN))
     st.plotly_chart(fig_b, use_container_width=True)
-    render_safe_table(sectors_df.sort_values(tf_choice, ascending=False)[["Sector", "Zone", tf_choice, "Sec_RS", "Peer_Up_Pct", "1D", "1W", "1M", "3M", "1Y", "Avg_Vol", "RSI", "Top_Pick"]], [tf_choice, "Sec_RS", "1D", "1W", "1M", "3M", "1Y"])
+    # Fixed duplicate column bug when tf_choice == '1D'
+    mat_cols = list(dict.fromkeys(["Sector", "Zone", tf_choice, "Sec_RS", "Peer_Up_Pct", "1D", "1W", "1M", "3M", "Avg_Vol", "RSI", "Top_Pick"]))
+    render_safe_table(sectors_df.sort_values(tf_choice, ascending=False)[mat_cols], [tf_choice, "Sec_RS", "1D", "1W", "1M", "3M"])
 
 # ==============================================================================
 # 15. FLOATING ‘🚀 Top’ BUTTON & PERSISTENT AUTO-SCAN ENGINE
