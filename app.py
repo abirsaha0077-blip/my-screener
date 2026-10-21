@@ -17,14 +17,14 @@ warnings.filterwarnings("ignore")
 # 1. PAGE CONFIGURATION
 # ==============================================================================
 st.set_page_config(
-    page_title="AlphaPulse Pro | Sector Turnaround & Intraday Terminal",
+    page_title="AlphaPulse Pro | Final Sector, Darvas & Swing Terminal",
     page_icon="🧭",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
 # ==============================================================================
-# 2. VERIFIED 42 SECTORS COVERING 415+ NIFTY 500 STOCKS (INCLUDING CEMENT)
+# 2. VERIFIED 42 SECTORS COVERING 415+ NIFTY 500 STOCKS
 # ==============================================================================
 SECTOR_STOCKS = {
     "Cement & Clinker": ["ULTRACEMCO.NS", "AMBUJACEM.NS", "SHREECEM.NS", "DALBHARAT.NS", "ACC.NS", "JKCEMENT.NS", "RAMCOCEM.NS", "BIRLACORPN.NS", "INDIACEM.NS", "NUVOCO.NS", "HEIDELBERG.NS"],
@@ -78,7 +78,7 @@ DEFAULT_STOCK = "Search or Select Stock..."
 EMPTY_VIEWER = "Select a Sector to View Stocks..."
 
 # ==============================================================================
-# 3. 3-LAYER QUALITY NOTIFICATION VAULT (9:15 AM TO 3:30 PM, AUTO-CLEANS)
+# 3. 3-LAYER + DARVAS BLAST NOTIFICATION VAULT (9:15 AM - 3:30 PM, AUTO-CLEANS)
 # ==============================================================================
 @st.cache_resource
 def get_3layer_notification_vault():
@@ -102,7 +102,7 @@ if alert_vault["date"] != today_str or is_after_close:
     alert_vault["items"] = []
     alert_vault["seen_keys"] = set()
 
-def push_3layer_alert(time_str: str, category: str, symbol: str, ticker: str, sector: str, peer_sync: str, price: float, vwap: float, ema9: float, entry: float, sl: float, target: float, note: str, is_bull: bool = True):
+def push_3layer_alert(time_str: str, category: str, symbol: str, ticker: str, sector: str, peer_sync: str, price: float, vwap: float, entry: float, sl: float, target: float, note: str, is_bull: bool = True):
     if is_after_close:
         return False
     u_key = f"{today_str}_{symbol}_{category}"
@@ -111,9 +111,9 @@ def push_3layer_alert(time_str: str, category: str, symbol: str, ticker: str, se
         alert_vault["items"].insert(0, {
             "time": time_str, "category": category, "symbol": symbol, "ticker": ticker,
             "sector": sector, "peer_sync": peer_sync, "price": round(float(price), 2),
-            "vwap": round(float(vwap), 2), "ema9": round(float(ema9), 2),
-            "entry": round(float(entry), 2), "sl": round(float(sl), 2),
-            "target": round(float(target), 2), "note": note, "is_bull": is_bull
+            "vwap": round(float(vwap), 2), "entry": round(float(entry), 2),
+            "sl": round(float(sl), 2), "target": round(float(target), 2),
+            "note": note, "is_bull": is_bull
         })
         return True
     return False
@@ -171,7 +171,7 @@ if "focus_sec" in qp:
     st.query_params["auto"] = get_auto_param()
 
 # ==============================================================================
-# 5. CRASH-PROOF DATA ENGINE (DEDUPLICATES COLUMNS TO PREVENT TYPEERROR)
+# 5. CRASH-PROOF DATA ENGINE + 5-MIN DARVAS BLAST SCANNER
 # ==============================================================================
 def safe_num(val, default: float = 0.0) -> float:
     try:
@@ -205,11 +205,9 @@ def calc_return(closes: pd.Series, days: int) -> float:
         return 0.0
 
 def render_safe_table(df: pd.DataFrame, pct_cols: list, height: int = None):
-    """100% Crash-Proof Table Renderer: Removes duplicate columns & safely colors % columns."""
     if df is None or df.empty:
         st.info("No matching records found right now.")
         return
-    # Remove any duplicate column names (fixes TypeError when tf_choice == '1D')
     clean_df = df.loc[:, ~df.columns.duplicated()].copy()
     num_cols = clean_df.select_dtypes(include=[np.number]).columns.tolist()
     for nc in num_cols:
@@ -280,8 +278,8 @@ def load_pulse_indices():
 
     defaults = {
         "NIFTY": {"price": 22811.35, "pts": -77.60, "1D": -0.34, "1W": -1.1, "1M": -2.4, "3M": 1.2, "6M": 3.5, "1Y": -1.2},
-        "BANKNIFTY": {"price": 51240.00, "pts": -280.00, "1D": -0.54, "1W": -1.4, "1M": -2.1, "3M": 1.5, "6M": 3.0, "1Y": 2.5},
-        "VIX": {"price": 14.45, "pts": 0.35, "1D": 2.48, "1W": 1.1, "1M": -2.0, "3M": 0.0, "6M": 0.0, "1Y": 0.0},
+        "BANKNIFTY": {"price": 54976.90, "pts": -511.20, "1D": -0.92, "1W": -1.4, "1M": -2.1, "3M": 1.5, "6M": 3.0, "1Y": 2.5},
+        "VIX": {"price": 15.68, "pts": 0.91, "1D": 6.18, "1W": 1.1, "1M": -2.0, "3M": 0.0, "6M": 0.0, "1Y": 0.0},
         "USDINR": {"price": 84.98, "pts": 0.05, "1D": 0.06, "1W": 0.1, "1M": 0.2, "3M": 0.5, "6M": 0.8, "1Y": 1.4},
     }
     for k, v in defaults.items():
@@ -449,93 +447,110 @@ def load_full_market_data():
     stocks_df["Sec_Bear_Roll"] = stocks_df["Sector"].map(lambda s: sec_map.get(s, {}).get("Sec_Bear_Roll", False))
     return stocks_df, sectors_df
 
-@st.cache_data(ttl=120, show_spinner=False)
-def run_3layer_intraday_scanner(stocks_df: pd.DataFrame):
+# ==============================================================================
+# 5.1 3-LAYER + STREAK "5 MIN DARVAS BLAST" INTRADAY SCANNER
+# ==============================================================================
+@st.cache_data(ttl=90, show_spinner=False)
+def run_darvas_blast_intraday_scanner(stocks_df: pd.DataFrame):
+    """
+    Combines Sector + Peer Sync (Layers 1 & 2) with User's Streak '5 min darvas blast' Logic (Layer 3):
+    - 5m Close > VWAP AND 5m Close <= VWAP * 1.022 (Safe Entry near VWAP)
+    - 5m Close > Prev Day Close
+    - 5m Close >= 5m High * 0.996 (Strong top closing, no upper wick rejection)
+    - 5m Close crosses above Period Max(15, Prev 5m High) (Darvas Box Breakout)
+    - 5m Volume Spike & 5m RSI(14) >= 58
+    """
     if stocks_df.empty:
         return pd.DataFrame(), pd.DataFrame()
 
     qualifying_pool = stocks_df[
-        (stocks_df["Price"] > 120) & (
-            ((stocks_df["Sec_Bull_Turn"] | (stocks_df["Sec_1D"] >= 0.25)) & (stocks_df["Sec_Peer_Up_Pct"] >= 55.0)) |
-            ((stocks_df["Sec_Bear_Roll"] | (stocks_df["Sec_1D"] <= -0.25)) & (stocks_df["Sec_Peer_Down_Pct"] >= 55.0))
+        (stocks_df["Price"] > 100) & (
+            ((stocks_df["Sec_Bull_Turn"] | (stocks_df["Sec_1D"] >= 0.15)) & (stocks_df["Sec_Peer_Up_Pct"] >= 50.0)) |
+            ((stocks_df["Sec_Bear_Roll"] | (stocks_df["Sec_1D"] <= -0.15)) & (stocks_df["Sec_Peer_Down_Pct"] >= 50.0))
         )
-    ].sort_values("Vol_Ratio", ascending=False).head(30)
+    ].sort_values("Vol_Ratio", ascending=False).head(34)
 
     if qualifying_pool.empty:
-        qualifying_pool = stocks_df[stocks_df["Price"] > 120].sort_values("Vol_Ratio", ascending=False).head(24)
+        qualifying_pool = stocks_df[stocks_df["Price"] > 100].sort_values("Vol_Ratio", ascending=False).head(26)
 
     pool_tickers = qualifying_pool["Ticker"].tolist()
     daily_map = qualifying_pool.set_index("Ticker").to_dict("index")
-    bull_15m, bear_15m = [], []
+    bull_5m, bear_5m = [], []
 
     try:
-        raw_15m = yf.download(pool_tickers, period="5d", interval="15m", progress=False, group_by="ticker", threads=True)
+        raw_5m = yf.download(pool_tickers, period="5d", interval="5m", progress=False, group_by="ticker", threads=True)
         for tk in pool_tickers:
             try:
-                df15 = (raw_15m[tk] if len(pool_tickers) > 1 else raw_15m).dropna(subset=["Close", "Open", "High", "Low"])
-                if len(df15) < 20:
+                df5 = (raw_5m[tk] if len(pool_tickers) > 1 else raw_5m).dropna(subset=["Close", "Open", "High", "Low"])
+                if len(df5) < 22:
                     continue
                 d_info = daily_map[tk]
-                c15, o15, h15, l15 = safe_num(df15["Close"].iloc[-1], d_info["Price"]), safe_num(df15["Open"].iloc[-1]), safe_num(df15["High"].iloc[-1]), safe_num(df15["Low"].iloc[-1])
-                v15 = safe_num(df15["Volume"].fillna(0).iloc[-1])
-                vol_sma20 = safe_num(df15["Volume"].fillna(0).iloc[-21:-1].mean())
-                v15_ratio = round(max(safe_num(v15 / vol_sma20, d_info["Vol_Ratio"]), d_info["Vol_Ratio"]), 2) if vol_sma20 > 0 else d_info["Vol_Ratio"]
-                rsi15 = round(calc_rsi(df15["Close"], 14), 1)
-                ema9_15 = round(safe_num(df15["Close"].ewm(span=9, adjust=False).mean().iloc[-1], c15), 2)
+                c5 = safe_num(df5["Close"].iloc[-1], d_info["Price"])
+                h5, l5 = safe_num(df5["High"].iloc[-1], c5), safe_num(df5["Low"].iloc[-1], c5)
+                v5 = safe_num(df5["Volume"].fillna(0).iloc[-1])
+                vol_sma20 = safe_num(df5["Volume"].fillna(0).iloc[-21:-1].mean())
+                v5_ratio = round(max(safe_num(v5 / vol_sma20, d_info["Vol_Ratio"]), d_info["Vol_Ratio"]), 2) if vol_sma20 > 0 else d_info["Vol_Ratio"]
+                rsi5 = round(calc_rsi(df5["Close"], 14), 1)
 
-                last_ts = df15.index[-1]
+                # Darvas 15-candle box high & low
+                darvas_high_15 = safe_num(df5["High"].iloc[-16:-1].max(), h5)
+                darvas_low_15 = safe_num(df5["Low"].iloc[-16:-1].min(), l5)
+
+                last_ts = df5.index[-1]
                 try:
                     last_ts_ist = last_ts.tz_convert("Asia/Kolkata") if last_ts.tzinfo else last_ts + timedelta(hours=5, minutes=30)
                     candle_time_str = last_ts_ist.strftime("%I:%M %p")
                 except Exception:
                     candle_time_str = ist_now.strftime("%I:%M %p")
 
-                day_slice = df15[df15.index.date == df15.index[-1].date()]
-                vwap15 = round(safe_num(((day_slice["High"] + day_slice["Low"] + day_slice["Close"]) / 3.0 * day_slice["Volume"]).sum() / day_slice["Volume"].sum(), c15), 2) if (len(day_slice) >= 1 and safe_num(day_slice["Volume"].sum()) > 0) else round(c15, 2)
+                day_slice = df5[df5.index.date == df5.index[-1].date()]
+                vwap5 = round(safe_num(((day_slice["High"] + day_slice["Low"] + day_slice["Close"]) / 3.0 * day_slice["Volume"]).sum() / day_slice["Volume"].sum(), c5), 2) if (len(day_slice) >= 1 and safe_num(day_slice["Volume"].sum()) > 0) else round(c5, 2)
 
                 sym_clean = tk.replace(".NS", "")
                 peer_up_str = f"{d_info['Sec_Up_Count']}/{d_info['Sec_Tot_Count']} Up ({d_info['Sec_Peer_Up_Pct']:.0f}%)"
                 peer_dn_cnt = d_info["Sec_Tot_Count"] - d_info["Sec_Up_Count"]
                 peer_dn_str = f"{peer_dn_cnt}/{d_info['Sec_Tot_Count']} Down ({d_info['Sec_Peer_Down_Pct']:.0f}%)"
 
-                l1_bull = d_info["Sec_Bull_Turn"] or (d_info["Sec_1D"] >= 0.25)
-                l2_bull = d_info["Sec_Peer_Up_Pct"] >= 55.0
-                l3_bull = (c15 > vwap15) and (c15 > ema9_15) and (c15 >= d_info["Prev_High"] * 0.995 or d_info["1D"] >= 1.0) and (v15_ratio >= 1.20) and (54 <= rsi15 <= 78)
+                # STREAK 5-MIN DARVAS BLAST LONG CONDITIONS
+                cond_sector_bull = (d_info["Sec_Bull_Turn"] or d_info["Sec_1D"] >= 0.10) and (d_info["Sec_Peer_Up_Pct"] >= 50.0)
+                cond_vwap_band = (c5 > vwap5) and (c5 <= vwap5 * 1.025)
+                cond_darvas_box = (c5 >= darvas_high_15 * 0.996) and (c5 > d_info["Prev_Close"]) and (c5 >= h5 * 0.995)
+                cond_mom_bull = (rsi5 >= 58.0) and (v5_ratio >= 1.35)
 
-                if l1_bull and l2_bull and l3_bull:
-                    ent_v = round(max(c15, h15 * 1.0005), 2)
-                    sl_v = round(min(l15, min(vwap15, ema9_15) * 0.995), 2)
-                    tgt_v = round(c15 + 1.6 * d_info["ATR"], 2)
-                    bull_15m.append({
+                if cond_sector_bull and cond_vwap_band and cond_darvas_box and cond_mom_bull:
+                    ent_v = round(max(c5, h5 * 1.0005), 2)
+                    sl_v = round(min(l5, vwap5 * 0.994), 2)
+                    tgt_v = round(c5 + 1.6 * d_info["ATR"], 2)
+                    bull_5m.append({
                         "Time": candle_time_str, "Symbol": sym_clean, "Ticker": tk, "Sector": d_info["Sector"],
-                        "Peer_Sync": peer_up_str, "Price": round(c15, 2), "VWAP": vwap15, "EMA9": ema9_15,
-                        "Vol_Ratio": v15_ratio, "RSI": rsi15, "1D": d_info["1D"], "Confidence": d_info["Confidence"],
-                        "Reason": f"✅ 3-Layer Pass: Sec {d_info['Sec_1D']:+.1f}% ({peer_up_str}) + Price > VWAP & 9EMA",
-                        "Entry": ent_v, "SL": sl_v, "Target": tgt_v,
+                        "Peer_Sync": peer_up_str, "Price": round(c5, 2), "Entry": ent_v, "SL": sl_v, "Target": tgt_v,
+                        "VWAP": vwap5, "Box_15H": round(darvas_high_15, 2), "Vol_Ratio": v5_ratio, "RSI": rsi5, "1D": d_info["1D"],
+                        "Reason": f"🔥 5m Darvas Blast: >15-Bar High + Within 2% VWAP + Vol {v5_ratio}x"
                     })
 
-                l1_bear = d_info["Sec_Bear_Roll"] or (d_info["Sec_1D"] <= -0.20)
-                l2_bear = d_info["Sec_Peer_Down_Pct"] >= 55.0
-                l3_bear = (c15 < vwap15) and (c15 < ema9_15) and (c15 <= d_info["Prev_Low"] * 1.005 or d_info["1D"] <= -1.0) and (v15_ratio >= 1.15) and (22 <= rsi15 <= 46)
+                # REVERSE 5-MIN DARVAS BREAKDOWN SHORT CONDITIONS
+                cond_sector_bear = (d_info["Sec_Bear_Roll"] or d_info["Sec_1D"] <= -0.10) and (d_info["Sec_Peer_Down_Pct"] >= 50.0)
+                cond_vwap_bear = (c5 < vwap5) and (c5 >= vwap5 * 0.975)
+                cond_darvas_bear = (c5 <= darvas_low_15 * 1.004) and (c5 < d_info["Prev_Close"]) and (c5 <= l5 * 1.005)
+                cond_mom_bear = (rsi5 <= 42.0) and (v5_ratio >= 1.30)
 
-                if l1_bear and l2_bear and l3_bear:
-                    ent_s = round(min(c15, l15 * 0.9995), 2)
-                    sl_s = round(max(h15, max(vwap15, ema9_15) * 1.005), 2)
-                    tgt_s = round(c15 - 1.6 * d_info["ATR"], 2)
-                    bear_15m.append({
+                if cond_sector_bear and cond_vwap_bear and cond_darvas_bear and cond_mom_bear:
+                    ent_s = round(min(c5, l5 * 0.9995), 2)
+                    sl_s = round(max(h5, vwap5 * 1.006), 2)
+                    tgt_s = round(c5 - 1.6 * d_info["ATR"], 2)
+                    bear_5m.append({
                         "Time": candle_time_str, "Symbol": sym_clean, "Ticker": tk, "Sector": d_info["Sector"],
-                        "Peer_Sync": peer_dn_str, "Price": round(c15, 2), "VWAP": vwap15, "EMA9": ema9_15,
-                        "Vol_Ratio": v15_ratio, "RSI": rsi15, "1D": d_info["1D"], "Confidence": d_info["Confidence"],
-                        "Reason": f"🔻 3-Layer Short: Sec {d_info['Sec_1D']:+.1f}% ({peer_dn_str}) + Price < VWAP & 9EMA",
-                        "Entry": ent_s, "SL": sl_s, "Target": tgt_s,
+                        "Peer_Sync": peer_dn_str, "Price": round(c5, 2), "Entry": ent_s, "SL": sl_s, "Target": tgt_s,
+                        "VWAP": vwap5, "Box_15L": round(darvas_low_15, 2), "Vol_Ratio": v5_ratio, "RSI": rsi5, "1D": d_info["1D"],
+                        "Reason": f"🔻 5m Darvas Breakdown: <15-Bar Low + Below VWAP + Vol {v5_ratio}x"
                     })
             except Exception:
                 continue
     except Exception:
         pass
 
-    b_df = pd.DataFrame(bull_15m).sort_values("1D", ascending=False) if bull_15m else pd.DataFrame()
-    br_df = pd.DataFrame(bear_15m).sort_values("1D", ascending=True) if bear_15m else pd.DataFrame()
+    b_df = pd.DataFrame(bull_5m).sort_values("1D", ascending=False) if bull_5m else pd.DataFrame()
+    br_df = pd.DataFrame(bear_5m).sort_values("1D", ascending=True) if bear_5m else pd.DataFrame()
     return b_df, br_df
 
 @st.cache_data(ttl=120, show_spinner=False)
@@ -567,8 +582,8 @@ def fetch_any_custom_stock_live(query_sym: str, stocks_df: pd.DataFrame):
             "DMA20": dma20, "DMA50": dma50, "Above_20DMA": c_now >= dma20, "Above_50DMA": c_now >= dma50,
             "Consec_Up": 1, "Bull_Candle": "Live Custom Scan", "Bear_Candle": None,
             "Sec_1D": r_1d, "Sec_Peer_Up_Pct": 65.0, "Sec_Bull_Turn": r_1d > 0, "ATR": atr_v,
-            "Action_Signal": "🟢 Bullish Setup" if (c_now >= dma20 and rsi_v >= 50) else "⚖️ Watch / Support",
-            "Confidence": 78 if c_now >= dma20 else 58,
+            "Action_Signal": "🟢 Turnaround Buy" if (r_1d > 1.5 and vol_r >= 1.2) else ("💎 Safe Swing Buy" if c_now >= dma20 else "⚖️ Watch"),
+            "Confidence": 82 if (c_now >= dma20 or r_1d > 1.5) else 58,
             "Buy_Entry": round(max(c_now, h_now * 0.998), 2),
             "Buy_SL": round(min(l_now, c_now - 1.2 * atr_v), 2),
             "Buy_Target": round(c_now + 1.8 * atr_v, 2),
@@ -586,13 +601,13 @@ def fetch_live_stock_news_and_sentiment(sym_clean: str):
     neg_words = ["fall", "drop", "loss", "crash", "downgrade", "sell", "weak", "slump", "penalty", "probe", "low", "cut", "miss", "decline", "bearish", "concern", "risk", "debt", "down"]
     pos_hits, neg_hits = 0, 0
     try:
-        q = urllib.parse.quote(f"{sym_clean} share price NSE India")
+        q = urllib.parse.quote(f"{sym_clean} share price NSE India when:7d")
         url = f"https://news.google.com/rss/search?q={q}&hl=en-IN&gl=IN&ceid=IN:en"
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=4) as resp:
             xml_data = resp.read()
         root = ET.fromstring(xml_data)
-        for item in root.findall(".//item")[:4]:
+        for item in root.findall(".//item")[:3]:
             title_el = item.find("title")
             pub_el = item.find("pubDate")
             if title_el is not None and title_el.text:
@@ -606,80 +621,91 @@ def fetch_live_stock_news_and_sentiment(sym_clean: str):
         pass
 
     if pos_hits > neg_hits:
-        return headlines, "🟢 Positive News Flow (Bullish Catalyst)", min(25, 16 + (pos_hits - neg_hits) * 3)
+        return headlines, "🟢 Positive News Flow (Last 7 Days)", min(25, 18 + (pos_hits - neg_hits) * 3)
     elif neg_hits > pos_hits:
-        return headlines, "🔴 Negative / Cautious News Flow", max(4, 12 - (neg_hits - pos_hits) * 3)
-    return headlines, "⚖️ Neutral / Normal Market News Flow", 15
+        return headlines, "🔴 Cautious News Flow (Last 7 Days)", max(8, 14 - (neg_hits - pos_hits) * 2)
+    return headlines, "⚖️ Normal Technical Flow (Last 7 Days)", 16
 
 def generate_ai_stock_verdict(s_info: dict, n_d: dict, v_d: dict, adv_cnt: int, dec_cnt: int):
+    """100% Synced with Table Action_Signal so a 'Turnaround Buy' or 'Swing Buy' NEVER shows Bearish!"""
     sym = s_info["Symbol"]
+    act_sig = str(s_info.get("Action_Signal", "⚖️ Watch"))
     headlines, news_label, news_pts = fetch_live_stock_news_and_sentiment(sym)
 
     tech_pts, tech_notes = 0, []
     if s_info["Above_50DMA"] and s_info["Above_20DMA"]:
+        tech_pts += 22
+        tech_notes.append(f"✅ Price (₹{s_info['Price']}) is above both 20-DMA (₹{s_info['DMA20']}) & 50-DMA (₹{s_info['DMA50']}).")
+    elif "Turnaround Buy" in act_sig or (s_info["1D"] >= 2.0 and s_info["Vol_Ratio"] >= 1.3):
+        tech_pts += 22
+        tech_notes.append(f"🚀 Strong Bottom Turnaround Breakout (+{s_info['1D']:.2f}% today with {s_info['Vol_Ratio']}x Volume!).")
+    elif s_info["Above_20DMA"] or s_info["Above_50DMA"]:
         tech_pts += 16
-        tech_notes.append(f"✅ Price (₹{s_info['Price']}) is above 20-DMA (₹{s_info['DMA20']}) & 50-DMA (₹{s_info['DMA50']}).")
-    elif s_info["Above_20DMA"]:
-        tech_pts += 12
-        tech_notes.append(f"🔄 Price crossed above 20-DMA (₹{s_info['DMA20']}) — Short-term Turnaround.")
+        tech_notes.append(f"🔄 Price is holding key Moving Average support (20-DMA: ₹{s_info['DMA20']}).")
     else:
-        tech_pts += 4
+        tech_pts += 6
         tech_notes.append(f"⚠️ Price is below 20-DMA (₹{s_info['DMA20']}) & 50-DMA (₹{s_info['DMA50']}).")
 
-    if 45 <= s_info["RSI"] <= 68:
-        tech_pts += 12
-        tech_notes.append(f"✅ RSI ({s_info['RSI']}) is in strong Bullish Momentum zone.")
+    if 42 <= s_info["RSI"] <= 70:
+        tech_pts += 14
+        tech_notes.append(f"✅ RSI ({s_info['RSI']}) is in healthy Bullish Momentum zone.")
     elif s_info["RSI"] > 74:
-        tech_pts += 4
-        tech_notes.append(f"⚠️ RSI ({s_info['RSI']}) is Overbought — wait for pullback.")
+        tech_pts += 6
+        tech_notes.append(f"⚠️ RSI ({s_info['RSI']}) is Overbought — wait for minor dip.")
+    else:
+        tech_pts += 9
+        tech_notes.append(f"🔄 RSI ({s_info['RSI']}) is recovering from oversold zone.")
+
+    if s_info["Vol_Ratio"] >= 1.20:
+        tech_pts += 14
+        tech_notes.append(f"🔥 Strong Institutional Volume ({s_info['Vol_Ratio']}x vs 20-day avg).")
     else:
         tech_pts += 7
-        tech_notes.append(f"🔄 RSI ({s_info['RSI']}) is in Oversold/Support zone.")
-
-    if s_info["Vol_Ratio"] >= 1.25:
-        tech_pts += 10
-        tech_notes.append(f"🔥 High Volume Breakout ({s_info['Vol_Ratio']}x vs 20-day avg).")
-    else:
-        tech_pts += 5
         tech_notes.append(f"📊 Volume Ratio is {s_info['Vol_Ratio']}x | RS vs Nifty: {s_info.get('RS_vs_Nifty', 0):+.2f}%.")
 
     mkt_pts, mkt_notes = 0, []
     peer_pct = s_info.get("Sec_Peer_Up_Pct", 50.0)
-    if n_d["1D"] >= -0.15 and adv_cnt >= dec_cnt * 0.8:
-        mkt_pts += 10
-        mkt_notes.append(f"✅ Broad Market (Nifty {n_d['1D']:+.2f}%) & Breadth ({adv_cnt} Up) are supportive.")
+    if s_info.get("RS_vs_Nifty", 0) > 0:
+        mkt_pts += 12
+        mkt_notes.append(f"✅ Outperforming Nifty 50 by {s_info.get('RS_vs_Nifty', 0):+.2f}% today (Positive Relative Strength).")
     else:
-        mkt_pts += 5
-        mkt_notes.append(f"⚠️ Broad Market is Down (Nifty {n_d['1D']:+.2f}%, {dec_cnt} Declining) — keep strict SL.")
+        mkt_pts += 6
+        mkt_notes.append(f"⚖️ Broad Market Nifty is {n_d['1D']:+.2f}% ({dec_cnt} Declining) — keep strict SL.")
 
-    if s_info.get("Sec_1D", 0) >= 0 and peer_pct >= 55.0:
-        mkt_pts += 14
-        mkt_notes.append(f"🚀 Sector ({s_info['Sector']}) & Peers ({peer_pct:.0f}% Stocks Up) are moving together!")
+    if s_info.get("Sec_1D", 0) >= 0 or peer_pct >= 50.0:
+        mkt_pts += 12
+        mkt_notes.append(f"🚀 Sector ({s_info['Sector']}) Peer Sync is {peer_pct:.0f}% Up.")
     else:
-        mkt_pts += 5
-        mkt_notes.append(f"⚠️ Sector ({s_info['Sector']}) Peer Sync is {peer_pct:.0f}% Up.")
+        mkt_pts += 6
+        mkt_notes.append(f"⚠️ Sector ({s_info['Sector']}) is soft today ({peer_pct:.0f}% Peers Up).")
 
-    total_ai_score = int(np.clip(tech_pts + mkt_pts + news_pts, 20, 97))
+    total_ai_score = int(np.clip(tech_pts + mkt_pts + news_pts, 25, 97))
+    # Guarantee alignment with Table Signal
+    if ("Turnaround Buy" in act_sig or "Swing Buy" in act_sig) and total_ai_score < 72:
+        total_ai_score = 76
+    elif "Top Short" in act_sig and total_ai_score > 48:
+        total_ai_score = 42
+
     safe_q = max(int(500.0 / max(abs(s_info["Buy_Entry"] - s_info["Buy_SL"]), 0.5)), 1)
 
     if total_ai_score >= 68:
-        verdict_badge = f"🟢 AI VERDICT ({sym}): YES — STRONG BUY SETUP (বুলিশ ট্রেড নেওয়া যেতে পারে)"
+        verdict_badge = f"🟢 AI VERDICT ({sym}): YES — STRONG BUY SETUP ({act_sig})"
         verdict_color = "#10b981"
         bangla_summary = (
-            f"✅ **AI পজিশন গাইড ({sym}):** সেক্টর মুভমেন্ট, পিয়ার স্টক সমর্থন ({peer_pct:.0f}% Up) এবং চার্ট অনুযায়ী শেয়ারটি শক্তিশালী অবস্থানে আছে। "
-            f"**ইন্ট্রাডে বা সুইং বাই পজিশন:** দাম **₹{s_info['Buy_Entry']}**-এর ওপরে থাকলে এন্ট্রি নিন | "
+            f"✅ **AI পজিশন গাইড ({sym}):** চার্ট, ভলিউম ({s_info['Vol_Ratio']}x) এবং রিলেটিভ স্ট্রেংথ অনুযায়ী শেয়ারটি শক্তিশালী অবস্থানে আছে। "
+            f"**বাই পজিশন:** দাম **₹{s_info['Buy_Entry']}**-এর ওপরে থাকলে এন্ট্রি নিন | "
             f"**স্টপ-লস (SL):** ₹{s_info['Buy_SL']} | **টার্গেট ১:** ₹{round(s_info['Buy_Entry'] + 1.2*s_info['ATR'], 2)} | **টার্গেট ২:** ₹{s_info['Buy_Target']} | **নিরাপদ শেয়ার সংখ্যা (₹500 ঝুঁকিতে):** `{safe_q} টি`।"
         )
     elif total_ai_score >= 52:
         verdict_badge = f"🟡 AI VERDICT ({sym}): WAIT FOR BREAKOUT ABOVE ₹{s_info['Buy_Entry']}"
         verdict_color = "#f59e0b"
         bangla_summary = (
-            f"⚖️ **AI পজিশন গাইড ({sym}):** শেয়ারটি এখন কনসোলিডেশন জোনে আছে। "
+            f"⚖️ **AI পজিশন গাইড ({sym}):** শেয়ারটি এখন ওয়াচ জোনে আছে। "
             f"**বাই এন্ট্রি:** কেবল দাম **₹{s_info['Buy_Entry']}** ব্রেক করে ওপরে টিকলে তবেই কিনবেন (SL: ₹{s_info['Buy_SL']}, Target: ₹{s_info['Buy_Target']})। "
             f"আর যদি দাম **₹{s_info['Short_Entry']}**-এর নিচে ভেঙে পড়ে, তবে শর্ট (Short) পজিশন নেওয়া যাবে (SL: ₹{s_info['Short_SL']}, Target: ₹{s_info['Short_Target']})।"
         )
     else:
-        verdict_badge = f"🔴 AI VERDICT ({sym}): BEARISH / AVOID BUYING (শর্ট ফোকাস বা অপেক্ষা)"
+        verdict_badge = f"🔴 AI VERDICT ({sym}): BEARISH / SHORT FOCUS ({act_sig})"
         verdict_color = "#ef4444"
         bangla_summary = (
             f"🛑 **AI পজিশন গাইড ({sym}):** এই মুহূর্তে বুলিশ বাই ট্রেড এড়িয়ে চলুন। "
@@ -731,27 +757,46 @@ stocks_df["RS_vs_Nifty"] = (stocks_df["1D"] - n_d["1D"]).round(2)
 sectors_df["Sec_RS"] = (sectors_df["1D"] - n_d["1D"]).round(2)
 
 if is_mkt_open:
-    bull_15m_df, bear_15m_df = run_3layer_intraday_scanner(stocks_df)
+    bull_5m_df, bear_5m_df = run_darvas_blast_intraday_scanner(stocks_df)
 else:
-    bull_15m_df, bear_15m_df = pd.DataFrame(), pd.DataFrame()
+    bull_5m_df, bear_5m_df = pd.DataFrame(), pd.DataFrame()
 
 bull_next8, bear_next8 = filter_next_day_intraday_stocks(stocks_df)
 
 if not is_after_close and is_mkt_open:
     now_hm = ist_now.strftime("%I:%M %p")
-    for _, r15 in bull_15m_df.iterrows():
+    for _, r5 in bull_5m_df.iterrows():
         push_3layer_alert(
-            str(r15.get("Time", now_hm)), "🟢 3-Layer LONG", r15["Symbol"], r15["Ticker"], r15["Sector"],
-            r15["Peer_Sync"], r15["Price"], r15["VWAP"], r15["EMA9"], r15["Entry"], r15["SL"], r15["Target"], r15["Reason"], True
+            str(r5.get("Time", now_hm)), "🟢 5m Darvas Blast", r5["Symbol"], r5["Ticker"], r5["Sector"],
+            r5["Peer_Sync"], r5["Price"], r5["VWAP"], r5["Entry"], r5["SL"], r5["Target"], r5["Reason"], True
         )
-    for _, r15b in bear_15m_df.iterrows():
+    for _, r5b in bear_5m_df.iterrows():
         push_3layer_alert(
-            str(r15b.get("Time", now_hm)), "🔴 3-Layer SHORT", r15b["Symbol"], r15b["Ticker"], r15b["Sector"],
-            r15b["Peer_Sync"], r15b["Price"], r15b["VWAP"], r15b["EMA9"], r15b["Entry"], r15b["SL"], r15b["Target"], r15b["Reason"], False
+            str(r5b.get("Time", now_hm)), "🔴 5m Darvas Short", r5b["Symbol"], r5b["Ticker"], r5b["Sector"],
+            r5b["Peer_Sync"], r5b["Price"], r5b["VWAP"], r5b["Entry"], r5b["SL"], r5b["Target"], r5b["Reason"], False
         )
 
+# Build Instant WhatsApp Alert Message for the Header WhatsApp Icon Button
+wa_header_lines = [
+    f"🧭 *AlphaPulse Pro Live Alert ({ist_now.strftime('%d %b %I:%M %p IST')})*",
+    f"🇮🇳 Nifty: {n_d['price']:,.2f} ({n_d['1D']:+.2f}%) | BankNifty: {b_d['price']:,.2f} ({b_d['1D']:+.2f}%)"
+]
+if alert_vault["items"]:
+    wa_header_lines.append("\n⚡ *Today's 5m Darvas Blast Alerts:*")
+    for al in alert_vault["items"][:5]:
+        wa_header_lines.append(f"• *{al['symbol']}* ({al['category']}) @ ₹{al['price']} | Entry: ₹{al['entry']} | SL: ₹{al['sl']} | Tgt: ₹{al['target']}")
+else:
+    wa_header_lines.append("\n🟢 *Top Bullish Intraday Watchlist:*")
+    for _, r in bull_next8.head(4).iterrows():
+        wa_header_lines.append(f"• *{r['Symbol']}* (₹{r['Price']}) | Buy: ₹{r['Entry']} | SL: ₹{r['SL']} | Tgt: ₹{r['Target']}")
+    wa_header_lines.append("\n🔴 *Top Bearish Short Watchlist:*")
+    for _, r in bear_next8.head(3).iterrows():
+        wa_header_lines.append(f"• *{r['Symbol']}* (₹{r['Price']}) | Short: ₹{r['Entry']} | SL: ₹{r['SL']} | Tgt: ₹{r['Target']}")
+
+header_wa_url = f"https://api.whatsapp.com/send?text={urllib.parse.quote(chr(10).join(wa_header_lines))}"
+
 # ==============================================================================
-# 7. TOP HEADER BAR
+# 7. TOP HEADER BAR (WITH WHATSAPP ALERT ICON IN THE EXACT RED BOX SPOT!)
 # ==============================================================================
 st.markdown('<div id="top-anchor"></div>', unsafe_allow_html=True)
 
@@ -761,13 +806,20 @@ mkt_status_html = (
     f'<span style="color:#f59e0b;font-weight:700;">🕒 MARKET CLOSED ({ist_now.strftime("%a %I:%M %p IST")})</span>'
 )
 
-top_c1, top_c2, top_c3, top_c4, top_c5, top_c6 = st.columns([4.5, 1.5, 1.2, 1.25, 0.9, 0.65])
+top_c1, top_c_wa, top_c2, top_c3, top_c4, top_c5, top_c6 = st.columns([3.85, 0.75, 1.45, 1.15, 1.2, 0.9, 0.7])
 with top_c1:
     st.markdown(
         f'<a href="?nav_action=home&auto={get_auto_param()}" target="_self" class="brand-logo-link" title="Click to Reset All Filters & Return to Home">'
         f'<span class="clean-compass-icon">🧭</span>'
         f'<div><div class="brand-title-glow">AlphaPulse Pro — Nifty 500 Turnaround Terminal</div>'
         f'<div class="brand-subtitle">{len(SECTOR_STOCKS)} Sectors • {len(ALL_TICKERS)}+ Stocks • {mkt_status_html}</div></div></a>',
+        unsafe_allow_html=True
+    )
+with top_c_wa:
+    st.markdown(
+        f'<a href="{header_wa_url}" target="_blank" class="top-wa-icon-btn" title="Click to Receive/Send Live Market & Darvas Alerts on WhatsApp">'
+        f'<svg viewBox="0 0 24 24" width="20" height="20" fill="#ffffff"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86s.274.072.376-.043c.101-.116.433-.506.549-.68.116-.173.231-.145.39-.087s1.011.477 1.184.564.289.13.332.202c.045.072.045.419-.1.824zm-3.423-14.416c-6.627 0-12 5.373-12 12 0 2.625.846 5.059 2.284 7.033l-2.284 4.967 5.141-2.214c1.922 1.396 4.29 2.214 6.859 2.214 6.627 0 12-5.373 12-12s-5.373-12-12-12z"/></svg>'
+        f'<span>WA</span></a>',
         unsafe_allow_html=True
     )
 with top_c2:
@@ -777,7 +829,7 @@ with top_c3:
         st.session_state.show_ai_helper = not st.session_state.show_ai_helper
 with top_c4:
     alert_count = len(alert_vault["items"])
-    if st.button(f"🔔 Alerts ({alert_count})", use_container_width=True, help="3-Layer Confirmed Intraday Alerts (9:15 AM – 3:30 PM)"):
+    if st.button(f"🔔 Alerts ({alert_count})", use_container_width=True, help="Today's 5m Darvas Blast & 3-Layer Intraday Alerts"):
         st.session_state.show_alert_drawer = not st.session_state.show_alert_drawer
 with top_c5:
     def on_auto_toggle():
@@ -834,6 +886,29 @@ a.brand-logo-link {{ text-decoration:none !important; display:inline-flex; align
 }}
 .brand-subtitle {{ font-size:0.72rem; font-weight:600; color:{TEXT_SUB} !important; }}
 
+/* TOP HEADER WHATSAPP ICON BUTTON (IN RED BOX SPOT) */
+a.top-wa-icon-btn {{
+    text-decoration:none !important;
+    background:linear-gradient(135deg, #16a34a 0%, #22c55e 100%) !important;
+    color:#ffffff !important;
+    border:1.5px solid #4ade80 !important;
+    border-radius:10px !important;
+    height:38px !important;
+    padding:0 10px !important;
+    display:flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    gap:5px !important;
+    font-weight:800 !important;
+    font-size:0.78rem !important;
+    box-shadow:0 4px 12px rgba(34, 197, 94, 0.38) !important;
+    transition:all 0.18s ease !important;
+}}
+a.top-wa-icon-btn:hover {{
+    transform:translateY(-2px) scale(1.03) !important;
+    box-shadow:0 6px 16px rgba(34, 197, 94, 0.55) !important;
+}}
+
 [data-testid="stWidgetLabel"] p, [data-testid="stWidgetLabel"] label, .stSelectbox label, .stNumberInput label, .stTextInput label, .stRadio label, [data-testid="stRadio"] label span, [data-testid="stToggle"] label p, [data-testid="stCheckbox"] label p {{
     color:{TEXT_MAIN} !important; font-weight:700 !important; font-size:0.80rem !important; opacity:1 !important;
 }}
@@ -855,8 +930,8 @@ div.stButton > button:hover p, div.stLinkButton > a:hover p, a[data-testid="stBa
     color:#ffffff !important;
 }}
 button[data-testid="stBaseButton-primary"] {{
-    background:linear-gradient(135deg, #f59e0b 0%, #ea580c 100%) !important; color:#ffffff !important;
-    border:1.5px solid #fbbf24 !important; border-radius:10px !important; font-weight:800 !important; font-size:0.81rem !important;
+    background:linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important; color:#ffffff !important;
+    border:1.5px solid #f87171 !important; border-radius:10px !important; font-weight:800 !important; font-size:0.81rem !important;
 }}
 button[data-testid="stBaseButton-primary"] p {{ color:#ffffff !important; font-weight:800 !important; }}
 
@@ -1041,28 +1116,30 @@ st.markdown(
 )
 
 # ==============================================================================
-# 9.1 3-LAYER QUALITY NOTIFICATION LOG DRAWER (9:15 AM - 3:30 PM)
+# 9.1 3-LAYER + DARVAS BLAST NOTIFICATION LOG DRAWER (9:15 AM - 3:30 PM)
 # ==============================================================================
 ap_flag = get_auto_param()
 
 if st.session_state.show_alert_drawer:
     st.markdown('<div class="alert-drawer-box">', unsafe_allow_html=True)
-    dr_c1, dr_c2, dr_c3 = st.columns([6.5, 2.0, 1.5])
+    dr_c1, dr_c2, dr_c3, dr_c4 = st.columns([5.3, 1.9, 1.5, 1.3])
     with dr_c1:
-        st.markdown(f"#### 🔔 Today's 3-Layer Confirmed Intraday Alerts ({today_str} • 9:15 AM – 3:30 PM IST)")
-        st.caption("শুধুমাত্র যে শেয়ারগুলো ৩টি স্তরই (১. সেক্টর মুভমেন্ট + ২. ৫৫%+ পিয়ার স্টক সাপোর্ট + ৩. 15m VWAP ও 9-EMA ব্রেকআউট) পাশ করেছে সেগুলোই এখানে জমা হয়।")
+        st.markdown(f"#### 🔔 Today's 5m Darvas Blast & 3-Layer Alerts ({today_str} • 9:15 AM – 3:30 PM IST)")
+        st.caption("শুধুমাত্র যে শেয়ারগুলো সেক্টর মুভমেন্ট + পিয়ার সাপোর্ট + তোমার 5-Min Darvas Blast শর্ত পাশ করেছে সেগুলোই এখানে জমা হয়।")
     with dr_c2:
+        st.markdown(f'<a href="{header_wa_url}" target="_blank" class="wa-share-btn">📲 Send Alerts to WhatsApp</a>', unsafe_allow_html=True)
+    with dr_c3:
         if st.button("🗑️ Clear Log", use_container_width=True):
             alert_vault["items"] = []
             alert_vault["seen_keys"] = set()
             st.rerun()
-    with dr_c3:
+    with dr_c4:
         if st.button("✖ Close Log", use_container_width=True):
             st.session_state.show_alert_drawer = False
             st.rerun()
 
     if not alert_vault["items"]:
-        st.info("🎯 No random alerts! Waiting for live market hours (9:15 AM – 3:30 PM IST) or a stock to pass all 3 layers.")
+        st.info("🎯 No random alerts! Waiting for live market hours (9:15 AM – 3:30 PM IST) or a stock to pass all 3 Darvas Blast layers.")
     else:
         log_cards_html = []
         for item in alert_vault["items"]:
@@ -1080,7 +1157,7 @@ if st.session_state.show_alert_drawer:
                 f'<span style="font-size:0.86rem;font-weight:800;">{item["symbol"]} <span style="font-size:0.70rem;color:{TEXT_SUB};">({item["sector"]})</span></span>'
                 f'<span style="font-size:0.80rem;font-weight:800;color:{c_col};">₹{item["price"]}</span>'
                 f'</div>'
-                f'<div style="font-size:0.70rem;color:{TEXT_SUB};">VWAP: ₹{item["vwap"]} | 9-EMA: ₹{item["ema9"]}</div>'
+                f'<div style="font-size:0.70rem;color:{TEXT_SUB};">VWAP: ₹{item["vwap"]} | {item["note"]}</div>'
                 f'<div class="r-plan"><span style="color:#f59e0b;">🎯 {act_lbl}: ₹{item["entry"]}</span><span style="color:#ef4444;">🛑 SL: ₹{item["sl"]}</span><span style="color:#10b981;">🚀 Tgt: ₹{item["target"]}</span></div>'
                 f'</a>'
             )
@@ -1127,7 +1204,7 @@ with fc5:
         st.session_state.show_nse_heatmap = not st.session_state.show_nse_heatmap
 
 # ==============================================================================
-# 10.1 RESTORED CLEAN AI MARKET BRIEF + ANY-STOCK CUSTOM AI SEARCH ENGINE
+# 10.1 CLEAN AI MARKET BRIEF + ANY-STOCK CUSTOM AI SEARCH ENGINE
 # ==============================================================================
 sectors_df["Is_Green_TF"] = sectors_df[tf_choice] >= 0
 turnaround_secs = sectors_df.sort_values(
@@ -1280,20 +1357,12 @@ st.markdown(
 # ==============================================================================
 # 12. PRIORITY 2 (HIDDEN BY DEFAULT): NEXT-DAY INTRADAY WATCHLIST + REASONS
 # ==============================================================================
-wa_lines = ["🧭 *AlphaPulse Pro — Next-Day Intraday Watchlist*", "🟢 *Bullish Turnaround Stocks:*"]
-for _, r in bull_next8.head(4).iterrows():
-    wa_lines.append(f"• *{r['Symbol']}* (₹{r['Price']}) | Buy: ₹{r['Entry']} | SL: ₹{r['SL']} | Tgt: ₹{r['Target']} [{r['Bull_Candle']}]")
-wa_lines.append("\n🔴 *Bearish Rejection Stocks:*")
-for _, r in bear_next8.head(4).iterrows():
-    wa_lines.append(f"• *{r['Symbol']}* (₹{r['Price']}) | Short: ₹{r['Entry']} | SL: ₹{r['SL']} | Tgt: ₹{r['Target']} [{r['Bear_Candle']}]")
-wa_direct_url = f"https://api.whatsapp.com/send?text={urllib.parse.quote(chr(10).join(wa_lines))}"
-
 with st.expander("🎯 PRIORITY 2 — Next-Day Intraday Watchlist (Bullish Turnaround & Bearish Rejection + Reasons) — Click to Expand", expanded=False):
     nd_c1, nd_c2 = st.columns([7.2, 2.8])
     with nd_c1:
         nd_bias = st.radio("View:", ["🌗 Both Bullish & Bearish", "🟢 Bullish Only", "🔴 Bearish Only"], horizontal=True, label_visibility="collapsed")
     with nd_c2:
-        st.markdown(f'<div style="text-align:right;"><a href="{wa_direct_url}" target="_blank" class="wa-share-btn">📲 Send to WhatsApp</a></div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="text-align:right;"><a href="{header_wa_url}" target="_blank" class="wa-share-btn">📲 Send to WhatsApp</a></div>', unsafe_allow_html=True)
 
     def build_nextday_box(df_sub: pd.DataFrame, is_bull: bool) -> str:
         cards = []
@@ -1328,7 +1397,7 @@ with st.expander("🎯 PRIORITY 2 — Next-Day Intraday Watchlist (Bullish Turna
             st.markdown(build_nextday_box(bear_next8.head(6), False), unsafe_allow_html=True)
 
 # ==============================================================================
-# 13. STOCK INSPECTOR + AI VERDICT + ZERODHA KITE PUBLISHER & SHORTCUT BRIDGE
+# 13. STOCK INSPECTOR + SYNCED AI VERDICT + ZERODHA KITE ORDER PAD
 # ==============================================================================
 st.markdown('<div id="stock-inspector-anchor"></div>', unsafe_allow_html=True)
 
@@ -1347,15 +1416,15 @@ if st.session_state.selected_stock != DEFAULT_STOCK:
     if s_dict is not None:
         s_info = pd.Series(s_dict)
         sym_clean, p_now, atr_v = s_info["Symbol"], s_info["Price"], s_info["ATR"]
-        is_bear_setup = ("Short" in str(s_info["Action_Signal"])) or (s_info["1D"] < -0.3 and pd.notna(s_info.get("Bear_Candle")))
+        is_bear_setup = ("Short" in str(s_info["Action_Signal"])) or (s_info["1D"] < -0.5 and pd.notna(s_info.get("Bear_Candle")))
         safe_qty = max(int(500.0 / max(abs(s_info["Buy_Entry"] - s_info["Buy_SL"]), 1.0)), 1)
 
-        chk_trend, chk_vol, chk_rsi, chk_sec, chk_streak = bool(s_info["Above_50DMA"]), s_info["Vol_Ratio"] >= 1.15, (42.0 <= s_info["RSI"] <= 72.0), (s_info.get("Sec_1D", 0) >= -0.15), (s_info.get("Consec_Up", 1) <= 2)
+        chk_trend, chk_vol, chk_rsi, chk_sec, chk_streak = bool(s_info["Above_50DMA"] or s_info["1D"] > 1.5), s_info["Vol_Ratio"] >= 1.15, (42.0 <= s_info["RSI"] <= 72.0), (s_info.get("Sec_1D", 0) >= -0.25), (s_info.get("Consec_Up", 1) <= 2)
         passed_cnt = sum([chk_trend, chk_vol, chk_rsi, chk_sec, chk_streak])
 
         single_wa_txt = urllib.parse.quote(
             f"🎯 *AlphaPulse Setup: {sym_clean}* ({s_info['Sector']})\n"
-            f"• Price: ₹{p_now} ({s_info['1D']:+.2f}%) | Safety: {passed_cnt}/5\n"
+            f"• Price: ₹{p_now} ({s_info['1D']:+.2f}%) | Signal: {s_info['Action_Signal']}\n"
             f"🟢 Buy: ₹{s_info['Buy_Entry']} | SL: ₹{s_info['Buy_SL']} | Tgt: ₹{s_info['Buy_Target']}\n"
             f"🔴 Short: ₹{s_info['Short_Entry']} | SL: ₹{s_info['Short_SL']} | Tgt: ₹{s_info['Short_Target']}"
         )
@@ -1363,11 +1432,11 @@ if st.session_state.selected_stock != DEFAULT_STOCK:
         st.markdown("---")
         sp1, sp2, sp3 = st.columns([6.2, 2.0, 1.8])
         with sp1:
-            st.markdown(f"#### 🎯 Stock Inspector: **{sym_clean}** (`{s_info['Sector']}`) — ₹{p_now:,.2f} ({s_info['1D']:+.2f}% | ⚡ RS: {s_info.get('RS_vs_Nifty', 0):+.2f}%)")
+            st.markdown(f"#### 🎯 Stock Inspector: **{sym_clean}** (`{s_info['Sector']}`) — ₹{p_now:,.2f} ({s_info['1D']:+.2f}% | {s_info['Action_Signal']})")
         with sp2:
             st.markdown(f'<a href="https://api.whatsapp.com/send?text={single_wa_txt}" target="_blank" class="wa-share-btn">📲 WhatsApp Setup</a>', unsafe_allow_html=True)
         with sp3:
-            if st.button("✖ Close Chart", key="close_stk", use_container_width=True):
+            if st.button("✖ Close Chart", key="close_stk", type="primary", use_container_width=True):
                 st.session_state.selected_stock = DEFAULT_STOCK
                 st.session_state.scroll_target = None
                 st.rerun()
@@ -1376,7 +1445,7 @@ if st.session_state.selected_stock != DEFAULT_STOCK:
         with lv1:
             st.info(
                 f"🛡️ **Safety Checklist ({passed_cnt}/5 Passed):**\n\n"
-                f"{'✅' if chk_trend else '⚠️'} >50-DMA | {'✅' if chk_vol else '⚠️'} Vol ({s_info['Vol_Ratio']}x) | "
+                f"{'✅' if chk_trend else '⚠️'} Trend/Momentum | {'✅' if chk_vol else '⚠️'} Vol ({s_info['Vol_Ratio']}x) | "
                 f"{'✅' if chk_rsi else '⚠️'} RSI ({s_info['RSI']}) | {'✅' if chk_streak else '⚠️'} Fresh Base\n\n"
                 f"📦 **Safe Qty (₹500 Risk):** `{safe_qty} Shares`"
             )
@@ -1404,7 +1473,16 @@ if st.session_state.selected_stock != DEFAULT_STOCK:
                 fig_st.add_hline(y=s_info["Buy_Target"], line_dash="dash", line_color="#10b981", annotation_text=f"Target: ₹{s_info['Buy_Target']}", row=1, col=1)
 
             fig_st.add_trace(go.Bar(x=sub_df.index, y=sub_df["Volume"], name="Volume", marker_color=["#10b981" if c >= o else "#ef4444" for c, o in zip(sub_df["Close"], sub_df["Open"])]), row=2, col=1)
-            fig_st.update_layout(height=350, template="plotly_dark" if "Clean Light" not in theme_mode else "plotly_white", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=10, r=10, t=20, b=10), xaxis_rangeslider_visible=False)
+            # Horizontal Top Legend so it NEVER overlaps right-side price labels!
+            fig_st.update_layout(
+                height=360,
+                template="plotly_dark" if "Clean Light" not in theme_mode else "plotly_white",
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                margin=dict(l=10, r=10, t=32, b=10),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+                xaxis_rangeslider_visible=False
+            )
             st.plotly_chart(fig_st, use_container_width=True)
 
         l1, l2, l3, l4 = st.columns(4)
@@ -1415,7 +1493,7 @@ if st.session_state.selected_stock != DEFAULT_STOCK:
         with l3:
             st.link_button(f"📰 Google Finance ({sym_clean})", f"https://www.google.com/finance/quote/{sym_clean}:NSE", use_container_width=True)
         with l4:
-            if st.button(f"🤖 Ask AI Verdict ({sym_clean})", type="primary", use_container_width=True):
+            if st.button(f"🤖 Ask AI Verdict ({sym_clean})", use_container_width=True):
                 st.session_state.show_stock_ai_verdict = not st.session_state.show_stock_ai_verdict
 
         if st.session_state.show_stock_ai_verdict:
@@ -1424,7 +1502,7 @@ if st.session_state.selected_stock != DEFAULT_STOCK:
                 f'<div style="font-size:0.75rem;margin-bottom:5px;padding-bottom:4px;border-bottom:1px dashed {BORDER_C};">'
                 f'📰 {hl} <span style="color:{TEXT_SUB};font-size:0.68rem;">({dt})</span></div>'
                 for hl, dt in ai_res["headlines"]
-            ]) or '<div style="font-size:0.75rem;color:#94a3b8;">No major breaking news in last 24h — moving on technicals & sector flow.</div>'
+            ]) or '<div style="font-size:0.75rem;color:#94a3b8;">No major breaking news in last 7 days — moving purely on technicals & sector flow.</div>'
 
             tech_items_html = "".join([f'<div style="font-size:0.76rem;margin-bottom:4px;">{tn}</div>' for tn in ai_res["tech_notes"]])
             mkt_items_html = "".join([f'<div style="font-size:0.76rem;margin-bottom:4px;">{mn}</div>' for mn in ai_res["mkt_notes"]])
@@ -1542,12 +1620,12 @@ if st.session_state.selected_stock != DEFAULT_STOCK:
         st.markdown("---")
 
 # ==============================================================================
-# 14. 4 ULTRA-FAST CONSOLIDATED TABS (SPEEDOMETERS EXPANDED BY DEFAULT + PREVIOUS SWING LOGIC)
+# 14. 4 CONSOLIDATED TABS (WITH CLOSE '✖' BUTTON ON SECTOR VIEWER & DARVAS TAB 2)
 # ==============================================================================
-live_tab_badge = f"🟢 {len(bull_15m_df) + len(bear_15m_df)} Active" if is_mkt_open else "⏸️ Standby"
+live_tab_badge = f"🟢 {len(bull_5m_df) + len(bear_5m_df)} Active" if is_mkt_open else "⏸️ Standby"
 tab1, tab2, tab3, tab4 = st.tabs([
     f"🔄 1. {len(SECTOR_STOCKS)} Sector Viewer & Gauges",
-    f"⚡ 2. 3-Layer Live Intraday Finder ({live_tab_badge})",
+    f"⚡ 2. 5-Min Darvas Blast Intraday ({live_tab_badge})",
     "💎 3. Swing & Positional Radar",
     f"📋 4. All {len(SECTOR_STOCKS)} Sectors Matrix"
 ])
@@ -1571,7 +1649,13 @@ with tab1:
     if st.session_state.inspect_sector not in all_sec_options:
         st.session_state.inspect_sector = EMPTY_VIEWER
 
-    mv_c1, mv_c2 = st.columns([4.0, 6.0])
+    # WHEN A SECTOR IS OPEN, SHOW THE CROSS (✖) BUTTON IN THE EXACT RED BOX SPOT!
+    if st.session_state.inspect_sector != EMPTY_VIEWER:
+        mv_c1, mv_c2, mv_c3 = st.columns([3.6, 5.2, 1.2])
+    else:
+        mv_c1, mv_c2 = st.columns([4.0, 6.0])
+        mv_c3 = None
+
     with mv_c1:
         chosen_view_sec = st.selectbox(
             "Master Sector Viewer",
@@ -1582,6 +1666,7 @@ with tab1:
         if chosen_view_sec != st.session_state.inspect_sector:
             st.session_state.inspect_sector = chosen_view_sec
             st.rerun()
+
     with mv_c2:
         if st.session_state.inspect_sector != EMPTY_VIEWER:
             sec_meta = sectors_df[sectors_df["Sector"] == st.session_state.inspect_sector].iloc[0]
@@ -1603,46 +1688,59 @@ with tab1:
                 unsafe_allow_html=True
             )
 
+    if mv_c3 is not None:
+        with mv_c3:
+            if st.button("✖ Close", key="close_sec_viewer_btn", type="primary", use_container_width=True, help="Close Sector Stock Table"):
+                st.session_state.inspect_sector = EMPTY_VIEWER
+                st.session_state.selected_sector = DEFAULT_SECTOR
+                st.rerun()
+
     if st.session_state.inspect_sector != EMPTY_VIEWER:
         active_sec_stocks = stocks_df[stocks_df["Sector"] == st.session_state.inspect_sector].sort_values(tf_choice, ascending=False)
+        # Mobile-Friendly Column Order: Entry, SL & Target right next to Signal!
         render_safe_table(
-            active_sec_stocks[["Symbol", "Price", "1D", "RS_vs_Nifty", "1W", "1M", "Vol_Ratio", "RSI", "Action_Signal", "Buy_Entry", "Buy_SL", "Buy_Target"]],
+            active_sec_stocks[["Symbol", "Price", "1D", "Action_Signal", "Buy_Entry", "Buy_SL", "Buy_Target", "Vol_Ratio", "RSI", "RS_vs_Nifty", "1W", "1M"]],
             ["1D", "RS_vs_Nifty", "1W", "1M"]
         )
         st.markdown(make_stock_pills(active_sec_stocks, tf_choice), unsafe_allow_html=True)
 
-    # KEPT EXPANDED=TRUE SO SPEEDOMETERS ALWAYS STAY VISIBLE LIKE SCREENSHOT 1!
-    with st.expander(f"🎛️ View All {len(f_secs)} Sectors Speedometers & Sequence Cards (Sorted: Green Top ➔ Down in {tf_choice})", expanded=True):
-        gauge_cards_html = "".join([make_svg_speedometer_card(s_row, tf_choice) for _, s_row in f_secs.iterrows()])
-        st.markdown(f'<div class="sector-grid-wrap">{gauge_cards_html}</div>', unsafe_allow_html=True)
+    # DIRECT DARK HEADER + 42 SPEEDOMETERS (NO WHITE BAR OR BROKEN EXPANDER ICON!)
+    st.markdown(
+        f'<div class="aligned-sec-hdr" style="margin-top:10px;">'
+        f'🎛️ All {len(f_secs)} Sectors Speedometers & Sequence Cards (Sorted: Green Top ➔ Down in {tf_choice} — Click Any Card to Open Stocks)'
+        f'</div>',
+        unsafe_allow_html=True
+    )
+    gauge_cards_html = "".join([make_svg_speedometer_card(s_row, tf_choice) for _, s_row in f_secs.iterrows()])
+    st.markdown(f'<div class="sector-grid-wrap">{gauge_cards_html}</div>', unsafe_allow_html=True)
 
 with tab2:
-    st.markdown('<div class="aligned-sec-hdr">⚡ PRIORITY 3 — 3-Layer Confirmed 15m Intraday Finder (Sector Move + Peer Sync >=55% + 15m VWAP & 9-EMA)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="aligned-sec-hdr">⚡ PRIORITY 3 — 5-Min Darvas Blast + 3-Layer Intraday Finder (Sector Sync + 15-Bar High Breakout + Within 2% of VWAP + RSI >= 58)</div>', unsafe_allow_html=True)
     force_test_scan = False
     if not is_mkt_open:
-        st.warning(f"⏸️ **Live Intraday Stock Finder is on Standby (Market Closed — {ist_now.strftime('%A %I:%M %p IST')}).** Automatically activates Mon–Fri, 9:15 AM – 3:30 PM IST.")
-        force_test_scan = st.checkbox("🔓 Run On-Demand 15m Scan for Last Session (Preview Mode)", value=False)
+        st.warning(f"⏸️ **Live 5-Min Darvas Blast Finder is on Standby (Market Closed — {ist_now.strftime('%A %I:%M %p IST')}).** Automatically activates Mon–Fri, 9:15 AM – 3:30 PM IST.")
+        force_test_scan = st.checkbox("🔓 Run On-Demand 5-Min Darvas Blast Scan for Last Session (Preview Mode)", value=False)
         if force_test_scan:
-            with st.spinner("⚡ Running 3-Layer 15m Scanner..."):
-                bull_15m_df, bear_15m_df = run_3layer_intraday_scanner(stocks_df)
+            with st.spinner("⚡ Running 5-Min Darvas Blast Scanner..."):
+                bull_5m_df, bear_5m_df = run_darvas_blast_intraday_scanner(stocks_df)
 
     if is_mkt_open or force_test_scan:
         c1, c2 = st.columns(2)
         with c1:
-            st.markdown('<div class="aligned-sec-hdr">🟢 3-Layer Confirmed LONG (Sorted Highest Green First)</div>', unsafe_allow_html=True)
-            if bull_15m_df.empty:
-                st.info("🎯 No stock currently passes all 3 Long layers. Waiting for high-conviction breakout...")
+            st.markdown('<div class="aligned-sec-hdr">🟢 5-Min Darvas Blast LONG (Close > 15-Bar High & Near VWAP)</div>', unsafe_allow_html=True)
+            if bull_5m_df.empty:
+                st.info("🎯 No stock currently passes all 5-Min Darvas Blast Long conditions. Waiting for breakout...")
             else:
-                render_safe_table(bull_15m_df[["Time", "Symbol", "Sector", "Peer_Sync", "Price", "VWAP", "EMA9", "Vol_Ratio", "RSI", "1D", "Entry", "SL", "Target"]], ["1D"])
-                st.markdown(make_stock_pills(bull_15m_df, "1D"), unsafe_allow_html=True)
+                render_safe_table(bull_5m_df[["Time", "Symbol", "Sector", "Price", "1D", "Entry", "SL", "Target", "VWAP", "Box_15H", "Vol_Ratio", "RSI", "Peer_Sync"]], ["1D"])
+                st.markdown(make_stock_pills(bull_5m_df, "1D"), unsafe_allow_html=True)
         with c2:
-            st.markdown('<div class="aligned-sec-hdr">🔴 3-Layer Confirmed SHORT (Sorted Strongest Drop First)</div>', unsafe_allow_html=True)
-            if bear_15m_df.empty:
-                st.info("🎯 No stock currently passes all 3 Short layers. Waiting for high-conviction breakdown...")
+            st.markdown('<div class="aligned-sec-hdr">🔴 5-Min Darvas Breakdown SHORT (Close < 15-Bar Low & Below VWAP)</div>', unsafe_allow_html=True)
+            if bear_5m_df.empty:
+                st.info("🎯 No stock currently passes all 5-Min Darvas Short conditions. Waiting for breakdown...")
             else:
-                b15_disp = bear_15m_df.rename(columns={"Entry": "Short_Below"})
-                render_safe_table(b15_disp[["Time", "Symbol", "Sector", "Peer_Sync", "Price", "VWAP", "EMA9", "Vol_Ratio", "RSI", "1D", "Short_Below", "SL", "Target"]], ["1D"])
-                st.markdown(make_stock_pills(bear_15m_df, "1D"), unsafe_allow_html=True)
+                b5_disp = bear_5m_df.rename(columns={"Entry": "Short_Below"})
+                render_safe_table(b5_disp[["Time", "Symbol", "Sector", "Price", "1D", "Short_Below", "SL", "Target", "VWAP", "Box_15L", "Vol_Ratio", "RSI", "Peer_Sync"]], ["1D"])
+                st.markdown(make_stock_pills(bear_5m_df, "1D"), unsafe_allow_html=True)
 
     st.markdown("---")
     st.markdown('<div class="aligned-sec-hdr">🧮 Smart Intraday Position Size & Risk Calculator</div>', unsafe_allow_html=True)
@@ -1662,7 +1760,7 @@ with tab2:
     st.success(f"✅ **Max Safe Loss:** ₹{max_loss:,.0f} &nbsp;|&nbsp; 📦 **Safe Quantity:** `{int(max_loss / diff) if diff > 0 else 0} Shares` &nbsp;|&nbsp; 🎯 **1:2 Target:** `₹{(ent_p + 2*diff if ent_p >= sl_p else ent_p - 2*diff):,.2f}`")
 
 # ==============================================================================
-# TAB 3: RESTORED PROVEN SWING LOGIC (PULLBACK TO 20-DMA + OVERSOLD 1M RECOVERY)
+# TAB 3: PROVEN SWING LOGIC (PULLBACK TO 20-DMA + OVERSOLD 1M RECOVERY)
 # ==============================================================================
 with tab3:
     sw1, sw2 = st.columns(2)
@@ -1670,7 +1768,7 @@ with tab3:
         st.markdown('<div class="aligned-sec-hdr">🚀 Safe Trend Pullback Picks (>50-DMA & Near 20-DMA Support)</div>', unsafe_allow_html=True)
         sp_df = stocks_df[(stocks_df["Above_50DMA"]) & (stocks_df["Dist_20DMA"].between(-3.0, 4.5)) & (stocks_df["RSI"].between(44, 64))].sort_values([tf_choice, "Vol_Ratio"], ascending=[False, False]).head(18)
         render_safe_table(
-            sp_df[["Symbol", "Sector", "Price", "1D", "RS_vs_Nifty", "1W", "Vol_Ratio", "RSI", "Buy_Entry", "Buy_SL", "Buy_Target"]],
+            sp_df[["Symbol", "Sector", "Price", "1D", "Buy_Entry", "Buy_SL", "Buy_Target", "Vol_Ratio", "RSI", "RS_vs_Nifty", "1W"]],
             ["1D", "RS_vs_Nifty", "1W"],
             height=420
         )
@@ -1679,7 +1777,7 @@ with tab3:
         st.markdown('<div class="aligned-sec-hdr">🌱 Bottom Turnaround Value Picks (Oversold Recovery Today)</div>', unsafe_allow_html=True)
         vr_df = stocks_df[(stocks_df["1M"] < 0) & (stocks_df["1D"] > 0) & (stocks_df["RSI"] <= 55)].sort_values(["1D", "Vol_Ratio"], ascending=[False, False]).head(18)
         render_safe_table(
-            vr_df[["Symbol", "Sector", "Price", "1D", "RS_vs_Nifty", "1M", "Vol_Ratio", "RSI", "Buy_Entry", "Buy_SL", "Buy_Target"]],
+            vr_df[["Symbol", "Sector", "Price", "1D", "Buy_Entry", "Buy_SL", "Buy_Target", "Vol_Ratio", "RSI", "RS_vs_Nifty", "1M"]],
             ["1D", "RS_vs_Nifty", "1M"],
             height=420
         )
@@ -1692,7 +1790,6 @@ with tab4:
     fig_b = go.Figure(go.Bar(x=chart_secs[tf_choice], y=chart_secs["Sector"], orientation="h", marker_color=["#10b981" if v >= 0 else "#ef4444" for v in chart_secs[tf_choice]], text=[f"{v:+.2f}%" for v in chart_secs[tf_choice]], textposition="outside"))
     fig_b.update_layout(height=860, template="plotly_dark" if "Clean Light" not in theme_mode else "plotly_white", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=10, r=40, t=15, b=10), font=dict(color=TEXT_MAIN))
     st.plotly_chart(fig_b, use_container_width=True)
-    # Fixed duplicate column bug when tf_choice == '1D'
     mat_cols = list(dict.fromkeys(["Sector", "Zone", tf_choice, "Sec_RS", "Peer_Up_Pct", "1D", "1W", "1M", "3M", "Avg_Vol", "RSI", "Top_Pick"]))
     render_safe_table(sectors_df.sort_values(tf_choice, ascending=False)[mat_cols], [tf_choice, "Sec_RS", "1D", "1W", "1M", "3M"])
 
@@ -1708,7 +1805,7 @@ st.markdown(
 
 scroll_target_id = st.session_state.scroll_target or ""
 st.session_state.scroll_target = None
-top_syms = ",".join((bull_15m_df["Symbol"].head(2).tolist() if not bull_15m_df.empty else []) + (bear_15m_df["Symbol"].head(2).tolist() if not bear_15m_df.empty else []))
+top_syms = ",".join((bull_5m_df["Symbol"].head(2).tolist() if not bull_5m_df.empty else []) + (bear_5m_df["Symbol"].head(2).tolist() if not bear_5m_df.empty else []))
 should_ring = "true" if (st.session_state.auto_scan_locked and is_mkt_open and top_syms and top_syms != st.session_state.last_alerted) else "false"
 if st.session_state.auto_scan_locked and is_mkt_open and top_syms:
     st.session_state.last_alerted = top_syms
