@@ -17,34 +17,34 @@ warnings.filterwarnings("ignore")
 # 1. PAGE CONFIGURATION
 # ==============================================================================
 st.set_page_config(
-    page_title="AlphaPulse Pro | Ultra-Fast Sector & Intraday Terminal",
+    page_title="AlphaPulse Pro | Crash-Proof Sector & Intraday Terminal",
     page_icon="🧭",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
 # ==============================================================================
-# 2. 42 SECTORS COVERING 420+ NIFTY 500 STOCKS (INCLUDING CEMENT)
+# 2. CLEANED & VERIFIED 42 SECTORS (REMOVED DELISTED/BROKEN NSE SYMBOLS)
 # ==============================================================================
 SECTOR_STOCKS = {
-    "Cement & Clinker": ["ULTRACEMCO.NS", "AMBUJACEM.NS", "SHREECEM.NS", "DALBHARAT.NS", "ACC.NS", "JKCEMENT.NS", "RAMCOCEM.NS", "BIRLACORPN.NS", "INDIACEM.NS", "NUVOCO.NS", "JKTYRE.NS", "HEIDELBERG.NS"],
+    "Cement & Clinker": ["ULTRACEMCO.NS", "AMBUJACEM.NS", "SHREECEM.NS", "DALBHARAT.NS", "ACC.NS", "JKCEMENT.NS", "RAMCOCEM.NS", "BIRLACORPN.NS", "INDIACEM.NS", "NUVOCO.NS", "HEIDELBERG.NS"],
     "Defence & Aerospace": ["HAL.NS", "BEL.NS", "BDL.NS", "PARAS.NS", "DATAPATTNS.NS", "ASTRAMICRO.NS", "MIDHANI.NS", "ZENTEC.NS", "BEML.NS", "SOLARINDS.NS"],
     "Shipbuilding & Marine": ["MAZDOCK.NS", "COCHINSHIP.NS", "GRSE.NS", "SCI.NS", "GESHIP.NS", "SEAMECLTD.NS", "DREDGECORP.NS"],
     "Railways & Wagons": ["RVNL.NS", "IRFC.NS", "IRCON.NS", "TITAGARH.NS", "JWL.NS", "CONCOR.NS", "RITES.NS", "RAILTEL.NS", "TEXRAIL.NS", "RAMKRISHNA.NS"],
-    "Cables & Wires": ["POLYCAB.NS", "KEI.NS", "RRKABEL.NS", "FINCABLES.NS", "UNIVERSAL.NS", "STERLITE.NS", "PARAMOUNT.NS"],
+    "Cables & Wires": ["POLYCAB.NS", "KEI.NS", "RRKABEL.NS", "FINCABLES.NS", "UNIVERSAL.NS", "PARAMOUNT.NS"],
     "Transformers & Power T&D": ["CGPOWER.NS", "VOLTAMP.NS", "TARIL.NS", "POWERINDIA.NS", "APARINDS.NS", "BHEL.NS", "SIEMENS.NS", "ABB.NS", "SCHNEIDER.NS", "TRITURBINE.NS"],
     "EMS & Electronics": ["DIXON.NS", "KAYNES.NS", "SYRMA.NS", "AMBER.NS", "PGEL.NS", "CYIENTDLM.NS", "AVALON.NS", "IKIO.NS", "HONAUT.NS"],
-    "Green Energy & Solar": ["IREDA.NS", "SUZLON.NS", "INOXWIND.NS", "KPIGREEN.NS", "BORORENEW.NS", "SWLECT.NS", "SJVN.NS", "NHPC.NS", "ADANIGREEN.NS"],
+    "Green Energy & Solar": ["IREDA.NS", "SUZLON.NS", "INOXWIND.NS", "KPIGREEN.NS", "BORORENEW.NS", "SJVN.NS", "NHPC.NS", "ADANIGREEN.NS"],
     "Power Utilities & Financiers": ["NTPC.NS", "POWERGRID.NS", "TATAPOWER.NS", "PFC.NS", "RECLTD.NS", "JSWENERGY.NS", "TORNTPOWER.NS", "CESC.NS", "ADANIPOWER.NS", "NLCINDIA.NS"],
     "Oil, Gas & City Gas": ["RELIANCE.NS", "ONGC.NS", "IOC.NS", "BPCL.NS", "HPCL.NS", "GAIL.NS", "OIL.NS", "PETRONET.NS", "IGL.NS", "MGL.NS", "GUJGASLTD.NS", "CHENNPETRO.NS"],
     "Metals, Steel & Mining": ["TATASTEEL.NS", "JSWSTEEL.NS", "HINDALCO.NS", "VEDL.NS", "NMDC.NS", "COALINDIA.NS", "NATIONALUM.NS", "SAIL.NS", "JINDALSTEL.NS", "HINDZINC.NS", "APLAPOLLO.NS", "WELCORP.NS"],
     "Auto OEMs (2W, 4W & CV)": ["M&M.NS", "TATAMOTORS.NS", "MARUTI.NS", "BAJAJ-AUTO.NS", "EICHERMOT.NS", "TVSMOTOR.NS", "HEROMOTOCO.NS", "ASHOKLEY.NS", "ESCORTS.NS", "FORCEMOT.NS"],
-    "Auto Ancillaries & Tyres": ["MOTHERSON.NS", "BOSCHLTD.NS", "SONACOMS.NS", "UNOMINDA.NS", "APOLLOTYRE.NS", "BALKRISIND.NS", "MRF.NS", "CEATLTD.NS", "ENDURANCE.NS", "EXIDEIND.NS", "ARE&M.NS", "BHARATFORG.NS"],
+    "Auto Ancillaries & Tyres": ["MOTHERSON.NS", "BOSCHLTD.NS", "SONACOMS.NS", "UNOMINDA.NS", "APOLLOTYRE.NS", "BALKRISIND.NS", "MRF.NS", "CEATLTD.NS", "ENDURANCE.NS", "EXIDEIND.NS", "BHARATFORG.NS", "JKTYRE.NS"],
     "PSU Banks": ["SBIN.NS", "BANKBARODA.NS", "PNB.NS", "CANBK.NS", "UNIONBANK.NS", "INDIANB.NS", "BANKINDIA.NS", "MAHABANK.NS", "IOB.NS", "UCOBANK.NS", "CENTRALBK.NS"],
     "Private Banks": ["HDFCBANK.NS", "ICICIBANK.NS", "AXISBANK.NS", "KOTAKBANK.NS", "INDUSINDBK.NS", "FEDERALBNK.NS", "IDFCFIRSTB.NS", "BANDHANBNK.NS", "RBLBANK.NS", "KARURVYSYA.NS", "AUBANK.NS", "CUB.NS"],
     "NBFCs & Housing Finance": ["BAJFINANCE.NS", "BAJAJFINSV.NS", "CHOLAFIN.NS", "SHRIRAMFIN.NS", "MUTHOOTFIN.NS", "MANAPPURAM.NS", "LICHSGFIN.NS", "PNBHOUSING.NS", "LTF.NS", "M&MFIN.NS", "POONAWALLA.NS", "CANFINHOME.NS"],
     "Insurance (Life & General)": ["LICI.NS", "SBILIFE.NS", "HDFCLIFE.NS", "ICICIPRULI.NS", "ICICIGI.NS", "STARHEALTH.NS", "NIACL.NS", "GICRE.NS", "MFSL.NS"],
-    "Capital Market, Exchanges & AMC": ["BSE.NS", "MCX.NS", "CDSL.NS", "ANGELONE.NS", "MOTILALOFS.NS", "CAMS.NS", "ANANDRATHI.NS", "HDFCAMC.NS", "NAM-INDIA.NS", "UTIAMC.NS", "KFINTECH.NS", "ISEC.NS"],
+    "Capital Market, Exchanges & AMC": ["BSE.NS", "MCX.NS", "CDSL.NS", "ANGELONE.NS", "MOTILALOFS.NS", "CAMS.NS", "ANANDRATHI.NS", "HDFCAMC.NS", "NAM-INDIA.NS", "UTIAMC.NS", "KFINTECH.NS"],
     "IT Largecap": ["TCS.NS", "INFY.NS", "HCLTECH.NS", "WIPRO.NS", "TECHM.NS", "LTIM.NS"],
     "IT Midcap, AI & ER&D": ["PERSISTENT.NS", "COFORGE.NS", "KPITTECH.NS", "TATAELXSI.NS", "MPHASIS.NS", "OFSS.NS", "LTTS.NS", "CYIENT.NS", "ZENSARTECH.NS", "BSOFT.NS", "SONATSOFTW.NS", "MASTEK.NS"],
     "Largecap Pharma": ["SUNPHARMA.NS", "CIPLA.NS", "DRREDDY.NS", "LUPIN.NS", "AUROPHARMA.NS", "ZYDUSLIFE.NS", "TORNTPHARM.NS", "ALKEM.NS", "GLENMARK.NS", "BIOCON.NS", "MANKIND.NS"],
@@ -59,7 +59,7 @@ SECTOR_STOCKS = {
     "Cooling, HVAC & Consumer Durables": ["VOLTAS.NS", "BLUESTARCO.NS", "SYMPHONY.NS", "WHIRLPOOL.NS", "HAVELLS.NS", "CROMPTON.NS", "VGUARD.NS", "ORIENTELEC.NS", "BAJAJELEC.NS"],
     "CNC, Bearings & Industrial Engg": ["CUMMINSIND.NS", "TIMKEN.NS", "SKFINDIA.NS", "SCHAEFFLER.NS", "GRINDWELL.NS", "MTARTECH.NS", "THERMAX.NS", "CARBORUNIV.NS", "ELGIEQUIP.NS", "AIAENG.NS"],
     "FMCG & Staples": ["ITC.NS", "HINDUNILVR.NS", "NESTLEIND.NS", "BRITANNIA.NS", "DABUR.NS", "MARICO.NS", "TATACONSUM.NS", "GODREJCP.NS", "COLPAL.NS", "VBL.NS", "EMAMILTD.NS", "JYOTHYLAB.NS"],
-    "QSR, Food & Beverages": ["ZOMATO.NS", "JUBLFOOD.NS", "DEVYANI.NS", "WESTLIFE.NS", "SAPPHIRE.NS", "BIKAJI.NS", "RADICO.NS", "UNITDSPR.NS", "UBL.NS", "PATANJALI.NS"],
+    "QSR, Food & Beverages": ["JUBLFOOD.NS", "DEVYANI.NS", "WESTLIFE.NS", "SAPPHIRE.NS", "BIKAJI.NS", "RADICO.NS", "UNITDSPR.NS", "UBL.NS", "PATANJALI.NS"],
     "Retail, Supermarkets & Footwear": ["TRENT.NS", "DMART.NS", "BATAINDIA.NS", "METROBRAND.NS", "MANYAVAR.NS", "ABFRL.NS", "RELAXO.NS", "CAMPUS.NS", "NYKAA.NS", "SHOPERSTOP.NS"],
     "Textiles, Yarn & Apparel": ["PAGEIND.NS", "KPRMILL.NS", "TRIDENT.NS", "WELSPUNLIV.NS", "VTL.NS", "RAYMOND.NS", "ARVIND.NS", "GOKEX.NS", "SWANENERGY.NS", "ALOKINDS.NS"],
     "Jewellery & Luxury": ["TITAN.NS", "KALYANKJIL.NS", "SENCO.NS", "THANGAMAYL.NS", "ETHOSLTD.NS", "RAJESHEXPO.NS", "VAIBHAVGBL.NS"],
@@ -75,6 +75,7 @@ ALL_TICKERS = sorted(list({t for lst in SECTOR_STOCKS.values() for t in lst}))
 TICKER_TO_SECTOR = {t: sec for sec, lst in SECTOR_STOCKS.items() for t in lst}
 DEFAULT_SECTOR = f"All {len(SECTOR_STOCKS)} Sectors ({len(ALL_TICKERS)} Stocks)"
 DEFAULT_STOCK = "Search or Select Stock..."
+EMPTY_VIEWER = "Select a Sector to View Stocks..."
 
 # ==============================================================================
 # 3. 3-LAYER QUALITY NOTIFICATION VAULT (9:15 AM TO 3:30 PM, AUTO-CLEANS)
@@ -125,7 +126,7 @@ init_auto = False if qp.get("auto") == "0" else True
 
 for k, v in [
     ("selected_sector", DEFAULT_SECTOR),
-    ("inspect_sector", "Select a Sector to View Stocks..."),
+    ("inspect_sector", EMPTY_VIEWER),
     ("selected_stock", DEFAULT_STOCK),
     ("scroll_target", None),
     ("last_alerted", ""),
@@ -145,7 +146,7 @@ def get_auto_param() -> str:
 
 if "nav_action" in qp:
     st.session_state.selected_sector = DEFAULT_SECTOR
-    st.session_state.inspect_sector = "Select a Sector to View Stocks..."
+    st.session_state.inspect_sector = EMPTY_VIEWER
     st.session_state.selected_stock = DEFAULT_STOCK
     st.session_state.scroll_target = None
     st.session_state.show_nse_heatmap = False
@@ -170,243 +171,7 @@ if "focus_sec" in qp:
     st.query_params["auto"] = get_auto_param()
 
 # ==============================================================================
-# 5. TOP HEADER BAR
-# ==============================================================================
-st.markdown('<div id="top-anchor"></div>', unsafe_allow_html=True)
-
-mkt_status_html = (
-    f'<span style="color:#10b981;font-weight:800;">🟢 LIVE MARKET ({ist_now.strftime("%I:%M %p IST")})</span>'
-    if is_mkt_open else
-    f'<span style="color:#f59e0b;font-weight:700;">🕒 MARKET CLOSED ({ist_now.strftime("%a %I:%M %p IST")})</span>'
-)
-
-top_c1, top_c2, top_c3, top_c4, top_c5, top_c6 = st.columns([4.5, 1.5, 1.2, 1.25, 0.9, 0.65])
-with top_c1:
-    st.markdown(
-        f'<a href="?nav_action=home&auto={get_auto_param()}" target="_self" class="brand-logo-link" title="Click to Reset All Filters & Return to Home">'
-        f'<span class="clean-compass-icon">🧭</span>'
-        f'<div><div class="brand-title-glow">AlphaPulse Pro — Nifty 500 Turnaround Terminal</div>'
-        f'<div class="brand-subtitle">{len(SECTOR_STOCKS)} Sectors • {len(ALL_TICKERS)}+ Stocks • {mkt_status_html}</div></div></a>',
-        unsafe_allow_html=True
-    )
-with top_c2:
-    theme_mode = st.selectbox("Theme", ["🌙 Pro Dark (Slate)", "🌌 Cyber Neon (Violet)", "☀️ Clean Light (Day)"], index=0, label_visibility="collapsed")
-with top_c3:
-    if st.button("🤖 AI Search", use_container_width=True, help="Open AI Market Brief & Search Any Stock"):
-        st.session_state.show_ai_helper = not st.session_state.show_ai_helper
-with top_c4:
-    alert_btn_Place = st.empty()
-with top_c5:
-    def on_auto_toggle():
-        st.session_state.auto_scan_locked = st.session_state.auto_toggle_widget
-        st.query_params["auto"] = "1" if st.session_state.auto_scan_locked else "0"
-
-    auto_alert_on = st.toggle(
-        "🔔 Auto",
-        value=st.session_state.auto_scan_locked,
-        key="auto_toggle_widget",
-        on_change=on_auto_toggle,
-        help="Persistent Auto-Alert: Stays ON until you manually turn it OFF"
-    )
-with top_c6:
-    if st.button("⚡", use_container_width=True, help="Sync Live Market Data Now"):
-        st.cache_data.clear()
-        st.rerun()
-
-# ==============================================================================
-# 6. LIGHTWEIGHT CSS & PERFECT ALIGNMENT
-# ==============================================================================
-if "Clean Light" in theme_mode:
-    BG_MAIN, BG_CARD, BG_SUB, TEXT_MAIN, TEXT_SUB, BORDER_C, ACCENT_C = "#f4f6fb", "#ffffff", "#eef2f8", "#0f172a", "#475569", "#cbd5e1", "#d97706"
-    BTN_BG, BTN_BORDER, CARD_SHADOW = "linear-gradient(135deg,#ffffff,#e2e8f0)", "#94a3b8", "0 4px 14px rgba(15,23,42,0.06)"
-elif "Cyber Neon" in theme_mode:
-    BG_MAIN, BG_CARD, BG_SUB, TEXT_MAIN, TEXT_SUB, BORDER_C, ACCENT_C = "#080214", "#14062b", "#1d093d", "#f8fafc", "#e879f9", "#00f5d488", "#00f5d4"
-    BTN_BG, BTN_BORDER, CARD_SHADOW = "linear-gradient(135deg,#3b0764,#701a75)", "#00f5d4", "0 0 20px rgba(0,245,212,0.20)"
-else:
-    BG_MAIN, BG_CARD, BG_SUB, TEXT_MAIN, TEXT_SUB, BORDER_C, ACCENT_C = "#060a12", "#0f172a", "#141f38", "#f8fafc", "#94a3b8", "#1e293b", "#f59e0b"
-    BTN_BG, BTN_BORDER, CARD_SHADOW = "linear-gradient(135deg,#111c33,#1e293b)", "#38bdf866", "0 6px 18px rgba(0,0,0,0.38)"
-
-st.markdown(f"""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
-
-header[data-testid="stHeader"], div[data-testid="stToolbar"], div[data-testid="stDecoration"] {{ display:none !important; }}
-
-html, body, [data-testid="stAppViewContainer"], .main, p, label, button, input, .stMarkdown {{
-    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-}}
-[data-testid="stIconMaterial"], .material-icons, .material-symbols-rounded {{
-    font-family: 'Material Symbols Rounded' !important;
-    font-weight: normal !important;
-    font-style: normal !important;
-    font-size: 1.15rem !important;
-    line-height: 1 !important;
-    letter-spacing: normal !important;
-    text-transform: none !important;
-    display: inline-block !important;
-    white-space: nowrap !important;
-    word-wrap: normal !important;
-    direction: ltr !important;
-    -webkit-font-smoothing: antialiased !important;
-}}
-
-html, body, [data-testid="stAppViewContainer"], .main {{
-    background-color:{BG_MAIN} !important;
-    color:{TEXT_MAIN} !important;
-    scroll-behavior:smooth !important;
-}}
-.block-container {{ padding-top:1.0rem !important; padding-bottom:4.8rem !important; max-width:97% !important; }}
-
-a.brand-logo-link {{ text-decoration:none !important; display:inline-flex; align-items:center; gap:10px; padding:2px 4px; transition:transform 0.2s ease; }}
-a.brand-logo-link:hover {{ transform:translateY(-1px); }}
-.clean-compass-icon {{ font-size:2.15rem; line-height:1; background:transparent !important; border:none !important; padding:0 !important; filter:drop-shadow(0 2px 6px rgba(245,158,11,0.35)); }}
-.brand-title-glow {{
-    font-size:1.30rem; font-weight:800; letter-spacing:-0.4px; line-height:1.18;
-    background:linear-gradient(90deg, #f59e0b 0%, #ef4444 48%, #10b981 100%);
-    -webkit-background-clip:text; -webkit-text-fill-color:transparent;
-}}
-.brand-subtitle {{ font-size:0.72rem; font-weight:600; color:{TEXT_SUB} !important; }}
-
-[data-testid="stWidgetLabel"] p, [data-testid="stWidgetLabel"] label, .stSelectbox label, .stNumberInput label, .stTextInput label, .stRadio label, [data-testid="stRadio"] label span, [data-testid="stToggle"] label p, [data-testid="stCheckbox"] label p {{
-    color:{TEXT_MAIN} !important; font-weight:700 !important; font-size:0.80rem !important; opacity:1 !important;
-}}
-[data-testid="stRadio"] div[role="radiogroup"] {{ background:{BG_CARD}; border:1px solid {BORDER_C}; padding:3px 10px; border-radius:999px; gap:10px !important; }}
-
-div.stButton > button, button[data-testid="stBaseButton-secondary"], div.stDownloadButton > button,
-div.stLinkButton > a, a[data-testid="stBaseLinkButton-secondary"] {{
-    background:{BTN_BG} !important; color:{TEXT_MAIN} !important; border:1.5px solid {BTN_BORDER} !important;
-    border-radius:10px !important; font-weight:800 !important; font-size:0.79rem !important;
-    padding:0.42rem 0.80rem !important; box-shadow:{CARD_SHADOW} !important; text-decoration:none !important; transition:all 0.2s ease !important;
-}}
-div.stButton > button p, div.stDownloadButton > button p, div.stLinkButton > a p, a[data-testid="stBaseLinkButton-secondary"] p, a[data-testid="stBaseLinkButton-secondary"] span {{
-    color:{TEXT_MAIN} !important; font-weight:800 !important;
-}}
-div.stButton > button:hover, div.stDownloadButton > button:hover, div.stLinkButton > a:hover, a[data-testid="stBaseLinkButton-secondary"]:hover {{
-    background:linear-gradient(135deg,#f59e0b,#ea580c) !important; color:#ffffff !important; border-color:#f59e0b !important; transform:translateY(-2px) !important;
-}}
-div.stButton > button:hover p, div.stLinkButton > a:hover p, a[data-testid="stBaseLinkButton-secondary"]:hover p, a[data-testid="stBaseLinkButton-secondary"]:hover span {{
-    color:#ffffff !important;
-}}
-
-button[data-testid="stBaseButton-primary"] {{
-    background:linear-gradient(135deg, #f59e0b 0%, #ea580c 100%) !important; color:#ffffff !important;
-    border:1.5px solid #fbbf24 !important; border-radius:10px !important; font-weight:800 !important;
-    font-size:0.81rem !important; box-shadow:0 4px 16px rgba(245, 158, 11, 0.45) !important;
-}}
-button[data-testid="stBaseButton-primary"] p {{ color:#ffffff !important; font-weight:800 !important; }}
-
-/* TRUE GREEN FOR UP & TRUE RED FOR DOWN IN PULSE BAR */
-.live-pulse-bar {{
-    background:{BG_CARD}; border:1px solid {BORDER_C}; border-radius:12px; padding:7px 12px;
-    margin:4px 0 8px 0; display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:7px; box-shadow:{CARD_SHADOW};
-}}
-.tick-chip-up {{
-    background:rgba(16, 185, 129, 0.14); border:1.5px solid #10b981; border-radius:9px; padding:4px 10px;
-    font-family:'JetBrains Mono',monospace !important; font-size:0.79rem; font-weight:800; color:#10b981;
-    display:inline-flex; align-items:center; gap:6px;
-}}
-.tick-chip-down {{
-    background:rgba(239, 68, 68, 0.14); border:1.5px solid #ef4444; border-radius:9px; padding:4px 10px;
-    font-family:'JetBrains Mono',monospace !important; font-size:0.79rem; font-weight:800; color:#ef4444;
-    display:inline-flex; align-items:center; gap:6px;
-}}
-.breadth-mini-pill {{ background:{BG_SUB}; border:1px solid {BORDER_C}; border-radius:9px; padding:4px 10px; font-size:0.76rem; font-weight:800; }}
-.live-dot {{ width:8px; height:8px; border-radius:50%; display:inline-block; }}
-
-.alert-drawer-box {{ background:{BG_CARD}; border:2px solid #f59e0b; border-radius:14px; padding:12px 16px; margin:6px 0 12px 0; box-shadow:0 8px 26px rgba(245,158,11,0.22); }}
-.alert-timeline-grid {{ display:grid; grid-template-columns:repeat(auto-fit, minmax(275px, 1fr)); gap:8px; max-height:360px; overflow-y:auto; padding:4px 2px; }}
-a.alert-log-item {{ text-decoration:none !important; background:{BG_SUB}; border:1px solid {BORDER_C}; border-radius:9px; padding:8px 11px; color:{TEXT_MAIN} !important; display:flex; flex-direction:column; gap:3px; transition:all 0.16s ease; }}
-a.alert-log-item:hover {{ border-color:#f59e0b; transform:translateY(-2px); }}
-.al-bull-left {{ border-left:4px solid #10b981 !important; }}
-.al-bear-left {{ border-left:4px solid #ef4444 !important; }}
-
-div[data-testid="stHorizontalBlock"] {{ align-items: flex-end !important; }}
-@media (max-width: 768px) {{
-    .live-pulse-bar {{ display:grid !important; grid-template-columns: 1fr 1fr !important; gap:6px !important; }}
-    .compass-pill {{ grid-column: span 2 !important; text-align:center !important; }}
-}}
-
-/* CLICKABLE ULTRA-LIGHT SVG GAUGE CARDS */
-a.svg-gauge-card {{
-    text-decoration:none !important;
-    background:{BG_CARD}; border:1.5px solid {BORDER_C}; border-radius:12px; padding:10px 14px;
-    display:flex; align-items:center; justify-content:space-between; box-shadow:{CARD_SHADOW};
-    transition:all 0.18s ease;
-}}
-a.svg-gauge-card:hover {{ border-color:#f59e0b; transform:translateY(-2px); }}
-.svg-gauge-info {{ display:flex; flex-direction:column; gap:4px; max-width:63%; }}
-.svg-gauge-title {{ font-size:0.90rem; font-weight:800; color:{TEXT_MAIN}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
-.svg-gauge-sub {{ font-size:0.72rem; color:{TEXT_SUB}; font-weight:600; }}
-.sector-grid-wrap {{ display:grid; grid-template-columns:repeat(auto-fit, minmax(340px, 1fr)); gap:10px; margin-top:8px; }}
-
-/* LEVEL MASTER VIEWER HEADER BAR (FIXES VERTICAL MISALIGNMENT) */
-.master-viewer-bar {{
-    font-size:0.84rem; font-weight:800; color:{TEXT_MAIN};
-    background:{BG_CARD}; border:1.5px solid {BORDER_C}; border-left:4px solid #10b981;
-    height:42px; padding:0 14px; border-radius:10px;
-    display:flex; align-items:center; justify-content:space-between;
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-}}
-
-.kite-order-pad {{ background:{BG_CARD}; border:1.5px solid #387ed1; border-top:4px solid #ff5722; border-radius:14px; padding:12px 16px; margin:10px 0 12px 0; box-shadow:0 8px 24px rgba(56,126,209,0.18); }}
-.kite-ticket-metric {{ background:{BG_SUB}; border:1px solid {BORDER_C}; border-radius:9px; padding:7px 10px; text-align:center; }}
-.kite-metric-lbl {{ font-size:0.68rem; color:{TEXT_SUB}; font-weight:700; display:block; }}
-.kite-metric-val {{ font-size:0.92rem; font-weight:800; font-family:'JetBrains Mono',monospace !important; color:{TEXT_MAIN}; }}
-
-.ai-verdict-box {{ background:{BG_CARD}; border:2px solid #f59e0b; border-radius:14px; padding:14px 18px; margin:10px 0 14px 0; box-shadow:0 8px 26px rgba(245,158,11,0.18); }}
-.ai-sub-card {{ background:{BG_SUB}; border:1px solid {BORDER_C}; border-radius:10px; padding:10px 12px; height:100%; }}
-
-button[data-baseweb="tab"] {{ background:{BG_CARD} !important; border:1.5px solid {BORDER_C} !important; border-radius:10px 10px 0 0 !important; margin-right:6px !important; padding:8px 16px !important; }}
-button[data-baseweb="tab"] p {{ color:{TEXT_MAIN} !important; font-weight:700 !important; font-size:0.84rem !important; }}
-button[data-baseweb="tab"][aria-selected="true"] {{ background:linear-gradient(135deg,rgba(245,158,11,0.22),rgba(16,185,129,0.18)) !important; border-color:#f59e0b !important; border-bottom:3px solid #f59e0b !important; }}
-button[data-baseweb="tab"][aria-selected="true"] p {{ color:#f59e0b !important; font-weight:800 !important; }}
-[data-testid="stExpander"] details {{ background:{BG_CARD} !important; border:1px solid {BORDER_C} !important; border-radius:10px !important; box-shadow:{CARD_SHADOW}; margin-top:2px !important; }}
-[data-testid="stExpander"] summary {{ padding:8px 14px !important; display:flex !important; align-items:center !important; gap:8px !important; }}
-[data-testid="stExpander"] summary p {{ color:{TEXT_MAIN} !important; font-weight:700 !important; font-size:0.81rem !important; margin:0 !important; }}
-
-.aligned-sec-hdr {{ font-size:0.86rem; font-weight:800; color:{TEXT_MAIN}; background:{BG_CARD}; border:1px solid {BORDER_C}; border-left:4px solid #f59e0b; padding:7px 12px; border-radius:8px; margin-bottom:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
-
-.nse-heatmap-container {{ background:{BG_CARD}; border:1.5px solid {BORDER_C}; border-radius:14px; padding:14px 16px; margin:8px 0 14px 0; box-shadow:{CARD_SHADOW}; }}
-.nse-heatmap-grid {{ display:grid; grid-template-columns:repeat(auto-fill, minmax(175px, 1fr)); gap:8px; margin-top:10px; }}
-a.nse-tile {{ text-decoration:none !important; color:#ffffff !important; padding:10px 12px; border-radius:8px; display:flex; flex-direction:column; justify-content:space-between; height:74px; box-shadow:0 3px 8px rgba(0,0,0,0.22); transition:transform 0.16s ease; border:1px solid rgba(255,255,255,0.15); }}
-a.nse-tile:hover {{ transform:translateY(-2px) scale(1.02); }}
-.nse-tile-name {{ font-size:0.74rem; font-weight:800; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
-.nse-tile-bot {{ display:flex; justify-content:space-between; align-items:baseline; font-family:'JetBrains Mono',monospace !important; }}
-
-.compass-pill {{ padding:4px 11px; border-radius:999px; font-size:0.74rem; font-weight:800; }}
-.turnaround-hero-box {{ background:{BG_CARD}; border:1.5px solid {BORDER_C}; border-left:5px solid #10b981; border-radius:12px; padding:10px 14px; margin:4px 0 10px 0; box-shadow:{CARD_SHADOW}; }}
-.turnaround-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(225px,1fr)); gap:8px; margin-top:8px; }}
-a.turn-sec-card {{ text-decoration:none !important; background:{BG_SUB}; border:1px solid #10b98155; border-radius:10px; padding:8px 11px; color:{TEXT_MAIN} !important; display:flex; flex-direction:column; justify-content:space-between; height:88px; transition:all 0.18s ease; }}
-a.turn-sec-card:hover {{ border-color:#f59e0b; transform:translateY(-2px); box-shadow:0 4px 12px rgba(16,185,129,0.22); }}
-.t-sec-name {{ font-weight:800; font-size:0.81rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:145px; }}
-
-.radar-panel-bull {{ background:{BG_CARD}; border:1px solid #10b98166; border-top:3.5px solid #10b981; border-radius:12px; padding:10px 12px; margin-bottom:8px; }}
-.radar-panel-bear {{ background:{BG_CARD}; border:1px solid #ef444466; border-top:3.5px solid #ef4444; border-radius:12px; padding:10px 12px; margin-bottom:8px; }}
-.radar-panel-header {{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-bottom:5px; border-bottom:1px solid {BORDER_C}; }}
-.radar-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(235px,1fr)); gap:7px; }}
-a.radar-row-card {{ text-decoration:none !important; background:{BG_SUB}; border:1px solid {BORDER_C}; border-radius:9px; padding:8px 10px; color:{TEXT_MAIN} !important; display:flex; flex-direction:column; justify-content:space-between; min-height:96px; transition:all 0.18s ease; }}
-a.radar-row-card:hover {{ border-color:#f59e0b; transform:translateY(-2px); }}
-.r-top {{ display:flex; justify-content:space-between; align-items:center; }}
-.r-sym {{ font-size:0.84rem; font-weight:800; color:{TEXT_MAIN}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:155px; }}
-.r-tag-bull {{ background:rgba(16,185,129,0.16); color:#10b981; border:1px solid #10b98155; padding:1px 6px; border-radius:5px; font-size:0.66rem; font-weight:800; }}
-.r-tag-bear {{ background:rgba(239,68,68,0.16); color:#ef4444; border:1px solid #ef444455; padding:1px 6px; border-radius:5px; font-size:0.66rem; font-weight:800; }}
-.r-mid {{ display:flex; justify-content:space-between; font-size:0.73rem; color:{TEXT_SUB}; }}
-.r-reason-box {{ font-size:0.70rem; color:{TEXT_MAIN}; background:rgba(245,158,11,0.10); border-left:2.5px solid #f59e0b; padding:3px 7px; border-radius:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
-.r-plan {{ display:flex; justify-content:space-between; font-size:0.70rem; font-weight:700; background:rgba(0,0,0,0.16); padding:3px 7px; border-radius:6px; font-family:'JetBrains Mono',monospace !important; }}
-a.wa-share-btn {{ text-decoration:none !important; background:linear-gradient(135deg,#16a34a,#22c55e); color:#fff !important; padding:5px 13px; border-radius:999px; font-size:0.75rem; font-weight:800; display:inline-flex; align-items:center; gap:5px; }}
-
-.pill-container {{ display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }}
-a.bull-pill, a.bear-pill {{ text-decoration:none !important; padding:3px 8px; border-radius:999px; font-size:0.71rem; font-weight:700; display:inline-flex; align-items:center; gap:4px; }}
-a.bull-pill {{ background:rgba(16,185,129,0.14); border:1px solid #10b98199; color:#10b981 !important; }}
-a.bear-pill {{ background:rgba(239,68,68,0.14); border:1px solid #ef444499; color:#ef4444 !important; }}
-
-.floating-right-dock {{ position:fixed; bottom:58px; right:18px; z-index:999999; display:flex; flex-direction:column; gap:7px; align-items:flex-end; }}
-a.single-top-btn {{ text-decoration:none !important; background:linear-gradient(135deg,#f59e0b,#ea580c); color:#fff !important; padding:7px 15px; border-radius:999px; font-size:0.79rem; font-weight:800; border:1.5px solid rgba(255,255,255,0.35); box-shadow:0 6px 20px rgba(245,158,11,0.5); }}
-</style>
-""", unsafe_allow_html=True)
-
-# ==============================================================================
-# 7. BULLETPROOF INDEX FETCHER & ZERO-ARG CACHE FOR 420+ STOCKS
+# 5. CRASH-PROOF DATA ENGINE & ACCURATE REAL-TIME INDEX FETCHER
 # ==============================================================================
 def safe_num(val, default: float = 0.0) -> float:
     try:
@@ -416,66 +181,58 @@ def safe_num(val, default: float = 0.0) -> float:
         return default
 
 def calc_rsi(series: pd.Series, period: int = 14) -> float:
-    s = series.dropna()
-    if len(s) < period + 1:
+    try:
+        s = series.dropna()
+        if len(s) < period + 1:
+            return 50.0
+        delta = s.diff()
+        up = delta.clip(lower=0).rolling(period).mean()
+        down = (-delta.clip(upper=0)).rolling(period).mean()
+        rs = up / down.replace(0, np.nan)
+        return safe_num((100.0 - (100.0 / (1.0 + rs))).iloc[-1], 50.0)
+    except Exception:
         return 50.0
-    delta = s.diff()
-    up = delta.clip(lower=0).rolling(period).mean()
-    down = (-delta.clip(upper=0)).rolling(period).mean()
-    rs = up / down.replace(0, np.nan)
-    return safe_num((100.0 - (100.0 / (1.0 + rs))).iloc[-1], 50.0)
 
 def calc_return(closes: pd.Series, days: int) -> float:
-    s = closes.dropna()
-    if len(s) < 2:
+    try:
+        s = closes.dropna()
+        if len(s) < 2:
+            return 0.0
+        base = safe_num(s.iloc[max(0, len(s) - 1 - days)], 0.0)
+        last = safe_num(s.iloc[-1], 0.0)
+        return safe_num(((last - base) / base) * 100.0, 0.0) if base > 0 else 0.0
+    except Exception:
         return 0.0
-    base = safe_num(s.iloc[max(0, len(s) - 1 - days)], 0.0)
-    last = safe_num(s.iloc[-1], 0.0)
-    return safe_num(((last - base) / base) * 100.0, 0.0) if base > 0 else 0.0
 
-def make_stock_pills(df_sub: pd.DataFrame, tf_col: str = "1D") -> str:
-    ap = get_auto_param()
-    pills = []
-    col_use = tf_col if tf_col in df_sub.columns else "1D"
-    for _, r in df_sub.iterrows():
-        qt = urllib.parse.quote(str(r["Ticker"]))
-        val_c = safe_num(r.get(col_use, r.get("1D", 0.0)))
-        cls = "bull-pill" if val_c >= 0 else "bear-pill"
-        icon = "🟢" if val_c >= 0 else "🔴"
-        pills.append(f'<a class="{cls}" href="?focus_stock={qt}&auto={ap}" target="_self">{icon} {r["Symbol"]} ({val_c:+.1f}%)</a>')
-    return f'<div class="pill-container">{"".join(pills)}</div>'
+def style_colored_table(df: pd.DataFrame, pct_cols: list):
+    """100% Crash-Proof Table Styler: Formats only numeric columns & safely colors % columns."""
+    if df is None or df.empty:
+        return df
+    try:
+        valid_cols = [c for c in pct_cols if c in df.columns]
+        num_cols = df.select_dtypes(include=[np.number]).columns.tolist()
 
-def make_svg_speedometer_card(s_row: pd.Series, tf_choice: str) -> str:
-    score = int(np.clip(safe_num(s_row["Meter"], 50), 5, 98))
-    ret_val = safe_num(s_row[tf_choice], 0.0)
-    s_name = s_row["Sector"]
-    col = "#10b981" if ret_val >= 0 else "#ef4444"
-    ret_col = "#10b981" if ret_val >= 0 else "#ef4444"
-    rs_col = "#10b981" if s_row["Sec_RS"] >= 0 else "#ef4444"
-    dash_len = round((score / 100.0) * 126.0, 1)
-    q_s = urllib.parse.quote(s_name)
-    ap = get_auto_param()
+        def color_pct(val):
+            try:
+                v = float(val)
+                if np.isnan(v):
+                    return ""
+                return "color:#10b981;font-weight:700;" if v > 0 else ("color:#ef4444;font-weight:700;" if v < 0 else "color:#94a3b8;")
+            except Exception:
+                return ""
 
-    return (
-        f'<a href="?focus_sec={q_s}&auto={ap}" target="_self" class="svg-gauge-card" title="Click to open {s_name} stocks in Master Viewer">'
-        f'<div class="svg-gauge-info">'
-        f'<div class="svg-gauge-title">🧭 {s_name} 🔍</div>'
-        f'<div class="svg-gauge-sub">{s_row["Zone"]} • 🤝 Sync: <b style="color:{"#10b981" if s_row["Peer_Up_Pct"]>=50 else "#ef4444"};">{s_row["Up_Count"]}/{s_row["Count"]} Up ({s_row["Peer_Up_Pct"]:.0f}%)</b></div>'
-        f'<div class="svg-gauge-sub">Vol: <b>{s_row["Avg_Vol"]}x</b> • ⚡ RS: <b style="color:{rs_col};">{s_row["Sec_RS"]:+.2f}%</b> • ⭐ <b style="color:#f59e0b;">{s_row["Top_Pick"]}</b></div>'
-        f'</div>'
-        f'<div style="text-align:center;min-width:116px;">'
-        f'<svg width="112" height="62" viewBox="0 0 100 58">'
-        f'<path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="rgba(148,163,184,0.22)" stroke-width="10" stroke-linecap="round"/>'
-        f'<path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="{col}" stroke-width="10" stroke-linecap="round" stroke-dasharray="{dash_len} 126"/>'
-        f'<text x="50" y="47" text-anchor="middle" fill="{TEXT_MAIN}" font-size="14" font-weight="800" font-family="JetBrains Mono">{score}</text>'
-        f'</svg>'
-        f'<div style="font-size:0.74rem;font-weight:800;color:{ret_col};margin-top:-6px;font-family:\'JetBrains Mono\',monospace;">{ret_val:+.2f}% ({tf_choice})</div>'
-        f'</div></a>'
-    )
+        styler = df.style
+        if hasattr(styler, "map"):
+            styler = styler.map(color_pct, subset=valid_cols)
+        else:
+            styler = styler.applymap(color_pct, subset=valid_cols)
+        return styler.format("{:.2f}", subset=num_cols, na_rep="-")
+    except Exception:
+        return df
 
 @st.cache_data(ttl=45, show_spinner=False)
 def load_pulse_indices():
-    """Fetches each index individually via Ticker.history so it NEVER fails into fake green defaults!"""
+    """Uses fast_info + 5d daily history so Nifty & Bank Nifty ALWAYS show exact Red/Green day change."""
     idx_tickers = {"NIFTY": "^NSEI", "BANKNIFTY": "^NSEBANK", "VIX": "^INDIAVIX", "USDINR": "INR=X"}
     res = {}
     for k, sym in idx_tickers.items():
@@ -487,17 +244,12 @@ def load_pulse_indices():
                 if len(df_d) >= 2:
                     c_now = safe_num(df_d["Close"].iloc[-1], 0.0)
                     prev_c = safe_num(df_d["Close"].iloc[-2], c_now)
-                    # Also check 5m intraday if market is open for latest tick
                     try:
-                        df_5m = tk_obj.history(period="2d", interval="5m")
-                        if df_5m is not None and not df_5m.empty:
-                            df_5m = df_5m.dropna(subset=["Close"])
-                            if not df_5m.empty:
-                                c_now = safe_num(df_5m["Close"].iloc[-1], c_now)
-                                last_d = df_5m.index[-1].date()
-                                prev_slice = df_d[df_d.index.date < last_d]
-                                if not prev_slice.empty:
-                                    prev_c = safe_num(prev_slice["Close"].iloc[-1], prev_c)
+                        fi = tk_obj.fast_info
+                        fi_last = safe_num(getattr(fi, "last_price", None) or fi.get("lastPrice"), 0.0)
+                        fi_prev = safe_num(getattr(fi, "previous_close", None) or fi.get("previousClose"), 0.0)
+                        if fi_last > 0 and fi_prev > 0:
+                            c_now, prev_c = fi_last, fi_prev
                     except Exception:
                         pass
 
@@ -688,9 +440,6 @@ def load_full_market_data():
     stocks_df["Sec_Bear_Roll"] = stocks_df["Sector"].map(lambda s: sec_map.get(s, {}).get("Sec_Bear_Roll", False))
     return stocks_df, sectors_df
 
-# ==============================================================================
-# 7.1 3-LAYER CONFIRMED 15M INTRADAY SCANNER
-# ==============================================================================
 @st.cache_data(ttl=120, show_spinner=False)
 def run_3layer_intraday_scanner(stocks_df: pd.DataFrame):
     if stocks_df.empty:
@@ -701,10 +450,10 @@ def run_3layer_intraday_scanner(stocks_df: pd.DataFrame):
             ((stocks_df["Sec_Bull_Turn"] | (stocks_df["Sec_1D"] >= 0.25)) & (stocks_df["Sec_Peer_Up_Pct"] >= 55.0)) |
             ((stocks_df["Sec_Bear_Roll"] | (stocks_df["Sec_1D"] <= -0.25)) & (stocks_df["Sec_Peer_Down_Pct"] >= 55.0))
         )
-    ].sort_values("Vol_Ratio", ascending=False).head(32)
+    ].sort_values("Vol_Ratio", ascending=False).head(30)
 
     if qualifying_pool.empty:
-        qualifying_pool = stocks_df[stocks_df["Price"] > 120].sort_values("Vol_Ratio", ascending=False).head(25)
+        qualifying_pool = stocks_df[stocks_df["Price"] > 120].sort_values("Vol_Ratio", ascending=False).head(24)
 
     pool_tickers = qualifying_pool["Ticker"].tolist()
     daily_map = qualifying_pool.set_index("Ticker").to_dict("index")
@@ -715,7 +464,7 @@ def run_3layer_intraday_scanner(stocks_df: pd.DataFrame):
         for tk in pool_tickers:
             try:
                 df15 = (raw_15m[tk] if len(pool_tickers) > 1 else raw_15m).dropna(subset=["Close", "Open", "High", "Low"])
-                if len(df15) < 22:
+                if len(df15) < 20:
                     continue
                 d_info = daily_map[tk]
                 c15, o15, h15, l15 = safe_num(df15["Close"].iloc[-1], d_info["Price"]), safe_num(df15["Open"].iloc[-1]), safe_num(df15["High"].iloc[-1]), safe_num(df15["Low"].iloc[-1])
@@ -937,32 +686,28 @@ def generate_ai_stock_verdict(s_info: dict, n_d: dict, v_d: dict, adv_cnt: int, 
 
 def filter_next_day_intraday_stocks(stocks_df: pd.DataFrame):
     df = stocks_df.copy()
-    b_cand = df[(df["Consec_Up"] <= 2) & (df["1D"] >= 0.0) & (df["1D"] <= 4.2) & (df["Vol_Ratio"] >= 1.10)].copy()
+    b_cand = df[(df["Consec_Up"] <= 2) & (df["1D"] >= 0.0) & (df["1D"] <= 4.5) & (df["Vol_Ratio"] >= 1.05)].copy()
+    if b_cand.empty:
+        b_cand = df.sort_values("1D", ascending=False).head(8).copy()
     b_cand["Bull_Candle"] = b_cand["Bull_Candle"].fillna("Tight Base")
-    # Sequence: Highest green & volume first
     bull8 = b_cand.sort_values(["1D", "Vol_Ratio"], ascending=[False, False]).head(8).copy()
     bull8["Reason"] = bull8["Bull_Candle"].astype(str) + " • Vol " + bull8["Vol_Ratio"].astype(str) + "x • Peer Sync " + bull8["Sec_Peer_Up_Pct"].astype(str) + "% Up"
     bull8["Entry"], bull8["SL"], bull8["Target"] = bull8["Buy_Entry"], bull8["Buy_SL"], bull8["Buy_Target"]
 
     used = set(bull8["Ticker"].tolist())
-    br_cand = df[(~df["Ticker"].isin(used)) & (df["Consec_Down"] <= 2) & (df["1D"] < 0.0) & (df["1D"] >= -4.2) & (df["Vol_Ratio"] >= 1.08)].copy()
+    br_cand = df[(~df["Ticker"].isin(used)) & (df["Consec_Down"] <= 2) & (df["1D"] < 0.0) & (df["1D"] >= -4.5) & (df["Vol_Ratio"] >= 1.05)].copy()
+    if br_cand.empty:
+        br_cand = df[~df["Ticker"].isin(used)].sort_values("1D", ascending=True).head(8).copy()
     br_cand["Bear_Candle"] = br_cand["Bear_Candle"].fillna("Supply Stall")
     bear8 = br_cand.sort_values(["1D", "Vol_Ratio"], ascending=[True, False]).head(8).copy()
     bear8["Reason"] = bear8["Bear_Candle"].astype(str) + " • Vol " + bear8["Vol_Ratio"].astype(str) + "x • Peer Sync " + bear8["Sec_Peer_Down_Pct"].astype(str) + "% Down"
     bear8["Entry"], bear8["SL"], bear8["Target"] = bear8["Short_Entry"], bear8["Short_SL"], bear8["Short_Target"]
     return bull8, bear8
 
-def style_colored_table(df: pd.DataFrame, pct_cols: list):
-    def color_pct(val):
-        if pd.isna(val) or not isinstance(val, (int, float, np.number)):
-            return ""
-        return "color:#10b981;font-weight:700;" if val > 0 else ("color:#ef4444;font-weight:700;" if val < 0 else "color:#94a3b8;")
-    return df.style.map(color_pct, subset=[c for c in pct_cols if c in df.columns]).format(precision=2)
-
 # ==============================================================================
-# 8. FAST INITIAL LOAD
+# 6. LOAD CACHED DATA FIRST (ZERO PLACEHOLDER GLITCHES)
 # ==============================================================================
-with st.spinner("⚡ Loading Cached Market Matrix..."):
+with st.spinner("⚡ Loading Market Intelligence..."):
     pulse = load_pulse_indices()
     base_stocks_df, base_sectors_df = load_full_market_data()
 
@@ -996,13 +741,257 @@ if not is_after_close and is_mkt_open:
             r15b["Peer_Sync"], r15b["Price"], r15b["VWAP"], r15b["EMA9"], r15b["Entry"], r15b["SL"], r15b["Target"], r15b["Reason"], False
         )
 
-with alert_btn_Place:
+# ==============================================================================
+# 7. TOP HEADER BAR
+# ==============================================================================
+st.markdown('<div id="top-anchor"></div>', unsafe_allow_html=True)
+
+mkt_status_html = (
+    f'<span style="color:#10b981;font-weight:800;">🟢 LIVE MARKET ({ist_now.strftime("%I:%M %p IST")})</span>'
+    if is_mkt_open else
+    f'<span style="color:#f59e0b;font-weight:700;">🕒 MARKET CLOSED ({ist_now.strftime("%a %I:%M %p IST")})</span>'
+)
+
+top_c1, top_c2, top_c3, top_c4, top_c5, top_c6 = st.columns([4.5, 1.5, 1.2, 1.25, 0.9, 0.65])
+with top_c1:
+    st.markdown(
+        f'<a href="?nav_action=home&auto={get_auto_param()}" target="_self" class="brand-logo-link" title="Click to Reset All Filters & Return to Home">'
+        f'<span class="clean-compass-icon">🧭</span>'
+        f'<div><div class="brand-title-glow">AlphaPulse Pro — Nifty 500 Turnaround Terminal</div>'
+        f'<div class="brand-subtitle">{len(SECTOR_STOCKS)} Sectors • {len(ALL_TICKERS)}+ Stocks • {mkt_status_html}</div></div></a>',
+        unsafe_allow_html=True
+    )
+with top_c2:
+    theme_mode = st.selectbox("Theme", ["🌙 Pro Dark (Slate)", "🌌 Cyber Neon (Violet)", "☀️ Clean Light (Day)"], index=0, label_visibility="collapsed")
+with top_c3:
+    if st.button("🤖 AI Search", use_container_width=True, help="Open AI Market Brief & Search Any Stock"):
+        st.session_state.show_ai_helper = not st.session_state.show_ai_helper
+with top_c4:
     alert_count = len(alert_vault["items"])
     if st.button(f"🔔 Alerts ({alert_count})", use_container_width=True, help="3-Layer Confirmed Intraday Alerts (9:15 AM – 3:30 PM)"):
         st.session_state.show_alert_drawer = not st.session_state.show_alert_drawer
+with top_c5:
+    def on_auto_toggle():
+        st.session_state.auto_scan_locked = st.session_state.auto_toggle_widget
+        st.query_params["auto"] = "1" if st.session_state.auto_scan_locked else "0"
+
+    auto_alert_on = st.toggle(
+        "🔔 Auto",
+        value=st.session_state.auto_scan_locked,
+        key="auto_toggle_widget",
+        on_change=on_auto_toggle,
+        help="Persistent Auto-Alert: Stays ON until you manually turn it OFF"
+    )
+with top_c6:
+    if st.button("⚡", use_container_width=True, help="Sync Live Market Data Now"):
+        st.cache_data.clear()
+        st.rerun()
 
 # ==============================================================================
-# 9. TRUE GREEN / RED PULSE BAR (FIXED: RED WHEN DOWN, GREEN WHEN UP!)
+# 8. THEME CSS & UI HELPERS
+# ==============================================================================
+if "Clean Light" in theme_mode:
+    BG_MAIN, BG_CARD, BG_SUB, TEXT_MAIN, TEXT_SUB, BORDER_C, ACCENT_C = "#f4f6fb", "#ffffff", "#eef2f8", "#0f172a", "#475569", "#cbd5e1", "#d97706"
+    BTN_BG, BTN_BORDER, CARD_SHADOW = "linear-gradient(135deg,#ffffff,#e2e8f0)", "#94a3b8", "0 4px 14px rgba(15,23,42,0.06)"
+elif "Cyber Neon" in theme_mode:
+    BG_MAIN, BG_CARD, BG_SUB, TEXT_MAIN, TEXT_SUB, BORDER_C, ACCENT_C = "#080214", "#14062b", "#1d093d", "#f8fafc", "#e879f9", "#00f5d488", "#00f5d4"
+    BTN_BG, BTN_BORDER, CARD_SHADOW = "linear-gradient(135deg,#3b0764,#701a75)", "#00f5d4", "0 0 20px rgba(0,245,212,0.20)"
+else:
+    BG_MAIN, BG_CARD, BG_SUB, TEXT_MAIN, TEXT_SUB, BORDER_C, ACCENT_C = "#060a12", "#0f172a", "#141f38", "#f8fafc", "#94a3b8", "#1e293b", "#f59e0b"
+    BTN_BG, BTN_BORDER, CARD_SHADOW = "linear-gradient(135deg,#111c33,#1e293b)", "#38bdf866", "0 6px 18px rgba(0,0,0,0.38)"
+
+st.markdown(f"""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
+
+header[data-testid="stHeader"], div[data-testid="stToolbar"], div[data-testid="stDecoration"] {{ display:none !important; }}
+html, body, [data-testid="stAppViewContainer"], .main, p, label, button, input, .stMarkdown {{
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+}}
+[data-testid="stIconMaterial"], .material-icons, .material-symbols-rounded {{
+    font-family: 'Material Symbols Rounded' !important; font-weight: normal !important; font-style: normal !important;
+    font-size: 1.15rem !important; line-height: 1 !important; letter-spacing: normal !important; text-transform: none !important;
+    display: inline-block !important; white-space: nowrap !important; word-wrap: normal !important; direction: ltr !important;
+}}
+html, body, [data-testid="stAppViewContainer"], .main {{ background-color:{BG_MAIN} !important; color:{TEXT_MAIN} !important; scroll-behavior:smooth !important; }}
+.block-container {{ padding-top:1.0rem !important; padding-bottom:4.8rem !important; max-width:97% !important; }}
+
+a.brand-logo-link {{ text-decoration:none !important; display:inline-flex; align-items:center; gap:10px; padding:2px 4px; }}
+.clean-compass-icon {{ font-size:2.15rem; line-height:1; background:transparent !important; border:none !important; padding:0 !important; }}
+.brand-title-glow {{
+    font-size:1.30rem; font-weight:800; letter-spacing:-0.4px; line-height:1.18;
+    background:linear-gradient(90deg, #f59e0b 0%, #ef4444 48%, #10b981 100%);
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+}}
+.brand-subtitle {{ font-size:0.72rem; font-weight:600; color:{TEXT_SUB} !important; }}
+
+[data-testid="stWidgetLabel"] p, [data-testid="stWidgetLabel"] label, .stSelectbox label, .stNumberInput label, .stTextInput label, .stRadio label, [data-testid="stRadio"] label span, [data-testid="stToggle"] label p, [data-testid="stCheckbox"] label p {{
+    color:{TEXT_MAIN} !important; font-weight:700 !important; font-size:0.80rem !important; opacity:1 !important;
+}}
+[data-testid="stRadio"] div[role="radiogroup"] {{ background:{BG_CARD}; border:1px solid {BORDER_C}; padding:3px 10px; border-radius:999px; gap:10px !important; }}
+
+div.stButton > button, button[data-testid="stBaseButton-secondary"], div.stDownloadButton > button,
+div.stLinkButton > a, a[data-testid="stBaseLinkButton-secondary"] {{
+    background:{BTN_BG} !important; color:{TEXT_MAIN} !important; border:1.5px solid {BTN_BORDER} !important;
+    border-radius:10px !important; font-weight:800 !important; font-size:0.79rem !important;
+    padding:0.42rem 0.80rem !important; box-shadow:{CARD_SHADOW} !important; text-decoration:none !important;
+}}
+div.stButton > button p, div.stDownloadButton > button p, div.stLinkButton > a p, a[data-testid="stBaseLinkButton-secondary"] p, a[data-testid="stBaseLinkButton-secondary"] span {{
+    color:{TEXT_MAIN} !important; font-weight:800 !important;
+}}
+div.stButton > button:hover, div.stDownloadButton > button:hover, div.stLinkButton > a:hover, a[data-testid="stBaseLinkButton-secondary"]:hover {{
+    background:linear-gradient(135deg,#f59e0b,#ea580c) !important; color:#ffffff !important; border-color:#f59e0b !important;
+}}
+div.stButton > button:hover p, div.stLinkButton > a:hover p, a[data-testid="stBaseLinkButton-secondary"]:hover p, a[data-testid="stBaseLinkButton-secondary"]:hover span {{
+    color:#ffffff !important;
+}}
+button[data-testid="stBaseButton-primary"] {{
+    background:linear-gradient(135deg, #f59e0b 0%, #ea580c 100%) !important; color:#ffffff !important;
+    border:1.5px solid #fbbf24 !important; border-radius:10px !important; font-weight:800 !important; font-size:0.81rem !important;
+}}
+button[data-testid="stBaseButton-primary"] p {{ color:#ffffff !important; font-weight:800 !important; }}
+
+.live-pulse-bar {{
+    background:{BG_CARD}; border:1px solid {BORDER_C}; border-radius:12px; padding:7px 12px;
+    margin:4px 0 8px 0; display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:7px; box-shadow:{CARD_SHADOW};
+}}
+.tick-chip-up {{
+    background:rgba(16, 185, 129, 0.14); border:1.5px solid #10b981; border-radius:9px; padding:4px 10px;
+    font-family:'JetBrains Mono',monospace !important; font-size:0.79rem; font-weight:800; color:#10b981;
+    display:inline-flex; align-items:center; gap:6px;
+}}
+.tick-chip-down {{
+    background:rgba(239, 68, 68, 0.14); border:1.5px solid #ef4444; border-radius:9px; padding:4px 10px;
+    font-family:'JetBrains Mono',monospace !important; font-size:0.79rem; font-weight:800; color:#ef4444;
+    display:inline-flex; align-items:center; gap:6px;
+}}
+.breadth-mini-pill {{ background:{BG_SUB}; border:1px solid {BORDER_C}; border-radius:9px; padding:4px 10px; font-size:0.76rem; font-weight:800; }}
+.live-dot {{ width:8px; height:8px; border-radius:50%; display:inline-block; }}
+
+.alert-drawer-box {{ background:{BG_CARD}; border:2px solid #f59e0b; border-radius:14px; padding:12px 16px; margin:6px 0 12px 0; }}
+.alert-timeline-grid {{ display:grid; grid-template-columns:repeat(auto-fit, minmax(275px, 1fr)); gap:8px; max-height:360px; overflow-y:auto; padding:4px 2px; }}
+a.alert-log-item {{ text-decoration:none !important; background:{BG_SUB}; border:1px solid {BORDER_C}; border-radius:9px; padding:8px 11px; color:{TEXT_MAIN} !important; display:flex; flex-direction:column; gap:3px; }}
+.al-bull-left {{ border-left:4px solid #10b981 !important; }}
+.al-bear-left {{ border-left:4px solid #ef4444 !important; }}
+
+div[data-testid="stHorizontalBlock"] {{ align-items: flex-end !important; }}
+@media (max-width: 768px) {{
+    .live-pulse-bar {{ display:grid !important; grid-template-columns: 1fr 1fr !important; gap:6px !important; }}
+    .compass-pill {{ grid-column: span 2 !important; text-align:center !important; }}
+}}
+
+a.svg-gauge-card {{
+    text-decoration:none !important; background:{BG_CARD}; border:1.5px solid {BORDER_C}; border-radius:12px; padding:10px 14px;
+    display:flex; align-items:center; justify-content:space-between; box-shadow:{CARD_SHADOW};
+}}
+a.svg-gauge-card:hover {{ border-color:#f59e0b; }}
+.svg-gauge-info {{ display:flex; flex-direction:column; gap:4px; max-width:63%; }}
+.svg-gauge-title {{ font-size:0.90rem; font-weight:800; color:{TEXT_MAIN}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
+.svg-gauge-sub {{ font-size:0.72rem; color:{TEXT_SUB}; font-weight:600; }}
+.sector-grid-wrap {{ display:grid; grid-template-columns:repeat(auto-fit, minmax(340px, 1fr)); gap:10px; margin-top:8px; }}
+
+.master-viewer-bar {{
+    font-size:0.84rem; font-weight:800; color:{TEXT_MAIN}; background:{BG_CARD}; border:1.5px solid {BORDER_C}; border-left:4px solid #10b981;
+    height:42px; padding:0 14px; border-radius:10px; display:flex; align-items:center; justify-content:space-between;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}}
+
+.kite-order-pad {{ background:{BG_CARD}; border:1.5px solid #387ed1; border-top:4px solid #ff5722; border-radius:14px; padding:12px 16px; margin:10px 0 12px 0; }}
+.kite-ticket-metric {{ background:{BG_SUB}; border:1px solid {BORDER_C}; border-radius:9px; padding:7px 10px; text-align:center; }}
+.kite-metric-lbl {{ font-size:0.68rem; color:{TEXT_SUB}; font-weight:700; display:block; }}
+.kite-metric-val {{ font-size:0.92rem; font-weight:800; font-family:'JetBrains Mono',monospace !important; color:{TEXT_MAIN}; }}
+
+.ai-verdict-box {{ background:{BG_CARD}; border:2px solid #f59e0b; border-radius:14px; padding:14px 18px; margin:10px 0 14px 0; }}
+.ai-sub-card {{ background:{BG_SUB}; border:1px solid {BORDER_C}; border-radius:10px; padding:10px 12px; height:100%; }}
+
+button[data-baseweb="tab"] {{ background:{BG_CARD} !important; border:1.5px solid {BORDER_C} !important; border-radius:10px 10px 0 0 !important; margin-right:6px !important; padding:8px 16px !important; }}
+button[data-baseweb="tab"] p {{ color:{TEXT_MAIN} !important; font-weight:700 !important; font-size:0.84rem !important; }}
+button[data-baseweb="tab"][aria-selected="true"] {{ background:linear-gradient(135deg,rgba(245,158,11,0.22),rgba(16,185,129,0.18)) !important; border-color:#f59e0b !important; border-bottom:3px solid #f59e0b !important; }}
+button[data-baseweb="tab"][aria-selected="true"] p {{ color:#f59e0b !important; font-weight:800 !important; }}
+[data-testid="stExpander"] details {{ background:{BG_CARD} !important; border:1px solid {BORDER_C} !important; border-radius:10px !important; box-shadow:{CARD_SHADOW}; margin-top:2px !important; }}
+[data-testid="stExpander"] summary {{ padding:8px 14px !important; display:flex !important; align-items:center !important; gap:8px !important; }}
+[data-testid="stExpander"] summary p {{ color:{TEXT_MAIN} !important; font-weight:700 !important; font-size:0.81rem !important; margin:0 !important; }}
+
+.aligned-sec-hdr {{ font-size:0.86rem; font-weight:800; color:{TEXT_MAIN}; background:{BG_CARD}; border:1px solid {BORDER_C}; border-left:4px solid #f59e0b; padding:7px 12px; border-radius:8px; margin-bottom:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
+
+.nse-heatmap-container {{ background:{BG_CARD}; border:1.5px solid {BORDER_C}; border-radius:14px; padding:14px 16px; margin:8px 0 14px 0; }}
+.nse-heatmap-grid {{ display:grid; grid-template-columns:repeat(auto-fill, minmax(175px, 1fr)); gap:8px; margin-top:10px; }}
+a.nse-tile {{ text-decoration:none !important; color:#ffffff !important; padding:10px 12px; border-radius:8px; display:flex; flex-direction:column; justify-content:space-between; height:74px; border:1px solid rgba(255,255,255,0.15); }}
+.nse-tile-name {{ font-size:0.74rem; font-weight:800; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
+.nse-tile-bot {{ display:flex; justify-content:space-between; align-items:baseline; font-family:'JetBrains Mono',monospace !important; }}
+
+.compass-pill {{ padding:4px 11px; border-radius:999px; font-size:0.74rem; font-weight:800; }}
+.turnaround-hero-box {{ background:{BG_CARD}; border:1.5px solid {BORDER_C}; border-left:5px solid #10b981; border-radius:12px; padding:10px 14px; margin:4px 0 10px 0; box-shadow:{CARD_SHADOW}; }}
+.turnaround-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(225px,1fr)); gap:8px; margin-top:8px; }}
+a.turn-sec-card {{ text-decoration:none !important; background:{BG_SUB}; border:1px solid #10b98155; border-radius:10px; padding:8px 11px; color:{TEXT_MAIN} !important; display:flex; flex-direction:column; justify-content:space-between; height:88px; }}
+.t-sec-name {{ font-weight:800; font-size:0.81rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:145px; }}
+
+.radar-panel-bull {{ background:{BG_CARD}; border:1px solid #10b98166; border-top:3.5px solid #10b981; border-radius:12px; padding:10px 12px; margin-bottom:8px; }}
+.radar-panel-bear {{ background:{BG_CARD}; border:1px solid #ef444466; border-top:3.5px solid #ef4444; border-radius:12px; padding:10px 12px; margin-bottom:8px; }}
+.radar-panel-header {{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-bottom:5px; border-bottom:1px solid {BORDER_C}; }}
+.radar-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(235px,1fr)); gap:7px; }}
+a.radar-row-card {{ text-decoration:none !important; background:{BG_SUB}; border:1px solid {BORDER_C}; border-radius:9px; padding:8px 10px; color:{TEXT_MAIN} !important; display:flex; flex-direction:column; justify-content:space-between; min-height:96px; }}
+.r-top {{ display:flex; justify-content:space-between; align-items:center; }}
+.r-sym {{ font-size:0.84rem; font-weight:800; color:{TEXT_MAIN}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:155px; }}
+.r-tag-bull {{ background:rgba(16,185,129,0.16); color:#10b981; border:1px solid #10b98155; padding:1px 6px; border-radius:5px; font-size:0.66rem; font-weight:800; }}
+.r-tag-bear {{ background:rgba(239,68,68,0.16); color:#ef4444; border:1px solid #ef444455; padding:1px 6px; border-radius:5px; font-size:0.66rem; font-weight:800; }}
+.r-mid {{ display:flex; justify-content:space-between; font-size:0.73rem; color:{TEXT_SUB}; }}
+.r-reason-box {{ font-size:0.70rem; color:{TEXT_MAIN}; background:rgba(245,158,11,0.10); border-left:2.5px solid #f59e0b; padding:3px 7px; border-radius:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
+.r-plan {{ display:flex; justify-content:space-between; font-size:0.70rem; font-weight:700; background:rgba(0,0,0,0.16); padding:3px 7px; border-radius:6px; font-family:'JetBrains Mono',monospace !important; }}
+a.wa-share-btn {{ text-decoration:none !important; background:linear-gradient(135deg,#16a34a,#22c55e); color:#fff !important; padding:5px 13px; border-radius:999px; font-size:0.75rem; font-weight:800; display:inline-flex; align-items:center; gap:5px; }}
+
+.pill-container {{ display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }}
+a.bull-pill, a.bear-pill {{ text-decoration:none !important; padding:3px 8px; border-radius:999px; font-size:0.71rem; font-weight:700; display:inline-flex; align-items:center; gap:4px; }}
+a.bull-pill {{ background:rgba(16,185,129,0.14); border:1px solid #10b98199; color:#10b981 !important; }}
+a.bear-pill {{ background:rgba(239,68,68,0.14); border:1px solid #ef444499; color:#ef4444 !important; }}
+
+.floating-right-dock {{ position:fixed; bottom:58px; right:18px; z-index:999999; display:flex; flex-direction:column; gap:7px; align-items:flex-end; }}
+a.single-top-btn {{ text-decoration:none !important; background:linear-gradient(135deg,#f59e0b,#ea580c); color:#fff !important; padding:7px 15px; border-radius:999px; font-size:0.79rem; font-weight:800; border:1.5px solid rgba(255,255,255,0.35); box-shadow:0 6px 20px rgba(245,158,11,0.5); }}
+</style>
+""", unsafe_allow_html=True)
+
+def make_stock_pills(df_sub: pd.DataFrame, tf_col: str = "1D") -> str:
+    ap = get_auto_param()
+    pills = []
+    col_use = tf_col if tf_col in df_sub.columns else "1D"
+    for _, r in df_sub.iterrows():
+        qt = urllib.parse.quote(str(r["Ticker"]))
+        val_c = safe_num(r.get(col_use, r.get("1D", 0.0)))
+        cls = "bull-pill" if val_c >= 0 else "bear-pill"
+        icon = "🟢" if val_c >= 0 else "🔴"
+        pills.append(f'<a class="{cls}" href="?focus_stock={qt}&auto={ap}" target="_self">{icon} {r["Symbol"]} ({val_c:+.1f}%)</a>')
+    return f'<div class="pill-container">{"".join(pills)}</div>'
+
+def make_svg_speedometer_card(s_row: pd.Series, tf_choice: str) -> str:
+    score = int(np.clip(safe_num(s_row["Meter"], 50), 5, 98))
+    ret_val = safe_num(s_row[tf_choice], 0.0)
+    s_name = s_row["Sector"]
+    col = "#10b981" if ret_val >= 0 else "#ef4444"
+    ret_col = "#10b981" if ret_val >= 0 else "#ef4444"
+    rs_col = "#10b981" if s_row["Sec_RS"] >= 0 else "#ef4444"
+    dash_len = round((score / 100.0) * 126.0, 1)
+    q_s = urllib.parse.quote(s_name)
+    ap = get_auto_param()
+
+    return (
+        f'<a href="?focus_sec={q_s}&auto={ap}" target="_self" class="svg-gauge-card" title="Click to open {s_name} stocks in Master Viewer">'
+        f'<div class="svg-gauge-info">'
+        f'<div class="svg-gauge-title">🧭 {s_name} 🔍</div>'
+        f'<div class="svg-gauge-sub">{s_row["Zone"]} • 🤝 Sync: <b style="color:{"#10b981" if s_row["Peer_Up_Pct"]>=50 else "#ef4444"};">{s_row["Up_Count"]}/{s_row["Count"]} Up ({s_row["Peer_Up_Pct"]:.0f}%)</b></div>'
+        f'<div class="svg-gauge-sub">Vol: <b>{s_row["Avg_Vol"]}x</b> • ⚡ RS: <b style="color:{rs_col};">{s_row["Sec_RS"]:+.2f}%</b> • ⭐ <b style="color:#f59e0b;">{s_row["Top_Pick"]}</b></div>'
+        f'</div>'
+        f'<div style="text-align:center;min-width:116px;">'
+        f'<svg width="112" height="62" viewBox="0 0 100 58">'
+        f'<path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="rgba(148,163,184,0.22)" stroke-width="10" stroke-linecap="round"/>'
+        f'<path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="{col}" stroke-width="10" stroke-linecap="round" stroke-dasharray="{dash_len} 126"/>'
+        f'<text x="50" y="47" text-anchor="middle" fill="{TEXT_MAIN}" font-size="14" font-weight="800" font-family="JetBrains Mono">{score}</text>'
+        f'</svg>'
+        f'<div style="font-size:0.74rem;font-weight:800;color:{ret_col};margin-top:-6px;font-family:\'JetBrains Mono\',monospace;">{ret_val:+.2f}% ({tf_choice})</div>'
+        f'</div></a>'
+    )
+
+# ==============================================================================
+# 9. TRUE GREEN / RED PULSE BAR (RED WHEN DOWN, GREEN WHEN UP)
 # ==============================================================================
 adv_today, dec_today = int((stocks_df["1D"] > 0).sum()), int((stocks_df["1D"] < 0).sum())
 
@@ -1011,7 +1000,6 @@ def make_true_color_chip(label: str, key: str):
     cur_val = d["price"]
     day_pct = d["1D"]
     pts_val = d.get("pts", 0.0)
-    # Strictly Green ONLY if today's change >= 0, Red if < 0!
     is_green = day_pct >= 0
     cls = "tick-chip-up" if is_green else "tick-chip-down"
     arr = "▲" if is_green else "▼"
@@ -1130,7 +1118,6 @@ with fc5:
 # ==============================================================================
 # 10.1 AI MARKET BRIEF + ANY-STOCK CUSTOM AI SEARCH ENGINE
 # ==============================================================================
-# Sort turnaround sectors so GREEN in selected timeframe are strictly on top, then descending sequence!
 sectors_df["Is_Green_TF"] = sectors_df[tf_choice] >= 0
 turnaround_secs = sectors_df.sort_values(
     by=["Is_Green_TF", tf_choice, "Turnaround_Score"],
@@ -1147,7 +1134,7 @@ if st.session_state.show_ai_helper:
     with ai_b1:
         st.info(
             f"🧭 **Market Summary:** Nifty {n_d['price']:,.2f} ({n_d['1D']:+.2f}%) | Bank Nifty {b_d['price']:,.2f} ({b_d['1D']:+.2f}%)\n\n"
-            f"🟢 **Top Performing / Turnaround Sectors ({tf_choice}):** {top_turn_names}\n\n"
+            f"🟢 **Top Performing Sectors ({tf_choice}):** {top_turn_names}\n\n"
             f"🚀 **Top Bullish Intraday Picks:** {top_bull_syms}\n\n"
             f"🔻 **Top Bearish Intraday Picks:** {top_bear_syms}"
         )
@@ -1205,7 +1192,6 @@ if st.session_state.show_nse_heatmap:
         return "#047857" if val >= 2.5 else ("#10b981" if val >= 0.75 else ("#059669" if val >= 0.0 else ("#e11d48" if val >= -1.0 else ("#dc2626" if val >= -2.5 else "#991b1b"))))
 
     heatmap_tiles = []
-    # Strictly sorted from highest green to lowest red!
     for _, srow in sectors_df.sort_values(tf_choice, ascending=False).iterrows():
         v_pct = safe_num(srow[tf_choice], 0.0)
         bg_c = get_nse_tile_color(v_pct)
@@ -1449,7 +1435,7 @@ if st.session_state.selected_stock != DEFAULT_STOCK:
                 unsafe_allow_html=True
             )
 
-        # ZERODHA KITE ORDER PAD (OFFICIAL PUBLISHER JS + INSTANT CTRL+K LAUNCHER)
+        # ZERODHA KITE ORDER PAD
         st.markdown(
             '<div class="kite-order-pad">'
             '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">'
@@ -1545,7 +1531,7 @@ if st.session_state.selected_stock != DEFAULT_STOCK:
         st.markdown("---")
 
 # ==============================================================================
-# 14. 4 ULTRA-FAST CONSOLIDATED TABS (COLLAPSED BY DEFAULT + PERFECT SEQUENCE)
+# 14. 4 ULTRA-FAST CONSOLIDATED TABS
 # ==============================================================================
 live_tab_badge = f"🟢 {len(bull_15m_df) + len(bear_15m_df)} Active" if is_mkt_open else "⏸️ Standby"
 tab1, tab2, tab3, tab4 = st.tabs([
@@ -1557,7 +1543,6 @@ tab1, tab2, tab3, tab4 = st.tabs([
 
 with tab1:
     f_secs = sectors_df.copy()
-    # STRICT SEQUENCE SORTING: Green on Top -> Downward Sequence in Selected Timeframe!
     if "Green Top" in sort_choice:
         f_secs = f_secs.sort_values(tf_choice, ascending=False).reset_index(drop=True)
     elif "Bottom Turnaround" in sort_choice:
@@ -1571,11 +1556,10 @@ with tab1:
         f_secs = f_secs.sort_values(["Avg_Vol", tf_choice], ascending=[False, False]).reset_index(drop=True)
 
     st.markdown('<div id="sector-viewer-anchor"></div>', unsafe_allow_html=True)
-    all_sec_options = ["Select a Sector to View Stocks..."] + f_secs["Sector"].tolist()
+    all_sec_options = [EMPTY_VIEWER] + f_secs["Sector"].tolist()
     if st.session_state.inspect_sector not in all_sec_options:
-        st.session_state.inspect_sector = "Select a Sector to View Stocks..."
+        st.session_state.inspect_sector = EMPTY_VIEWER
 
-    # PERFECTLY LEVEL 2-COLUMN BAR (Both label_visibility="collapsed" & 42px height!)
     mv_c1, mv_c2 = st.columns([4.0, 6.0])
     with mv_c1:
         chosen_view_sec = st.selectbox(
@@ -1588,7 +1572,7 @@ with tab1:
             st.session_state.inspect_sector = chosen_view_sec
             st.rerun()
     with mv_c2:
-        if st.session_state.inspect_sector != "Select a Sector to View Stocks...":
+        if st.session_state.inspect_sector != EMPTY_VIEWER:
             sec_meta = sectors_df[sectors_df["Sector"] == st.session_state.inspect_sector].iloc[0]
             s_tf_v = sec_meta[tf_choice]
             s_col = "#10b981" if s_tf_v >= 0 else "#ef4444"
@@ -1608,9 +1592,7 @@ with tab1:
                 unsafe_allow_html=True
             )
 
-    # ONLY OPEN STOCK TABLE WHEN USER SELECTS A SECTOR (NOT ALWAYS CLUTTERED!)
-    if st.session_state.inspect_sector != "Select a Sector to View Stocks...":
-        # Strictly sort stocks inside the sector from Highest Green on Top -> Downward Sequence!
+    if st.session_state.inspect_sector != EMPTY_VIEWER:
         active_sec_stocks = stocks_df[stocks_df["Sector"] == st.session_state.inspect_sector].sort_values(tf_choice, ascending=False)
         st.dataframe(
             style_colored_table(
@@ -1622,7 +1604,6 @@ with tab1:
         )
         st.markdown(make_stock_pills(active_sec_stocks, tf_choice), unsafe_allow_html=True)
 
-    # 42 SECTOR SPEEDOMETERS KEPT COLLAPSED BY DEFAULT SO PAGE LOOKS SUPER CLEAN!
     with st.expander(f"🎛️ View All {len(f_secs)} Sectors Speedometers & Sequence Cards (Sorted: Green Top ➔ Down in {tf_choice}) — Click to Open", expanded=False):
         gauge_cards_html = "".join([make_svg_speedometer_card(s_row, tf_choice) for _, s_row in f_secs.iterrows()])
         st.markdown(f'<div class="sector-grid-wrap">{gauge_cards_html}</div>', unsafe_allow_html=True)
@@ -1692,7 +1673,6 @@ with tab4:
     fig_b = go.Figure(go.Bar(x=chart_secs[tf_choice], y=chart_secs["Sector"], orientation="h", marker_color=["#10b981" if v >= 0 else "#ef4444" for v in chart_secs[tf_choice]], text=[f"{v:+.2f}%" for v in chart_secs[tf_choice]], textposition="outside"))
     fig_b.update_layout(height=860, template="plotly_dark" if "Clean Light" not in theme_mode else "plotly_white", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=10, r=40, t=15, b=10), font=dict(color=TEXT_MAIN))
     st.plotly_chart(fig_b, use_container_width=True)
-    # Strictly sorted from highest green to lowest red for the selected timeframe!
     st.dataframe(style_colored_table(sectors_df.sort_values(tf_choice, ascending=False)[["Sector", "Zone", tf_choice, "Sec_RS", "Peer_Up_Pct", "1D", "1W", "1M", "3M", "Avg_Vol", "RSI", "Top_Pick"]], [tf_choice, "Sec_RS", "1D", "1W", "1M", "3M"]), use_container_width=True, hide_index=True)
 
 # ==============================================================================
