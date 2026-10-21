@@ -17,7 +17,7 @@ warnings.filterwarnings("ignore")
 # 1. PAGE CONFIGURATION
 # ==============================================================================
 st.set_page_config(
-    page_title="AlphaPulse Pro | 3-Layer Sector & Intraday Terminal",
+    page_title="AlphaPulse Pro | Ultra-Fast Sector & Intraday Terminal",
     page_icon="🧭",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -81,7 +81,6 @@ DEFAULT_STOCK = "Search or Select Stock..."
 # ==============================================================================
 @st.cache_resource
 def get_3layer_notification_vault():
-    """Stores ONLY 3-Layer Confirmed Intraday Alerts (Sector + Peer Sync + VWAP/9EMA) from 9:15 to 3:30 IST."""
     return {"date": "", "items": [], "seen_keys": set()}
 
 def get_ist_now():
@@ -109,20 +108,11 @@ def push_3layer_alert(time_str: str, category: str, symbol: str, ticker: str, se
     if u_key not in alert_vault["seen_keys"]:
         alert_vault["seen_keys"].add(u_key)
         alert_vault["items"].insert(0, {
-            "time": time_str,
-            "category": category,
-            "symbol": symbol,
-            "ticker": ticker,
-            "sector": sector,
-            "peer_sync": peer_sync,
-            "price": round(float(price), 2),
-            "vwap": round(float(vwap), 2),
-            "ema9": round(float(ema9), 2),
-            "entry": round(float(entry), 2),
-            "sl": round(float(sl), 2),
-            "target": round(float(target), 2),
-            "note": note,
-            "is_bull": is_bull
+            "time": time_str, "category": category, "symbol": symbol, "ticker": ticker,
+            "sector": sector, "peer_sync": peer_sync, "price": round(float(price), 2),
+            "vwap": round(float(vwap), 2), "ema9": round(float(ema9), 2),
+            "entry": round(float(entry), 2), "sl": round(float(sl), 2),
+            "target": round(float(target), 2), "note": note, "is_bull": is_bull
         })
         return True
     return False
@@ -135,6 +125,7 @@ init_auto = False if qp.get("auto") == "0" else True
 
 for k, v in [
     ("selected_sector", DEFAULT_SECTOR),
+    ("inspect_sector", "Cement & Clinker"),
     ("selected_stock", DEFAULT_STOCK),
     ("scroll_target", None),
     ("last_alerted", ""),
@@ -172,7 +163,8 @@ if "focus_stock" in qp:
 if "focus_sec" in qp:
     clicked_sec = urllib.parse.unquote(qp["focus_sec"]).strip()
     if clicked_sec in SECTOR_STOCKS:
-        st.session_state.selected_sector = clicked_sec
+        st.session_state.inspect_sector = clicked_sec
+        st.session_state.scroll_target = "sector-viewer-anchor"
     st.query_params.clear()
     st.query_params["auto"] = get_auto_param()
 
@@ -182,7 +174,7 @@ if "focus_sec" in qp:
 st.markdown('<div id="top-anchor"></div>', unsafe_allow_html=True)
 
 mkt_status_html = (
-    f'<span style="color:#10b981;font-weight:800;">🟢 LIVE MARKET ({ist_now.strftime("%I:%M:%S %p IST")})</span>'
+    f'<span style="color:#10b981;font-weight:800;">🟢 LIVE MARKET ({ist_now.strftime("%I:%M %p IST")})</span>'
     if is_mkt_open else
     f'<span style="color:#f59e0b;font-weight:700;">🕒 MARKET CLOSED ({ist_now.strftime("%a %I:%M %p IST")})</span>'
 )
@@ -305,81 +297,33 @@ button[data-testid="stBaseButton-primary"] {{
 button[data-testid="stBaseButton-primary"] p {{ color:#ffffff !important; font-weight:800 !important; }}
 
 @keyframes flashGreenGlow {{
-    0% {{ background-color: rgba(16, 185, 129, 0.55); box-shadow: 0 0 18px rgba(16, 185, 129, 0.8); transform: scale(1.02); }}
-    100% {{ background-color: rgba(16, 185, 129, 0.12); box-shadow: none; transform: scale(1.0); }}
+    0% {{ background-color: rgba(16, 185, 129, 0.55); box-shadow: 0 0 18px rgba(16, 185, 129, 0.8); }}
+    100% {{ background-color: rgba(16, 185, 129, 0.12); box-shadow: none; }}
 }}
 @keyframes flashRedGlow {{
-    0% {{ background-color: rgba(239, 68, 68, 0.55); box-shadow: 0 0 18px rgba(239, 68, 68, 0.8); transform: scale(1.02); }}
-    100% {{ background-color: rgba(239, 68, 68, 0.12); box-shadow: none; transform: scale(1.0); }}
-}}
-@keyframes liveDotPulse {{
-    0%, 100% {{ opacity: 1; transform: scale(1); }}
-    50% {{ opacity: 0.35; transform: scale(1.25); }}
+    0% {{ background-color: rgba(239, 68, 68, 0.55); box-shadow: 0 0 18px rgba(239, 68, 68, 0.8); }}
+    100% {{ background-color: rgba(239, 68, 68, 0.12); box-shadow: none; }}
 }}
 .live-pulse-bar {{
-    background:{BG_CARD};
-    border:1px solid {BORDER_C};
-    border-radius:12px;
-    padding:7px 12px;
-    margin:4px 0 8px 0;
-    display:flex;
-    flex-wrap:wrap;
-    justify-content:space-between;
-    align-items:center;
-    gap:7px;
-    box-shadow:{CARD_SHADOW};
+    background:{BG_CARD}; border:1px solid {BORDER_C}; border-radius:12px; padding:7px 12px;
+    margin:4px 0 8px 0; display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:7px; box-shadow:{CARD_SHADOW};
 }}
 .tick-chip-up {{
-    background:rgba(16, 185, 129, 0.12);
-    border:1.5px solid #10b981;
-    border-radius:9px;
-    padding:4px 10px;
-    font-family:'JetBrains Mono',monospace !important;
-    font-size:0.79rem;
-    font-weight:800;
-    color:#10b981;
-    animation: flashGreenGlow 1.5s ease-out;
-    display:inline-flex;
-    align-items:center;
-    gap:6px;
+    background:rgba(16, 185, 129, 0.12); border:1.5px solid #10b981; border-radius:9px; padding:4px 10px;
+    font-family:'JetBrains Mono',monospace !important; font-size:0.79rem; font-weight:800; color:#10b981;
+    animation: flashGreenGlow 1.4s ease-out; display:inline-flex; align-items:center; gap:6px;
 }}
 .tick-chip-down {{
-    background:rgba(239, 68, 68, 0.12);
-    border:1.5px solid #ef4444;
-    border-radius:9px;
-    padding:4px 10px;
-    font-family:'JetBrains Mono',monospace !important;
-    font-size:0.79rem;
-    font-weight:800;
-    color:#ef4444;
-    animation: flashRedGlow 1.5s ease-out;
-    display:inline-flex;
-    align-items:center;
-    gap:6px;
+    background:rgba(239, 68, 68, 0.12); border:1.5px solid #ef4444; border-radius:9px; padding:4px 10px;
+    font-family:'JetBrains Mono',monospace !important; font-size:0.79rem; font-weight:800; color:#ef4444;
+    animation: flashRedGlow 1.4s ease-out; display:inline-flex; align-items:center; gap:6px;
 }}
-.breadth-mini-pill {{
-    background:{BG_SUB};
-    border:1px solid {BORDER_C};
-    border-radius:9px;
-    padding:4px 10px;
-    font-size:0.76rem;
-    font-weight:800;
-}}
-.live-dot {{ width:8px; height:8px; border-radius:50%; display:inline-block; animation: liveDotPulse 1.2s infinite; }}
+.breadth-mini-pill {{ background:{BG_SUB}; border:1px solid {BORDER_C}; border-radius:9px; padding:4px 10px; font-size:0.76rem; font-weight:800; }}
+.live-dot {{ width:8px; height:8px; border-radius:50%; display:inline-block; }}
 
-.alert-drawer-box {{
-    background:{BG_CARD}; border:2px solid #f59e0b; border-radius:14px; padding:12px 16px;
-    margin:6px 0 12px 0; box-shadow:0 8px 26px rgba(245,158,11,0.22);
-}}
-.alert-timeline-grid {{
-    display:grid; grid-template-columns:repeat(auto-fit, minmax(275px, 1fr));
-    gap:8px; max-height:360px; overflow-y:auto; padding:4px 2px;
-}}
-a.alert-log-item {{
-    text-decoration:none !important; background:{BG_SUB}; border:1px solid {BORDER_C};
-    border-radius:9px; padding:8px 11px; color:{TEXT_MAIN} !important; display:flex;
-    flex-direction:column; gap:3px; transition:all 0.16s ease;
-}}
+.alert-drawer-box {{ background:{BG_CARD}; border:2px solid #f59e0b; border-radius:14px; padding:12px 16px; margin:6px 0 12px 0; box-shadow:0 8px 26px rgba(245,158,11,0.22); }}
+.alert-timeline-grid {{ display:grid; grid-template-columns:repeat(auto-fit, minmax(275px, 1fr)); gap:8px; max-height:360px; overflow-y:auto; padding:4px 2px; }}
+a.alert-log-item {{ text-decoration:none !important; background:{BG_SUB}; border:1px solid {BORDER_C}; border-radius:9px; padding:8px 11px; color:{TEXT_MAIN} !important; display:flex; flex-direction:column; gap:3px; transition:all 0.16s ease; }}
 a.alert-log-item:hover {{ border-color:#f59e0b; transform:translateY(-2px); }}
 .al-bull-left {{ border-left:4px solid #10b981 !important; }}
 .al-bear-left {{ border-left:4px solid #ef4444 !important; }}
@@ -390,13 +334,26 @@ div[data-testid="stHorizontalBlock"] {{ align-items: flex-end !important; }}
     .compass-pill {{ grid-column: span 2 !important; text-align:center !important; }}
 }}
 
-.svg-gauge-card {{
-    background:{BG_CARD}; border:1px solid {BORDER_C}; border-radius:12px; padding:10px 14px 6px 14px;
-    margin-bottom:4px; display:flex; align-items:center; justify-content:space-between; box-shadow:{CARD_SHADOW};
+/* CLICKABLE ULTRA-LIGHT SVG GAUGE CARDS (ZERO DOM BLOAT) */
+a.svg-gauge-card {{
+    text-decoration:none !important;
+    background:{BG_CARD}; border:1.5px solid {BORDER_C}; border-radius:12px; padding:10px 14px;
+    display:flex; align-items:center; justify-content:space-between; box-shadow:{CARD_SHADOW};
+    transition:all 0.18s ease;
 }}
-.svg-gauge-info {{ display:flex; flex-direction:column; gap:3px; max-width:63%; }}
-.svg-gauge-title {{ font-size:0.89rem; font-weight:800; color:{TEXT_MAIN}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
+a.svg-gauge-card:hover {{
+    border-color:#f59e0b;
+    transform:translateY(-2px);
+}}
+.svg-gauge-info {{ display:flex; flex-direction:column; gap:4px; max-width:63%; }}
+.svg-gauge-title {{ font-size:0.90rem; font-weight:800; color:{TEXT_MAIN}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
 .svg-gauge-sub {{ font-size:0.72rem; color:{TEXT_SUB}; font-weight:600; }}
+.sector-grid-wrap {{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(340px, 1fr));
+    gap:10px;
+    margin-top:8px;
+}}
 
 .kite-order-pad {{ background:{BG_CARD}; border:1.5px solid #387ed1; border-top:4px solid #ff5722; border-radius:14px; padding:12px 16px; margin:10px 0 12px 0; box-shadow:0 8px 24px rgba(56,126,209,0.18); }}
 .kite-ticket-metric {{ background:{BG_SUB}; border:1px solid {BORDER_C}; border-radius:9px; padding:7px 10px; text-align:center; }}
@@ -456,7 +413,7 @@ a.single-top-btn {{ text-decoration:none !important; background:linear-gradient(
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 7. FAST DATA ENGINE WITH PEER SYNC %, RS VS NIFTY & 3-LAYER INTRADAY FILTER
+# 7. STEP 1 OPTIMIZATION: UNBREAKABLE ZERO-ARG CACHE FOR 420+ STOCKS
 # ==============================================================================
 def safe_num(val, default: float = 0.0) -> float:
     try:
@@ -505,36 +462,36 @@ def make_svg_speedometer_card(s_row: pd.Series, tf_choice: str) -> str:
     ap = get_auto_param()
 
     return (
-        f'<div class="svg-gauge-card">'
+        f'<a href="?focus_sec={q_s}&auto={ap}" target="_self" class="svg-gauge-card" title="Click to open {s_name} stocks in Master Viewer">'
         f'<div class="svg-gauge-info">'
-        f'<a href="?focus_sec={q_s}&auto={ap}" target="_self" style="text-decoration:none;"><div class="svg-gauge-title">🧭 {s_name}</div></a>'
+        f'<div class="svg-gauge-title">🧭 {s_name} 🔍</div>'
         f'<div class="svg-gauge-sub">{s_row["Zone"]} • 🤝 Sync: <b style="color:#10b981;">{s_row["Up_Count"]}/{s_row["Count"]} Up ({s_row["Peer_Up_Pct"]:.0f}%)</b></div>'
-        f'<div class="svg-gauge-sub">Vol: <b>{s_row["Avg_Vol"]}x</b> • ⚡ RS vs Nifty: <b style="color:{rs_col};">{s_row["Sec_RS"]:+.2f}%</b> • ⭐ <b style="color:#f59e0b;">{s_row["Top_Pick"]}</b></div>'
+        f'<div class="svg-gauge-sub">Vol: <b>{s_row["Avg_Vol"]}x</b> • ⚡ RS: <b style="color:{rs_col};">{s_row["Sec_RS"]:+.2f}%</b> • ⭐ <b style="color:#f59e0b;">{s_row["Top_Pick"]}</b></div>'
         f'</div>'
-        f'<div style="text-align:center;min-width:118px;">'
-        f'<svg width="114" height="64" viewBox="0 0 100 58">'
+        f'<div style="text-align:center;min-width:116px;">'
+        f'<svg width="112" height="62" viewBox="0 0 100 58">'
         f'<path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="rgba(148,163,184,0.22)" stroke-width="10" stroke-linecap="round"/>'
         f'<path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="{col}" stroke-width="10" stroke-linecap="round" stroke-dasharray="{dash_len} 126"/>'
         f'<text x="50" y="47" text-anchor="middle" fill="{TEXT_MAIN}" font-size="14" font-weight="800" font-family="JetBrains Mono">{score}</text>'
         f'</svg>'
-        f'<div style="font-size:0.75rem;font-weight:800;color:{ret_col};margin-top:-6px;font-family:\'JetBrains Mono\',monospace;">{ret_val:+.2f}% ({tf_choice})</div>'
-        f'</div></div>'
+        f'<div style="font-size:0.74rem;font-weight:800;color:{ret_col};margin-top:-6px;font-family:\'JetBrains Mono\',monospace;">{ret_val:+.2f}% ({tf_choice})</div>'
+        f'</div></a>'
     )
 
-@st.cache_data(ttl=8, show_spinner=False)
+@st.cache_data(ttl=60, show_spinner=False)
 def load_pulse_indices():
     idx_tickers = {"NIFTY": "^NSEI", "BANKNIFTY": "^NSEBANK", "VIX": "^INDIAVIX", "USDINR": "INR=X"}
     res = {}
     try:
         raw_1d = yf.download(list(idx_tickers.values()), period="6mo", interval="1d", progress=False, group_by="ticker", threads=True)
-        raw_1m = yf.download(list(idx_tickers.values()), period="2d", interval="1m", progress=False, group_by="ticker", threads=True)
+        raw_5m = yf.download(list(idx_tickers.values()), period="2d", interval="5m", progress=False, group_by="ticker", threads=True)
         for k, sym in idx_tickers.items():
             try:
                 df_d = raw_1d[sym].dropna(subset=["Close"])
-                df_m = raw_1m[sym].dropna(subset=["Close"]) if sym in raw_1m else pd.DataFrame()
+                df_m = raw_5m[sym].dropna(subset=["Close"]) if sym in raw_5m else pd.DataFrame()
                 if len(df_d) >= 2:
                     live_p = safe_num(df_m["Close"].iloc[-1], safe_num(df_d["Close"].iloc[-1])) if not df_m.empty else safe_num(df_d["Close"].iloc[-1])
-                    prev_tick_1m = safe_num(df_m["Close"].iloc[-2], live_p) if len(df_m) >= 2 else live_p
+                    prev_tick_5m = safe_num(df_m["Close"].iloc[-2], live_p) if len(df_m) >= 2 else live_p
                     if not df_m.empty:
                         last_day = df_m.index[-1].date()
                         prev_days_df = df_d[df_d.index.date < last_day]
@@ -546,7 +503,7 @@ def load_pulse_indices():
                     if live_p > 0:
                         res[k] = {
                             "price": live_p,
-                            "prev_tick": prev_tick_1m,
+                            "prev_tick": prev_tick_5m,
                             "1D": round(chg_1d, 2),
                             "1W": round(calc_return(df_d["Close"], 5), 2),
                             "1M": round(calc_return(df_d["Close"], 21), 2),
@@ -570,8 +527,9 @@ def load_pulse_indices():
             res[k] = v
     return res
 
-@st.cache_data(ttl=150, show_spinner=False)
-def load_full_market_data(nifty_1d: float = 0.0):
+@st.cache_data(ttl=300, show_spinner=False)
+def load_full_market_data():
+    """ZERO-ARGUMENT CACHE: Never invalidates when Nifty ticks! Stays in RAM for 5 full minutes."""
     raw = yf.download(ALL_TICKERS, period="6mo", interval="1d", progress=False, group_by="ticker", threads=True)
     stock_rows = []
     for ticker in ALL_TICKERS:
@@ -634,7 +592,6 @@ def load_full_market_data(nifty_1d: float = 0.0):
 
             atr_clean = round(max(float(np.mean(h_arr[-14:] - l_arr[-14:])), c_now * 0.012), 2)
             dist_20 = round(((c_now - dma20) / dma20) * 100.0, 2) if dma20 > 0 else 0.0
-            rs_vs_nifty = round(r_1d - nifty_1d, 2)
 
             if rsi_val >= 75 or consec_up >= 4:
                 action_sig = "⚠️ Overbought"
@@ -653,7 +610,7 @@ def load_full_market_data(nifty_1d: float = 0.0):
                 "Ticker": ticker, "Symbol": ticker.replace(".NS", ""), "Sector": TICKER_TO_SECTOR.get(ticker, "Others"),
                 "Price": round(c_now, 2), "1D": round(r_1d, 2), "1W": round(r_1w, 2), "1M": round(r_1m, 2),
                 "3M": round(r_3m, 2), "6M": round(r_6m, 2), "1Y": round(r_6m, 2),
-                "RS_vs_Nifty": rs_vs_nifty, "Vol_Ratio": vol_ratio, "RSI": rsi_val, "DMA20": round(dma20, 2), "DMA50": round(dma50, 2),
+                "Vol_Ratio": vol_ratio, "RSI": rsi_val, "DMA20": round(dma20, 2), "DMA50": round(dma50, 2),
                 "Above_20DMA": bool(c_now >= dma20), "Above_50DMA": bool(c_now >= dma50), "Dist_20DMA": dist_20,
                 "Consec_Up": int(consec_up), "Consec_Down": int(consec_down),
                 "Bull_Candle": bull_candle, "Bear_Candle": bear_candle, "Action_Signal": action_sig, "Confidence": conf_score,
@@ -683,7 +640,6 @@ def load_full_market_data(nifty_1d: float = 0.0):
         tot_cnt = max(len(grp), 1)
         peer_up_pct = round((up_cnt / tot_cnt) * 100.0, 1)
         peer_dn_pct = round((dn_cnt / tot_cnt) * 100.0, 1)
-        sec_rs = round(s_1d - nifty_1d, 2)
 
         was_correcting = (s_1m <= 2.2) or (s_3m <= 3.5) or (s_1w <= 1.5)
         reversing_up = (s_1d >= -0.05) and ((s_1d > (s_1w / 5.0)) or (s_1w > (s_1m / 4.0)))
@@ -709,7 +665,7 @@ def load_full_market_data(nifty_1d: float = 0.0):
 
         sec_rows.append({
             "Sector": sec_name, "Count": len(grp), "Up_Count": up_cnt, "Down_Count": dn_cnt,
-            "Peer_Up_Pct": peer_up_pct, "Peer_Down_Pct": peer_dn_pct, "Sec_RS": sec_rs,
+            "Peer_Up_Pct": peer_up_pct, "Peer_Down_Pct": peer_dn_pct,
             "Top_Pick": top_pick_sym,
             "1D": round(s_1d, 2), "1W": round(s_1w, 2), "1M": round(s_1m, 2),
             "3M": round(s_3m, 2), "6M": round(s_6m, 2), "1Y": round(s_1y, 2),
@@ -733,29 +689,22 @@ def load_full_market_data(nifty_1d: float = 0.0):
     return stocks_df, sectors_df
 
 # ==============================================================================
-# 7.1 3-LAYER CONFIRMED 15M INTRADAY SCANNER (SECTOR + PEER SYNC + VWAP & 9-EMA)
+# 7.1 3-LAYER CONFIRMED 15M INTRADAY SCANNER (ON-DEMAND / LIVE HOURS ONLY)
 # ==============================================================================
-@st.cache_data(ttl=90, show_spinner=False)
+@st.cache_data(ttl=120, show_spinner=False)
 def run_3layer_intraday_scanner(stocks_df: pd.DataFrame):
-    """
-    STRICT 3-LAYER FILTER:
-    Layer 1: Sector is moving (Turnaround or Sec_1D >= +0.35% for Bull; Sec_1D <= -0.35% or Rollover for Bear).
-    Layer 2: Peer Stocks in Sector are moving together (Peer_Up_Pct >= 60% for Bull; Peer_Down_Pct >= 60% for Bear).
-    Layer 3: 15m Price beats Intraday VWAP + 9 EMA + Prev High/Low Breakout + Volume Spike.
-    """
     if stocks_df.empty:
         return pd.DataFrame(), pd.DataFrame()
 
-    # Pre-filter pool by Layer 1 & Layer 2 (Sector + Peer Sync >= 55% so we only download 15m data for moving sectors!)
     qualifying_pool = stocks_df[
         (stocks_df["Price"] > 120) & (
             ((stocks_df["Sec_Bull_Turn"] | (stocks_df["Sec_1D"] >= 0.30)) & (stocks_df["Sec_Peer_Up_Pct"] >= 55.0)) |
             ((stocks_df["Sec_Bear_Roll"] | (stocks_df["Sec_1D"] <= -0.30)) & (stocks_df["Sec_Peer_Down_Pct"] >= 55.0))
         )
-    ].sort_values("Vol_Ratio", ascending=False).head(38)
+    ].sort_values("Vol_Ratio", ascending=False).head(32)
 
     if qualifying_pool.empty:
-        qualifying_pool = stocks_df[stocks_df["Price"] > 120].sort_values("Vol_Ratio", ascending=False).head(30)
+        qualifying_pool = stocks_df[stocks_df["Price"] > 120].sort_values("Vol_Ratio", ascending=False).head(25)
 
     pool_tickers = qualifying_pool["Ticker"].tolist()
     daily_map = qualifying_pool.set_index("Ticker").to_dict("index")
@@ -788,10 +737,9 @@ def run_3layer_intraday_scanner(stocks_df: pd.DataFrame):
 
                 sym_clean = tk.replace(".NS", "")
                 peer_up_str = f"{d_info['Sec_Up_Count']}/{d_info['Sec_Tot_Count']} Up ({d_info['Sec_Peer_Up_Pct']:.0f}%)"
-                peer_dn_Cnt = d_info["Sec_Tot_Count"] - d_info["Sec_Up_Count"]
-                peer_dn_str = f"{peer_dn_Cnt}/{d_info['Sec_Tot_Count']} Down ({d_info['Sec_Peer_Down_Pct']:.0f}%)"
+                peer_dn_cnt = d_info["Sec_Tot_Count"] - d_info["Sec_Up_Count"]
+                peer_dn_str = f"{peer_dn_cnt}/{d_info['Sec_Tot_Count']} Down ({d_info['Sec_Peer_Down_Pct']:.0f}%)"
 
-                # LAYER 1 + LAYER 2 + LAYER 3 CHECK FOR LONG (BULLISH)
                 l1_bull = d_info["Sec_Bull_Turn"] or (d_info["Sec_1D"] >= 0.30)
                 l2_bull = d_info["Sec_Peer_Up_Pct"] >= 58.0
                 l3_bull = (c15 > vwap15) and (c15 > ema9_15) and (c15 >= d_info["Prev_High"] * 0.995 or d_info["1D"] >= 1.2) and (v15_ratio >= 1.25) and (55 <= rsi15 <= 78)
@@ -808,7 +756,6 @@ def run_3layer_intraday_scanner(stocks_df: pd.DataFrame):
                         "Entry": ent_v, "SL": sl_v, "Target": tgt_v,
                     })
 
-                # LAYER 1 + LAYER 2 + LAYER 3 CHECK FOR SHORT (BEARISH)
                 l1_bear = d_info["Sec_Bear_Roll"] or (d_info["Sec_1D"] <= -0.25)
                 l2_bear = d_info["Sec_Peer_Down_Pct"] >= 58.0
                 l3_bear = (c15 < vwap15) and (c15 < ema9_15) and (c15 <= d_info["Prev_Low"] * 1.005 or d_info["1D"] <= -1.2) and (v15_ratio >= 1.20) and (22 <= rsi15 <= 45)
@@ -831,7 +778,7 @@ def run_3layer_intraday_scanner(stocks_df: pd.DataFrame):
 
     return pd.DataFrame(bull_15m), pd.DataFrame(bear_15m)
 
-@st.cache_data(ttl=60, show_spinner=False)
+@st.cache_data(ttl=120, show_spinner=False)
 def fetch_any_custom_stock_live(query_sym: str, stocks_df: pd.DataFrame):
     clean_s = query_sym.strip().upper().replace(".NS", "")
     full_tk = f"{clean_s}.NS"
@@ -988,7 +935,6 @@ def generate_ai_stock_verdict(s_info: dict, n_d: dict, v_d: dict, adv_cnt: int, 
 
 def filter_next_day_intraday_stocks(stocks_df: pd.DataFrame):
     df = stocks_df.copy()
-    # Require Sector + Peer Sync support for Next-Day Watchlist too
     b_cand = df[(df["Consec_Up"] <= 2) & (df["1D"] >= -0.2) & (df["1D"] <= 3.8) & (df["Vol_Ratio"] >= 1.12) & (df["Sec_Peer_Up_Pct"] >= 50.0)].copy()
     if len(b_cand) < 6:
         b_cand = df[(df["Consec_Up"] <= 2) & (df["1D"] >= 0.0) & (df["Vol_Ratio"] >= 1.08)].copy()
@@ -1016,30 +962,40 @@ def style_colored_table(df: pd.DataFrame, pct_cols: list):
         return "color:#10b981;font-weight:700;" if val > 0 else ("color:#ef4444;font-weight:700;" if val < 0 else "color:#94a3b8;")
     return df.style.map(color_pct, subset=[c for c in pct_cols if c in df.columns]).format(precision=2)
 
-with st.spinner("⚡ Syncing Live Market Indices, 42 Sectors & 3-Layer Intraday Signals..."):
+# ==============================================================================
+# 8. FAST INITIAL LOAD (DECOUPLED CACHE + ON-DEMAND 15M SCANNER)
+# ==============================================================================
+with st.spinner("⚡ Loading Cached Market Matrix..."):
     pulse = load_pulse_indices()
-    stocks_df, sectors_df = load_full_market_data(pulse["NIFTY"]["1D"])
-    bull_15m_df, bear_15m_df = run_3layer_intraday_scanner(stocks_df)
+    base_stocks_df, base_sectors_df = load_full_market_data()
 
-if stocks_df.empty or sectors_df.empty:
+if base_stocks_df.empty or base_sectors_df.empty:
     st.error("⚠️ Market data temporarily unavailable. Please click ⚡ Sync.")
     st.stop()
 
-# ==============================================================================
-# 8. POPULATE 3-LAYER CONFIRMED NOTIFICATION VAULT (NO RANDOM ALERTS!)
-# ==============================================================================
+# Compute RS_vs_Nifty & Sec_RS in memory (0.001s) without breaking the 420-stock cache!
+n_d, b_d, v_d, u_d = pulse["NIFTY"], pulse["BANKNIFTY"], pulse["VIX"], pulse["USDINR"]
+stocks_df = base_stocks_df.copy()
+sectors_df = base_sectors_df.copy()
+stocks_df["RS_vs_Nifty"] = (stocks_df["1D"] - n_d["1D"]).round(2)
+sectors_df["Sec_RS"] = (sectors_df["1D"] - n_d["1D"]).round(2)
+
+# Step 3 Optimization: Only run 15m scanner automatically during Live Market Hours!
+if is_mkt_open:
+    bull_15m_df, bear_15m_df = run_3layer_intraday_scanner(stocks_df)
+else:
+    bull_15m_df, bear_15m_df = pd.DataFrame(), pd.DataFrame()
+
 turnaround_secs = sectors_df.sort_values(["Sec_Bull_Turn", "Turnaround_Score"], ascending=[False, False]).head(8)
 bull_next8, bear_next8 = filter_next_day_intraday_stocks(stocks_df)
 
-if not is_after_close:
+if not is_after_close and is_mkt_open:
     now_hm = ist_now.strftime("%I:%M %p")
-    # Log ONLY 3-Layer Confirmed 15m Bullish Breakouts (Sector + Peer Sync + VWAP/9EMA)
     for _, r15 in bull_15m_df.iterrows():
         push_3layer_alert(
             str(r15.get("Time", now_hm)), "🟢 3-Layer LONG", r15["Symbol"], r15["Ticker"], r15["Sector"],
             r15["Peer_Sync"], r15["Price"], r15["VWAP"], r15["EMA9"], r15["Entry"], r15["SL"], r15["Target"], r15["Reason"], True
         )
-    # Log ONLY 3-Layer Confirmed 15m Bearish Breakdowns (Sector + Peer Sync + VWAP/9EMA)
     for _, r15b in bear_15m_df.iterrows():
         push_3layer_alert(
             str(r15b.get("Time", now_hm)), "🔴 3-Layer SHORT", r15b["Symbol"], r15b["Ticker"], r15b["Sector"],
@@ -1048,60 +1004,47 @@ if not is_after_close:
 
 with alert_btn_Place:
     alert_count = len(alert_vault["items"])
-    if st.button(f"🔔 Alerts ({alert_count})", use_container_width=True, help="3-Layer Confirmed Intraday Alerts (Sector + Peer Sync + VWAP & 9 EMA)"):
+    if st.button(f"🔔 Alerts ({alert_count})", use_container_width=True, help="3-Layer Confirmed Intraday Alerts (9:15 AM – 3:30 PM)"):
         st.session_state.show_alert_drawer = not st.session_state.show_alert_drawer
 
 # ==============================================================================
-# 9. REAL-TIME AUTO-UPDATING PULSE BAR (WITH INTEGRATED MARKET BREADTH)
+# 9. REAL-TIME PULSE BAR (WITH INTEGRATED MARKET BREADTH)
 # ==============================================================================
-n_d, b_d, v_d, u_d = pulse["NIFTY"], pulse["BANKNIFTY"], pulse["VIX"], pulse["USDINR"]
 adv_today, dec_today = int((stocks_df["1D"] > 0).sum()), int((stocks_df["1D"] < 0).sum())
+prev_map = st.session_state.prev_pulse_prices
 
-def render_live_flashing_pulse_bar():
-    live_p = load_pulse_indices()
-    prev_map = st.session_state.prev_pulse_prices
-
-    def make_flash_chip(label: str, key: str):
-        d = live_p[key]
-        cur_val = d["price"]
-        last_val = prev_map.get(key, d.get("prev_tick", cur_val))
-        is_up_tick = (cur_val > last_val) if (cur_val != last_val) else (d["1D"] >= 0)
-        prev_map[key] = cur_val
-        cls = "tick-chip-up" if is_up_tick else "tick-chip-down"
-        arr = "▲" if is_up_tick else "▼"
-        return (
-            f'<div class="{cls}" title="Live Real-Time Tick — Flashes Green on Up-Tick & Red on Down-Tick">'
-            f'<span class="live-dot" style="background:{"#10b981" if is_up_tick else "#ef4444"};"></span>'
-            f'<span>{label}: {cur_val:,.2f} {arr} ({d["1D"]:+.2f}%)</span>'
-            f'</div>'
-        )
-
-    nd_now = live_p["NIFTY"]
-    if nd_now["1D"] >= 0.20 and adv_today >= dec_today:
-        c_txt, c_sty = "🟢 Bullish — Focus Long", "background:rgba(16,185,129,0.16);color:#10b981;border:1px solid #10b98155;"
-    elif nd_now["1D"] <= -0.20 and dec_today > adv_today:
-        c_txt, c_sty = "🔴 Bearish — Focus Short", "background:rgba(239,68,68,0.16);color:#ef4444;border:1px solid #ef444455;"
-    else:
-        c_txt, c_sty = "⚖️ Rotational — Track Sector Turnaround", "background:rgba(245,158,11,0.16);color:#f59e0b;border:1px solid #f59e0b55;"
-
-    st.markdown(
-        f'<div class="live-pulse-bar">'
-        f'{make_flash_chip("🇮🇳 Nifty 50", "NIFTY")}'
-        f'{make_flash_chip("🏛️ Bank Nifty", "BANKNIFTY")}'
-        f'{make_flash_chip("⚡ VIX", "VIX")}'
-        f'<div class="breadth-mini-pill">📊 Breadth: <span style="color:#10b981;">🟢 {adv_today} Up</span> | <span style="color:#ef4444;">🔴 {dec_today} Down</span></div>'
-        f'<div class="compass-pill" style="{c_sty}">🧭 {c_txt}</div>'
-        f'</div>',
-        unsafe_allow_html=True
+def make_flash_chip(label: str, key: str):
+    d = pulse[key]
+    cur_val = d["price"]
+    last_val = prev_map.get(key, d.get("prev_tick", cur_val))
+    is_up_tick = (cur_val > last_val) if (cur_val != last_val) else (d["1D"] >= 0)
+    prev_map[key] = cur_val
+    cls = "tick-chip-up" if is_up_tick else "tick-chip-down"
+    arr = "▲" if is_up_tick else "▼"
+    return (
+        f'<div class="{cls}">'
+        f'<span class="live-dot" style="background:{"#10b981" if is_up_tick else "#ef4444"};"></span>'
+        f'<span>{label}: {cur_val:,.2f} {arr} ({d["1D"]:+.2f}%)</span>'
+        f'</div>'
     )
 
-if hasattr(st, "fragment"):
-    @st.fragment(run_every="10s")
-    def auto_live_pulse_fragment():
-        render_live_flashing_pulse_bar()
-    auto_live_pulse_fragment()
+if n_d["1D"] >= 0.20 and adv_today >= dec_today:
+    c_txt, c_sty = "🟢 Bullish — Focus Long", "background:rgba(16,185,129,0.16);color:#10b981;border:1px solid #10b98155;"
+elif n_d["1D"] <= -0.20 and dec_today > adv_today:
+    c_txt, c_sty = "🔴 Bearish — Focus Short", "background:rgba(239,68,68,0.16);color:#ef4444;border:1px solid #ef444455;"
 else:
-    render_live_flashing_pulse_bar()
+    c_txt, c_sty = "⚖️ Rotational — Track Sector Turnaround", "background:rgba(245,158,11,0.16);color:#f59e0b;border:1px solid #f59e0b55;"
+
+st.markdown(
+    f'<div class="live-pulse-bar">'
+    f'{make_flash_chip("🇮🇳 Nifty 50", "NIFTY")}'
+    f'{make_flash_chip("🏛️ Bank Nifty", "BANKNIFTY")}'
+    f'{make_flash_chip("⚡ VIX", "VIX")}'
+    f'<div class="breadth-mini-pill">📊 Breadth: <span style="color:#10b981;">🟢 {adv_today} Up</span> | <span style="color:#ef4444;">🔴 {dec_today} Down</span></div>'
+    f'<div class="compass-pill" style="{c_sty}">🧭 {c_txt}</div>'
+    f'</div>',
+    unsafe_allow_html=True
+)
 
 # ==============================================================================
 # 9.1 3-LAYER QUALITY NOTIFICATION LOG DRAWER (9:15 AM - 3:30 PM)
@@ -1113,7 +1056,7 @@ if st.session_state.show_alert_drawer:
     dr_c1, dr_c2, dr_c3 = st.columns([6.5, 2.0, 1.5])
     with dr_c1:
         st.markdown(f"#### 🔔 Today's 3-Layer Confirmed Intraday Alerts ({today_str} • 9:15 AM – 3:30 PM IST)")
-        st.caption("শুধুমাত্র যে শেয়ারগুলো ৩টি স্তরই (১. সেক্টর মুভমেন্ট + ২. ৬০%+ পিয়ার স্টক সাপোর্ট + ৩. 15m VWAP ও 9-EMA ব্রেকআউট) পাশ করেছে সেগুলোই এখানে আসবে।")
+        st.caption("শুধুমাত্র যে শেয়ারগুলো ৩টি স্তরই (১. সেক্টর মুভমেন্ট + ২. ৫৮%+ পিয়ার স্টক সাপোর্ট + ৩. 15m VWAP ও 9-EMA ব্রেকআউট) পাশ করেছে সেগুলোই এখানে জমা হয়।")
     with dr_c2:
         if st.button("🗑️ Clear Log", use_container_width=True):
             alert_vault["items"] = []
@@ -1125,7 +1068,7 @@ if st.session_state.show_alert_drawer:
             st.rerun()
 
     if not alert_vault["items"]:
-        st.info("🎯 No random alerts! Currently waiting for a stock to pass all 3 layers (Sector Move + >=58% Peer Sync + 15m VWAP & 9-EMA Breakout).")
+        st.info("🎯 No random alerts! Currently waiting for live market hours (9:15 AM – 3:30 PM IST) or a stock to pass all 3 layers.")
     else:
         log_cards_html = []
         for item in alert_vault["items"]:
@@ -1134,7 +1077,7 @@ if st.session_state.show_alert_drawer:
             c_col = "#10b981" if item["is_bull"] else "#ef4444"
             act_lbl = "Buy" if item["is_bull"] else "Short"
             log_cards_html.append(
-                f'<a href="?focus_stock={qt}&auto={ap_flag}" target="_self" class="alert-log-item {b_cls}" title="Click to open {item["symbol"]} chart & setup">'
+                f'<a href="?focus_stock={qt}&auto={ap_flag}" target="_self" class="alert-log-item {b_cls}">'
                 f'<div style="display:flex;justify-content:space-between;align-items:center;">'
                 f'<span style="font-size:0.72rem;font-weight:800;color:#f59e0b;font-family:\'JetBrains Mono\',monospace;">🕒 {item["time"]} IST</span>'
                 f'<span style="font-size:0.68rem;font-weight:800;color:{c_col};">{item["category"]} • 🤝 {item["peer_sync"]}</span>'
@@ -1167,6 +1110,8 @@ with fc3:
     picked_sec = st.selectbox("🔍 3. Select Sector (42 Sectors):", sec_list, index=sec_list.index(st.session_state.selected_sector) if st.session_state.selected_sector in sec_list else 0)
     if picked_sec != st.session_state.selected_sector:
         st.session_state.selected_sector = picked_sec
+        if picked_sec != DEFAULT_SECTOR:
+            st.session_state.inspect_sector = picked_sec
         st.rerun()
 with fc4:
     stock_search_list = [DEFAULT_STOCK] + [f"{r['Symbol']} ({r['Sector']})" for _, r in stocks_df.sort_values("Symbol").iterrows()]
@@ -1290,14 +1235,14 @@ if st.session_state.show_nse_heatmap:
     st.markdown(f'<div class="nse-heatmap-container"><div class="nse-heatmap-grid">{"".join(heatmap_tiles)}</div></div>', unsafe_allow_html=True)
 
 # ==============================================================================
-# 11. PRIORITY 1 (HERO FOCUS): SECTOR TURNAROUND RADAR (WITH PEER SYNC & RS)
+# 11. PRIORITY 1 (HERO FOCUS): SECTOR TURNAROUND RADAR
 # ==============================================================================
 turn_cards = []
 for _, ts in turnaround_secs.iterrows():
     q_s = urllib.parse.quote(ts["Sector"])
     rs_c = "#10b981" if ts["Sec_RS"] >= 0 else "#ef4444"
     turn_cards.append(
-        f'<a href="?focus_sec={q_s}&auto={ap_flag}" target="_self" class="turn-sec-card" title="{ts["Sector"]} — Click to view all stocks">'
+        f'<a href="?focus_sec={q_s}&auto={ap_flag}" target="_self" class="turn-sec-card" title="Click to open {ts["Sector"]} stocks in Master Viewer">'
         f'<div style="display:flex;justify-content:space-between;align-items:center;">'
         f'<span class="t-sec-name">🔄 {ts["Sector"]}</span>'
         f'<span style="background:rgba(16,185,129,0.16);color:#10b981;padding:1px 6px;border-radius:5px;font-size:0.66rem;font-weight:800;">🤝 {ts["Up_Count"]}/{ts["Count"]} Up</span>'
@@ -1317,7 +1262,7 @@ st.markdown(
     f'<div class="turnaround-hero-box">'
     f'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">'
     f'<span style="font-size:0.88rem;font-weight:800;color:#10b981;">🧭 PRIORITY 1 — Sector Turnaround Radar (Bottom Reversal + Peer Group Sync + RS vs Nifty)</span>'
-    f'<span style="font-size:0.72rem;color:{TEXT_SUB};">Click any sector card to filter its stocks below</span>'
+    f'<span style="font-size:0.72rem;color:{TEXT_SUB};">Click any sector card to inspect its stocks below</span>'
     f'</div>'
     f'<div class="turnaround-grid">{"".join(turn_cards)}</div></div>',
     unsafe_allow_html=True
@@ -1558,7 +1503,7 @@ if st.session_state.selected_stock != DEFAULT_STOCK:
         st.markdown("---")
 
 # ==============================================================================
-# 14. 4 ULTRA-FAST CONSOLIDATED TABS
+# 14. STEP 2 OPTIMIZATION: 4 FEATHER-LIGHT TABS (SINGLE MASTER VIEWER + SVG GRID)
 # ==============================================================================
 live_tab_badge = f"🟢 {len(bull_15m_df) + len(bear_15m_df)} Active" if is_mkt_open else "⏸️ Standby"
 tab1, tab2, tab3, tab4 = st.tabs([
@@ -1570,12 +1515,6 @@ tab1, tab2, tab3, tab4 = st.tabs([
 
 with tab1:
     f_secs = sectors_df.copy()
-    if st.session_state.selected_sector != DEFAULT_SECTOR:
-        f_secs = f_secs[f_secs["Sector"] == st.session_state.selected_sector]
-        if st.button(f"🔄 Show All {len(SECTOR_STOCKS)} Sectors"):
-            st.session_state.selected_sector = DEFAULT_SECTOR
-            st.rerun()
-
     if "Bottom Turnaround" in sort_choice:
         f_secs = f_secs.sort_values(["Sec_Bull_Turn", "Turnaround_Score"], ascending=[False, False]).reset_index(drop=True)
     elif "Highest Peer Sync" in sort_choice:
@@ -1587,29 +1526,59 @@ with tab1:
     else:
         f_secs = f_secs.sort_values("Avg_Vol", ascending=False).reset_index(drop=True)
 
-    for row_start in range(0, len(f_secs), 2):
-        row_cols = st.columns(2)
-        for offset in range(2):
-            idx = row_start + offset
-            if idx >= len(f_secs):
-                break
-            s_row = f_secs.iloc[idx]
-            s_name, s_ret = s_row["Sector"], safe_num(s_row[tf_choice])
-            s_stocks = stocks_df[stocks_df["Sector"] == s_name].sort_values(tf_choice, ascending=False)
-            with row_cols[offset]:
-                if show_analog_meter:
-                    st.markdown(make_svg_speedometer_card(s_row, tf_choice), unsafe_allow_html=True)
-                short_exp_lbl = f"📂 {s_name} ({s_ret:+.1f}% • {s_row['Up_Count']}/{s_row['Count']} Up • {s_row['Zone']})"
-                with st.expander(short_exp_lbl, expanded=(len(f_secs) == 1)):
-                    st.dataframe(style_colored_table(s_stocks[["Symbol", "Price", "1D", "RS_vs_Nifty", "1W", "Vol_Ratio", "RSI", "Action_Signal", "Buy_Entry", "Buy_SL", "Buy_Target"]], ["1D", "RS_vs_Nifty", "1W"]), use_container_width=True, hide_index=True)
-                    st.markdown(make_stock_pills(s_stocks), unsafe_allow_html=True)
+    # SINGLE ON-DEMAND MASTER SECTOR VIEWER (Replaces 42 hidden tables for 10x speed!)
+    st.markdown('<div id="sector-viewer-anchor"></div>', unsafe_allow_html=True)
+    all_sec_names = f_secs["Sector"].tolist()
+    if st.session_state.inspect_sector not in all_sec_names:
+        st.session_state.inspect_sector = all_sec_names[0]
+
+    mv_c1, mv_c2 = st.columns([4.2, 5.8])
+    with mv_c1:
+        chosen_view_sec = st.selectbox(
+            "📂 Master Sector Stock Viewer (Select or Click Any Sector Card Below):",
+            all_sec_names,
+            index=all_sec_names.index(st.session_state.inspect_sector)
+        )
+        if chosen_view_sec != st.session_state.inspect_sector:
+            st.session_state.inspect_sector = chosen_view_sec
+            st.rerun()
+    with mv_c2:
+        sec_meta = sectors_df[sectors_df["Sector"] == st.session_state.inspect_sector].iloc[0]
+        st.markdown(
+            f'<div class="aligned-sec-hdr" style="margin-bottom:0;">'
+            f'🧭 <b>{st.session_state.inspect_sector}</b> — {sec_meta["Zone"]} • '
+            f'🤝 Sync: <b>{sec_meta["Up_Count"]}/{sec_meta["Count"]} Up ({sec_meta["Peer_Up_Pct"]:.0f}%)</b> • '
+            f'1D: <b>{sec_meta["1D"]:+.2f}%</b> • ⚡ RS: <b>{sec_meta["Sec_RS"]:+.2f}%</b>'
+            f'</div>',
+            unsafe_allow_html=True
+        )
+
+    active_sec_stocks = stocks_df[stocks_df["Sector"] == st.session_state.inspect_sector].sort_values(tf_choice, ascending=False)
+    st.dataframe(
+        style_colored_table(
+            active_sec_stocks[["Symbol", "Price", "1D", "RS_vs_Nifty", "1W", "1M", "Vol_Ratio", "RSI", "Action_Signal", "Buy_Entry", "Buy_SL", "Buy_Target"]],
+            ["1D", "RS_vs_Nifty", "1W", "1M"]
+        ),
+        use_container_width=True,
+        hide_index=True
+    )
+    st.markdown(make_stock_pills(active_sec_stocks), unsafe_allow_html=True)
+
+    if show_analog_meter:
+        st.markdown("---")
+        st.markdown(f'<div class="aligned-sec-hdr">🎛️ All {len(f_secs)} Sectors Fast Analog Speedometers (Click Any Card to Load Stocks Above)</div>', unsafe_allow_html=True)
+        gauge_cards_html = "".join([make_svg_speedometer_card(s_row, tf_choice) for _, s_row in f_secs.iterrows()])
+        st.markdown(f'<div class="sector-grid-wrap">{gauge_cards_html}</div>', unsafe_allow_html=True)
 
 with tab2:
     st.markdown('<div class="aligned-sec-hdr">⚡ PRIORITY 3 — 3-Layer Confirmed 15m Intraday Finder (Sector Move + Peer Sync >=58% + 15m VWAP & 9-EMA)</div>', unsafe_allow_html=True)
     force_test_scan = False
     if not is_mkt_open:
         st.warning(f"⏸️ **Live Intraday Stock Finder is on Standby (Market Closed — {ist_now.strftime('%A %I:%M %p IST')}).** Automatically activates Mon–Fri, 9:15 AM – 3:30 PM IST.")
-        force_test_scan = st.checkbox("🔓 Preview Last Session's 3-Layer Confirmed Results", value=False)
+        force_test_scan = st.checkbox("🔓 Run On-Demand 15m Scan for Last Session (Preview Mode)", value=False)
+        if force_test_scan:
+            with st.spinner("⚡ Running 3-Layer 15m Scanner..."):
+                bull_15m_df, bear_15m_df = run_3layer_intraday_scanner(stocks_df)
 
     if is_mkt_open or force_test_scan:
         c1, c2 = st.columns(2)
@@ -1703,7 +1672,7 @@ components.html(
             setTimeout(function() {{
                 const el = doc.getElementById(targetId);
                 if (el) el.scrollIntoView({{ behavior: "smooth", block: "start" }});
-            }}, 250);
+            }}, 200);
         }}
         const btn = doc.getElementById("alphapulse-top-btn");
         if (btn) {{
