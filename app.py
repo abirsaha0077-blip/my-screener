@@ -17,7 +17,7 @@ warnings.filterwarnings("ignore")
 # 1. PAGE CONFIGURATION
 # ==============================================================================
 st.set_page_config(
-    page_title="AlphaPulse Pro | Final Sector, Darvas & Swing Terminal",
+    page_title="AlphaPulse Pro | Final Trading Terminal",
     page_icon="🧭",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -150,6 +150,12 @@ if "nav_action" in qp:
     st.session_state.selected_stock = DEFAULT_STOCK
     st.session_state.scroll_target = None
     st.session_state.show_nse_heatmap = False
+    st.query_params.clear()
+    st.query_params["auto"] = get_auto_param()
+
+if "close_sec" in qp:
+    st.session_state.inspect_sector = EMPTY_VIEWER
+    st.session_state.selected_sector = DEFAULT_SECTOR
     st.query_params.clear()
     st.query_params["auto"] = get_auto_param()
 
@@ -452,14 +458,6 @@ def load_full_market_data():
 # ==============================================================================
 @st.cache_data(ttl=90, show_spinner=False)
 def run_darvas_blast_intraday_scanner(stocks_df: pd.DataFrame):
-    """
-    Combines Sector + Peer Sync (Layers 1 & 2) with User's Streak '5 min darvas blast' Logic (Layer 3):
-    - 5m Close > VWAP AND 5m Close <= VWAP * 1.022 (Safe Entry near VWAP)
-    - 5m Close > Prev Day Close
-    - 5m Close >= 5m High * 0.996 (Strong top closing, no upper wick rejection)
-    - 5m Close crosses above Period Max(15, Prev 5m High) (Darvas Box Breakout)
-    - 5m Volume Spike & 5m RSI(14) >= 58
-    """
     if stocks_df.empty:
         return pd.DataFrame(), pd.DataFrame()
 
@@ -492,7 +490,6 @@ def run_darvas_blast_intraday_scanner(stocks_df: pd.DataFrame):
                 v5_ratio = round(max(safe_num(v5 / vol_sma20, d_info["Vol_Ratio"]), d_info["Vol_Ratio"]), 2) if vol_sma20 > 0 else d_info["Vol_Ratio"]
                 rsi5 = round(calc_rsi(df5["Close"], 14), 1)
 
-                # Darvas 15-candle box high & low
                 darvas_high_15 = safe_num(df5["High"].iloc[-16:-1].max(), h5)
                 darvas_low_15 = safe_num(df5["Low"].iloc[-16:-1].min(), l5)
 
@@ -511,7 +508,6 @@ def run_darvas_blast_intraday_scanner(stocks_df: pd.DataFrame):
                 peer_dn_cnt = d_info["Sec_Tot_Count"] - d_info["Sec_Up_Count"]
                 peer_dn_str = f"{peer_dn_cnt}/{d_info['Sec_Tot_Count']} Down ({d_info['Sec_Peer_Down_Pct']:.0f}%)"
 
-                # STREAK 5-MIN DARVAS BLAST LONG CONDITIONS
                 cond_sector_bull = (d_info["Sec_Bull_Turn"] or d_info["Sec_1D"] >= 0.10) and (d_info["Sec_Peer_Up_Pct"] >= 50.0)
                 cond_vwap_band = (c5 > vwap5) and (c5 <= vwap5 * 1.025)
                 cond_darvas_box = (c5 >= darvas_high_15 * 0.996) and (c5 > d_info["Prev_Close"]) and (c5 >= h5 * 0.995)
@@ -528,7 +524,6 @@ def run_darvas_blast_intraday_scanner(stocks_df: pd.DataFrame):
                         "Reason": f"🔥 5m Darvas Blast: >15-Bar High + Within 2% VWAP + Vol {v5_ratio}x"
                     })
 
-                # REVERSE 5-MIN DARVAS BREAKDOWN SHORT CONDITIONS
                 cond_sector_bear = (d_info["Sec_Bear_Roll"] or d_info["Sec_1D"] <= -0.10) and (d_info["Sec_Peer_Down_Pct"] >= 50.0)
                 cond_vwap_bear = (c5 < vwap5) and (c5 >= vwap5 * 0.975)
                 cond_darvas_bear = (c5 <= darvas_low_15 * 1.004) and (c5 < d_info["Prev_Close"]) and (c5 <= l5 * 1.005)
@@ -627,7 +622,6 @@ def fetch_live_stock_news_and_sentiment(sym_clean: str):
     return headlines, "⚖️ Normal Technical Flow (Last 7 Days)", 16
 
 def generate_ai_stock_verdict(s_info: dict, n_d: dict, v_d: dict, adv_cnt: int, dec_cnt: int):
-    """100% Synced with Table Action_Signal so a 'Turnaround Buy' or 'Swing Buy' NEVER shows Bearish!"""
     sym = s_info["Symbol"]
     act_sig = str(s_info.get("Action_Signal", "⚖️ Watch"))
     headlines, news_label, news_pts = fetch_live_stock_news_and_sentiment(sym)
@@ -680,7 +674,6 @@ def generate_ai_stock_verdict(s_info: dict, n_d: dict, v_d: dict, adv_cnt: int, 
         mkt_notes.append(f"⚠️ Sector ({s_info['Sector']}) is soft today ({peer_pct:.0f}% Peers Up).")
 
     total_ai_score = int(np.clip(tech_pts + mkt_pts + news_pts, 25, 97))
-    # Guarantee alignment with Table Signal
     if ("Turnaround Buy" in act_sig or "Swing Buy" in act_sig) and total_ai_score < 72:
         total_ai_score = 76
     elif "Top Short" in act_sig and total_ai_score > 48:
@@ -776,7 +769,7 @@ if not is_after_close and is_mkt_open:
             r5b["Peer_Sync"], r5b["Price"], r5b["VWAP"], r5b["Entry"], r5b["SL"], r5b["Target"], r5b["Reason"], False
         )
 
-# Build Instant WhatsApp Alert Message for the Header WhatsApp Icon Button
+# Build Instant WhatsApp Alert Message for Phone Notification
 wa_header_lines = [
     f"🧭 *AlphaPulse Pro Live Alert ({ist_now.strftime('%d %b %I:%M %p IST')})*",
     f"🇮🇳 Nifty: {n_d['price']:,.2f} ({n_d['1D']:+.2f}%) | BankNifty: {b_d['price']:,.2f} ({b_d['1D']:+.2f}%)"
@@ -796,7 +789,7 @@ else:
 header_wa_url = f"https://api.whatsapp.com/send?text={urllib.parse.quote(chr(10).join(wa_header_lines))}"
 
 # ==============================================================================
-# 7. TOP HEADER BAR (WITH WHATSAPP ALERT ICON IN THE EXACT RED BOX SPOT!)
+# 7. TOP HEADER BAR (PURE WHATSAPP ICON IN RED BOX 1 SPOT)
 # ==============================================================================
 st.markdown('<div id="top-anchor"></div>', unsafe_allow_html=True)
 
@@ -806,7 +799,7 @@ mkt_status_html = (
     f'<span style="color:#f59e0b;font-weight:700;">🕒 MARKET CLOSED ({ist_now.strftime("%a %I:%M %p IST")})</span>'
 )
 
-top_c1, top_c_wa, top_c2, top_c3, top_c4, top_c5, top_c6 = st.columns([3.85, 0.75, 1.45, 1.15, 1.2, 0.9, 0.7])
+top_c1, top_c_wa, top_c2, top_c3, top_c4, top_c5, top_c6 = st.columns([4.05, 0.55, 1.45, 1.15, 1.2, 0.9, 0.7])
 with top_c1:
     st.markdown(
         f'<a href="?nav_action=home&auto={get_auto_param()}" target="_self" class="brand-logo-link" title="Click to Reset All Filters & Return to Home">'
@@ -816,10 +809,11 @@ with top_c1:
         unsafe_allow_html=True
     )
 with top_c_wa:
+    # ONLY THE OFFICIAL WHATSAPP ICON IN THE EXACT RED BOX POSITION!
     st.markdown(
-        f'<a href="{header_wa_url}" target="_blank" class="top-wa-icon-btn" title="Click to Receive/Send Live Market & Darvas Alerts on WhatsApp">'
-        f'<svg viewBox="0 0 24 24" width="20" height="20" fill="#ffffff"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86s.274.072.376-.043c.101-.116.433-.506.549-.68.116-.173.231-.145.39-.087s1.011.477 1.184.564.289.13.332.202c.045.072.045.419-.1.824zm-3.423-14.416c-6.627 0-12 5.373-12 12 0 2.625.846 5.059 2.284 7.033l-2.284 4.967 5.141-2.214c1.922 1.396 4.29 2.214 6.859 2.214 6.627 0 12-5.373 12-12s-5.373-12-12-12z"/></svg>'
-        f'<span>WA</span></a>',
+        f'<a href="{header_wa_url}" target="_blank" class="only-wa-icon-btn" title="Get Live Market & Darvas Alerts on WhatsApp">'
+        f'<svg viewBox="0 0 24 24" width="22" height="22" fill="#ffffff"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86s.274.072.376-.043c.101-.116.433-.506.549-.68.116-.173.231-.145.39-.087s1.011.477 1.184.564.289.13.332.202c.045.072.045.419-.1.824zm-3.423-14.416c-6.627 0-12 5.373-12 12 0 2.625.846 5.059 2.284 7.033l-2.284 4.967 5.141-2.214c1.922 1.396 4.29 2.214 6.859 2.214 6.627 0 12-5.373 12-12s-5.373-12-12-12z"/></svg>'
+        f'</a>',
         unsafe_allow_html=True
     )
 with top_c2:
@@ -886,27 +880,46 @@ a.brand-logo-link {{ text-decoration:none !important; display:inline-flex; align
 }}
 .brand-subtitle {{ font-size:0.72rem; font-weight:600; color:{TEXT_SUB} !important; }}
 
-/* TOP HEADER WHATSAPP ICON BUTTON (IN RED BOX SPOT) */
-a.top-wa-icon-btn {{
+/* PURE WHATSAPP ICON BUTTON IN HEADER (RED BOX 1) */
+a.only-wa-icon-btn {{
     text-decoration:none !important;
-    background:linear-gradient(135deg, #16a34a 0%, #22c55e 100%) !important;
+    background:linear-gradient(135deg, #25D366 0%, #128C7E 100%) !important;
     color:#ffffff !important;
     border:1.5px solid #4ade80 !important;
     border-radius:10px !important;
+    width:42px !important;
     height:38px !important;
-    padding:0 10px !important;
+    margin:0 auto !important;
     display:flex !important;
     align-items:center !important;
     justify-content:center !important;
-    gap:5px !important;
-    font-weight:800 !important;
-    font-size:0.78rem !important;
-    box-shadow:0 4px 12px rgba(34, 197, 94, 0.38) !important;
+    box-shadow:0 4px 14px rgba(37, 211, 102, 0.45) !important;
     transition:all 0.18s ease !important;
 }}
-a.top-wa-icon-btn:hover {{
-    transform:translateY(-2px) scale(1.03) !important;
-    box-shadow:0 6px 16px rgba(34, 197, 94, 0.55) !important;
+a.only-wa-icon-btn:hover {{
+    transform:translateY(-2px) scale(1.06) !important;
+    box-shadow:0 6px 18px rgba(37, 211, 102, 0.65) !important;
+}}
+
+/* SECTOR TABLE TOP-RIGHT CORNER CROSS (✖) BUTTON (RED BOX 2) */
+a.table-corner-close-btn {{
+    text-decoration:none !important;
+    background:linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+    color:#ffffff !important;
+    border:1.5px solid #fca5a5 !important;
+    border-radius:8px !important;
+    padding:4px 12px !important;
+    font-size:0.80rem !important;
+    font-weight:800 !important;
+    display:inline-flex !important;
+    align-items:center !important;
+    gap:4px !important;
+    box-shadow:0 3px 10px rgba(239, 68, 68, 0.45) !important;
+    transition:all 0.15s ease !important;
+}}
+a.table-corner-close-btn:hover {{
+    background:linear-gradient(135deg, #dc2626 0%, #b91c1c 100%) !important;
+    transform:scale(1.05) !important;
 }}
 
 [data-testid="stWidgetLabel"] p, [data-testid="stWidgetLabel"] label, .stSelectbox label, .stNumberInput label, .stTextInput label, .stRadio label, [data-testid="stRadio"] label span, [data-testid="stToggle"] label p, [data-testid="stCheckbox"] label p {{
@@ -976,7 +989,7 @@ a.svg-gauge-card:hover {{ border-color:#f59e0b; }}
 
 .master-viewer-bar {{
     font-size:0.84rem; font-weight:800; color:{TEXT_MAIN}; background:{BG_CARD}; border:1.5px solid {BORDER_C}; border-left:4px solid #10b981;
-    height:42px; padding:0 14px; border-radius:10px; display:flex; align-items:center; justify-content:space-between;
+    height:42px; padding:0 12px; border-radius:10px; display:flex; align-items:center; justify-content:space-between;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }}
 
@@ -993,7 +1006,7 @@ button[data-baseweb="tab"] p {{ color:{TEXT_MAIN} !important; font-weight:700 !i
 button[data-baseweb="tab"][aria-selected="true"] {{ background:linear-gradient(135deg,rgba(245,158,11,0.22),rgba(16,185,129,0.18)) !important; border-color:#f59e0b !important; border-bottom:3px solid #f59e0b !important; }}
 button[data-baseweb="tab"][aria-selected="true"] p {{ color:#f59e0b !important; font-weight:800 !important; }}
 [data-testid="stExpander"] details {{ background:{BG_CARD} !important; border:1px solid {BORDER_C} !important; border-radius:10px !important; box-shadow:{CARD_SHADOW}; margin-top:2px !important; }}
-[data-testid="stExpander"] summary {{ padding:8px 14px !important; display:flex !important; align-items:center !important; gap:8px !important; }}
+[data-testid="stExpander"] summary {{ background:{BG_CARD} !important; padding:8px 14px !important; display:flex !important; align-items:center !important; gap:8px !important; }}
 [data-testid="stExpander"] summary p {{ color:{TEXT_MAIN} !important; font-weight:700 !important; font-size:0.81rem !important; margin:0 !important; }}
 
 .aligned-sec-hdr {{ font-size:0.86rem; font-weight:800; color:{TEXT_MAIN}; background:{BG_CARD}; border:1px solid {BORDER_C}; border-left:4px solid #f59e0b; padding:7px 12px; border-radius:8px; margin-bottom:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
@@ -1473,7 +1486,6 @@ if st.session_state.selected_stock != DEFAULT_STOCK:
                 fig_st.add_hline(y=s_info["Buy_Target"], line_dash="dash", line_color="#10b981", annotation_text=f"Target: ₹{s_info['Buy_Target']}", row=1, col=1)
 
             fig_st.add_trace(go.Bar(x=sub_df.index, y=sub_df["Volume"], name="Volume", marker_color=["#10b981" if c >= o else "#ef4444" for c, o in zip(sub_df["Close"], sub_df["Open"])]), row=2, col=1)
-            # Horizontal Top Legend so it NEVER overlaps right-side price labels!
             fig_st.update_layout(
                 height=360,
                 template="plotly_dark" if "Clean Light" not in theme_mode else "plotly_white",
@@ -1620,7 +1632,7 @@ if st.session_state.selected_stock != DEFAULT_STOCK:
         st.markdown("---")
 
 # ==============================================================================
-# 14. 4 CONSOLIDATED TABS (WITH CLOSE '✖' BUTTON ON SECTOR VIEWER & DARVAS TAB 2)
+# 14. 4 CONSOLIDATED TABS (WITH TOP-RIGHT CROSS '✖' BUTTON IN RED BOX 2 SPOT)
 # ==============================================================================
 live_tab_badge = f"🟢 {len(bull_5m_df) + len(bear_5m_df)} Active" if is_mkt_open else "⏸️ Standby"
 tab1, tab2, tab3, tab4 = st.tabs([
@@ -1649,13 +1661,7 @@ with tab1:
     if st.session_state.inspect_sector not in all_sec_options:
         st.session_state.inspect_sector = EMPTY_VIEWER
 
-    # WHEN A SECTOR IS OPEN, SHOW THE CROSS (✖) BUTTON IN THE EXACT RED BOX SPOT!
-    if st.session_state.inspect_sector != EMPTY_VIEWER:
-        mv_c1, mv_c2, mv_c3 = st.columns([3.6, 5.2, 1.2])
-    else:
-        mv_c1, mv_c2 = st.columns([4.0, 6.0])
-        mv_c3 = None
-
+    mv_c1, mv_c2 = st.columns([3.8, 6.2])
     with mv_c1:
         chosen_view_sec = st.selectbox(
             "Master Sector Viewer",
@@ -1672,11 +1678,13 @@ with tab1:
             sec_meta = sectors_df[sectors_df["Sector"] == st.session_state.inspect_sector].iloc[0]
             s_tf_v = sec_meta[tf_choice]
             s_col = "#10b981" if s_tf_v >= 0 else "#ef4444"
+            # INCLUDES DIRECT RED CROSS (✖) BUTTON ON THE RIGHT END OF THE SECTOR VIEWER BAR (RED BOX 2 SPOT)!
             st.markdown(
                 f'<div class="master-viewer-bar">'
                 f'<span>🧭 <b>{st.session_state.inspect_sector}</b> ({sec_meta["Zone"]})</span>'
                 f'<span>🤝 Sync: <b>{sec_meta["Up_Count"]}/{sec_meta["Count"]} Up</b></span>'
                 f'<span style="color:{s_col};">{tf_choice}: <b>{s_tf_v:+.2f}%</b> | ⚡ RS: <b>{sec_meta["Sec_RS"]:+.2f}%</b></span>'
+                f'<a href="?close_sec=1&auto={ap_flag}" target="_self" class="table-corner-close-btn" title="Close Sector Stock Window">✖</a>'
                 f'</div>',
                 unsafe_allow_html=True
             )
@@ -1688,23 +1696,15 @@ with tab1:
                 unsafe_allow_html=True
             )
 
-    if mv_c3 is not None:
-        with mv_c3:
-            if st.button("✖ Close", key="close_sec_viewer_btn", type="primary", use_container_width=True, help="Close Sector Stock Table"):
-                st.session_state.inspect_sector = EMPTY_VIEWER
-                st.session_state.selected_sector = DEFAULT_SECTOR
-                st.rerun()
-
     if st.session_state.inspect_sector != EMPTY_VIEWER:
         active_sec_stocks = stocks_df[stocks_df["Sector"] == st.session_state.inspect_sector].sort_values(tf_choice, ascending=False)
-        # Mobile-Friendly Column Order: Entry, SL & Target right next to Signal!
         render_safe_table(
-            active_sec_stocks[["Symbol", "Price", "1D", "Action_Signal", "Buy_Entry", "Buy_SL", "Buy_Target", "Vol_Ratio", "RSI", "RS_vs_Nifty", "1W", "1M"]],
+            active_sec_stocks[["Symbol", "Price", "1D", "RS_vs_Nifty", "1W", "1M", "Vol_Ratio", "RSI", "Action_Signal", "Buy_Entry", "Buy_SL", "Buy_Target"]],
             ["1D", "RS_vs_Nifty", "1W", "1M"]
         )
         st.markdown(make_stock_pills(active_sec_stocks, tf_choice), unsafe_allow_html=True)
 
-    # DIRECT DARK HEADER + 42 SPEEDOMETERS (NO WHITE BAR OR BROKEN EXPANDER ICON!)
+    # CLEAN DARK HEADER + 42 SPEEDOMETERS (NO WHITE BAR OR BROKEN ICON!)
     st.markdown(
         f'<div class="aligned-sec-hdr" style="margin-top:10px;">'
         f'🎛️ All {len(f_secs)} Sectors Speedometers & Sequence Cards (Sorted: Green Top ➔ Down in {tf_choice} — Click Any Card to Open Stocks)'
